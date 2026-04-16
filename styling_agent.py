@@ -7,12 +7,22 @@ with full reasoning explanation.
 
 import sys
 import os
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from tools.calendar_tool import get_upcoming_events
-from tools.weather_tool import get_weather
-from tools.wardrobe_tool import filter_items_by_occasion, get_owner_profile, check_gaps
-from tools.color_tool import score_outfit_colors
+_here = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _here)                                    # flat: tools are siblings
+sys.path.insert(0, os.path.dirname(_here))                   # structured: parent has tools/
+sys.path.insert(0, os.path.join(os.path.dirname(_here), "tools"))  # structured tools subdir
+
+try:
+    from tools.calendar_tool import get_upcoming_events
+    from tools.weather_tool import get_weather
+    from tools.wardrobe_tool import filter_items_by_occasion, get_owner_profile, check_gaps
+    from tools.color_tool import score_outfit_colors
+except ModuleNotFoundError:
+    from calendar_tool import get_upcoming_events
+    from weather_tool import get_weather
+    from wardrobe_tool import filter_items_by_occasion, get_owner_profile, check_gaps
+    from color_tool import score_outfit_colors
 
 
 # ─────────────────────────────────────────────

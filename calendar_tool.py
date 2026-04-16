@@ -9,7 +9,21 @@ import os
 from datetime import datetime
 
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "calendar_events.json")
+def _find_data_file(filename):
+    """Locate a data file in either structured (data/) or flat layout."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "data", filename),   # structured: tools/../data/
+        os.path.join(here, "..", filename),            # flat: sibling of everything
+        os.path.join(here, filename),                  # flat: same dir as tool
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return candidates[0]  # will raise clear FileNotFoundError
+
+
+DATA_PATH = _find_data_file("calendar_events.json")
 
 
 def get_upcoming_events(days_ahead: int = 7) -> dict:
@@ -35,7 +49,7 @@ def get_upcoming_events(days_ahead: int = 7) -> dict:
                 event["days_from_now"] = delta
                 upcoming.append(event)
         except ValueError:
-            continue  # Skip events with bad date formats
+            continue
 
     upcoming.sort(key=lambda e: e["date"])
 

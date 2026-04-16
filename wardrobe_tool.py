@@ -1,18 +1,29 @@
 """
 Tool 3: Wardrobe Reader
 Reads wardrobe inventory and filters items by formality, season, and occasion tags.
-In a real system this could connect to a closet app, Airtable, or a database.
 """
 
 import json
 import os
 
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "wardrobe.json")
+def _find_data_file(filename):
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "data", filename),
+        os.path.join(here, "..", filename),
+        os.path.join(here, filename),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return candidates[0]
+
+
+DATA_PATH = _find_data_file("wardrobe.json")
 
 
 def get_wardrobe() -> dict:
-    """Loads the full wardrobe from JSON."""
     try:
         with open(DATA_PATH, "r") as f:
             return {"success": True, "wardrobe": json.load(f), "error": None}
@@ -23,7 +34,6 @@ def get_wardrobe() -> dict:
 
 
 def get_owner_profile() -> dict:
-    """Returns just the owner's style profile."""
     result = get_wardrobe()
     if not result["success"]:
         return result
@@ -31,11 +41,6 @@ def get_owner_profile() -> dict:
 
 
 def filter_items_by_occasion(occasion_tag: str, season: str = "all") -> dict:
-    """
-    Filters all wardrobe items (clothing + shoes + accessories) by occasion tag.
-    Also filters by season if provided (falls back gracefully if not matched).
-    Returns filtered lists for each category.
-    """
     result = get_wardrobe()
     if not result["success"]:
         return result
@@ -54,7 +59,6 @@ def filter_items_by_occasion(occasion_tag: str, season: str = "all") -> dict:
     shoes = [i for i in wardrobe.get("shoes", []) if matches(i)]
     accessories = [i for i in wardrobe.get("accessories", []) if matches(i)]
 
-    # Fallback: if no clothing found, loosen season filter
     if not clothing:
         clothing = [i for i in wardrobe.get("clothing", []) if tag in [t.lower() for t in i.get("tags", [])]]
 
@@ -69,10 +73,6 @@ def filter_items_by_occasion(occasion_tag: str, season: str = "all") -> dict:
 
 
 def check_gaps(outfit_pieces: list, required_types: list) -> list:
-    """
-    Checks whether a selected outfit covers all required garment types.
-    Returns a list of missing types (empty list = complete outfit).
-    """
     covered = {piece.get("type", "").lower() for piece in outfit_pieces}
     missing = [t for t in required_types if t.lower() not in covered]
     return missing

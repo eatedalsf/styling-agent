@@ -7,9 +7,19 @@ import sys
 import os
 import streamlit as st
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from agent.styling_agent import run_agent
-from tools.calendar_tool import get_upcoming_events
+# Support both structured layout (agent/styling_agent.py) and
+# flat layout (styling_agent.py directly in the same folder)
+_here = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _here)
+sys.path.insert(0, os.path.join(_here, "agent"))
+sys.path.insert(0, os.path.join(_here, "tools"))
+
+try:
+    from agent.styling_agent import run_agent
+    from tools.calendar_tool import get_upcoming_events
+except ModuleNotFoundError:
+    from styling_agent import run_agent
+    from calendar_tool import get_upcoming_events
 
 # ─────────────────────────────────────────────
 # PAGE CONFIG

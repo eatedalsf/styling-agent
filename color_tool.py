@@ -1,18 +1,29 @@
 """
 Tool 4: Color Coordination Checker
 Checks whether clothing colors work for a given skin tone.
-Reads rules from color_rules.json.
 """
 
 import json
 import os
 
 
-DATA_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "color_rules.json")
+def _find_data_file(filename):
+    here = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(here, "..", "data", filename),
+        os.path.join(here, "..", filename),
+        os.path.join(here, filename),
+    ]
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return candidates[0]
+
+
+DATA_PATH = _find_data_file("color_rules.json")
 
 
 def get_color_rules(skin_tone: str) -> dict:
-    """Loads color rules for a given skin tone."""
     try:
         with open(DATA_PATH, "r") as f:
             all_rules = json.load(f)
@@ -21,7 +32,6 @@ def get_color_rules(skin_tone: str) -> dict:
 
     rules = all_rules.get(skin_tone.lower())
     if not rules:
-        # Fallback: return generic safe advice
         return {
             "success": True,
             "rules": {
@@ -33,15 +43,10 @@ def get_color_rules(skin_tone: str) -> dict:
             },
             "error": None
         }
-
     return {"success": True, "rules": rules, "error": None}
 
 
 def score_outfit_colors(items: list, skin_tone: str) -> dict:
-    """
-    Scores a list of outfit items against skin tone color rules.
-    Returns a score (0-100), a list of color notes, and flagged items.
-    """
     rules_result = get_color_rules(skin_tone)
     if not rules_result["success"]:
         return {"score": 50, "notes": ["Color check unavailable."], "flags": []}
@@ -51,7 +56,7 @@ def score_outfit_colors(items: list, skin_tone: str) -> dict:
     good = [c.lower() for c in rules.get("good_colors", [])]
     avoid = [c.lower() for c in rules.get("avoid_colors", [])]
 
-    score = 60  # baseline
+    score = 60
     notes = []
     flags = []
 
