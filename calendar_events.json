@@ -1,0 +1,47 @@
+[
+  {
+    "id": "EVT001",
+    "title": "Team Strategy Meeting",
+    "date": "2026-04-16",
+    "time": "10:00 AM",
+    "type": "work",
+    "formality": "business",
+    "notes": "Presenting quarterly results to senior leadership"
+  },
+  {
+    "id": "EVT002",
+    "title": "Dinner with Clients",
+    "date": "2026-04-17",
+    "time": "7:00 PM",
+    "type": "dinner",
+    "formality": "smart_casual",
+    "notes": "Restaurant dinner, semi-formal setting"
+  },
+  {
+    "id": "EVT003",
+    "title": "Morning Gym Session",
+    "date": "2026-04-18",
+    "time": "7:00 AM",
+    "type": "gym",
+    "formality": "athletic",
+    "notes": ""
+  },
+  {
+    "id": "EVT004",
+    "title": "Industry Gala",
+    "date": "2026-04-25",
+    "time": "6:30 PM",
+    "type": "formal_event",
+    "formality": "formal",
+    "notes": "Black-tie optional evening event"
+  },
+  {
+    "id": "EVT005",
+    "title": "Weekend Brunch",
+    "date": "2026-04-19",
+    "time": "11:00 AM",
+    "type": "casual",
+    "formality": "casual",
+    "notes": "Relaxed brunch with friends"
+  }
+]

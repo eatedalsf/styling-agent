@@ -1,0 +1,42 @@
+{
+  "owner": {
+    "name": "Eatedal",
+    "body_shape": "hourglass",
+    "skin_tone": "warm olive",
+    "style_preferences": ["classic", "elegant", "minimal"],
+    "preferred_fit": "tailored"
+  },
+  "clothing": [
+    {"id": "C001", "type": "top", "name": "White Button-Down Blouse", "color": "white", "formality": "business", "season": ["spring", "summer", "fall"], "tags": ["work", "dinner", "versatile"]},
+    {"id": "C002", "type": "top", "name": "Black Fitted Turtleneck", "color": "black", "formality": "smart_casual", "season": ["fall", "winter"], "tags": ["work", "casual", "evening"]},
+    {"id": "C003", "type": "top", "name": "Terracotta Silk Blouse", "color": "terracotta", "formality": "smart_casual", "season": ["spring", "fall"], "tags": ["dinner", "casual", "evening"]},
+    {"id": "C004", "type": "top", "name": "Navy Striped Breton Top", "color": "navy", "formality": "casual", "season": ["spring", "summer"], "tags": ["casual", "weekend"]},
+    {"id": "C005", "type": "top", "name": "Blush Pink Wrap Blouse", "color": "blush", "formality": "smart_casual", "season": ["spring", "summer"], "tags": ["dinner", "work", "date"]},
+    {"id": "C006", "type": "bottom", "name": "Black Tailored Trousers", "color": "black", "formality": "business", "season": ["all"], "tags": ["work", "dinner", "versatile"]},
+    {"id": "C007", "type": "bottom", "name": "Camel Wide-Leg Trousers", "color": "camel", "formality": "smart_casual", "season": ["fall", "winter", "spring"], "tags": ["work", "casual", "weekend"]},
+    {"id": "C008", "type": "bottom", "name": "Dark Wash Straight Jeans", "color": "dark indigo", "formality": "casual", "season": ["all"], "tags": ["casual", "weekend", "dinner"]},
+    {"id": "C009", "type": "bottom", "name": "Olive Midi Skirt", "color": "olive", "formality": "smart_casual", "season": ["spring", "summer", "fall"], "tags": ["casual", "work", "weekend"]},
+    {"id": "C010", "type": "dress", "name": "Black Wrap Dress", "color": "black", "formality": "smart_casual", "season": ["spring", "summer", "fall"], "tags": ["dinner", "date", "evening", "work"]},
+    {"id": "C011", "type": "dress", "name": "Burgundy Midi Dress", "color": "burgundy", "formality": "formal", "season": ["fall", "winter"], "tags": ["formal", "dinner", "evening", "gala"]},
+    {"id": "C012", "type": "outerwear", "name": "Camel Wool Coat", "color": "camel", "formality": "smart_casual", "season": ["fall", "winter"], "tags": ["work", "casual", "evening"]},
+    {"id": "C013", "type": "outerwear", "name": "Black Trench Coat", "color": "black", "formality": "business", "season": ["spring", "fall"], "tags": ["work", "casual", "travel"]},
+    {"id": "C014", "type": "activewear", "name": "Black Yoga Pants", "color": "black", "formality": "athletic", "season": ["all"], "tags": ["gym", "yoga", "workout"]},
+    {"id": "C015", "type": "activewear", "name": "Grey Performance Tank", "color": "grey", "formality": "athletic", "season": ["all"], "tags": ["gym", "yoga", "workout"]},
+    {"id": "C016", "type": "activewear", "name": "Pale Blue Running Jacket", "color": "pale blue", "formality": "athletic", "season": ["spring", "fall", "winter"], "tags": ["gym", "running", "outdoor"]}
+  ],
+  "shoes": [
+    {"id": "S001", "name": "Black Pointed-Toe Heels", "color": "black", "formality": "formal", "tags": ["work", "dinner", "formal", "evening"]},
+    {"id": "S002", "name": "Nude Block-Heel Pumps", "color": "nude", "formality": "business", "tags": ["work", "dinner", "smart_casual"]},
+    {"id": "S003", "name": "White Leather Sneakers", "color": "white", "formality": "casual", "tags": ["casual", "weekend", "gym"]},
+    {"id": "S004", "name": "Tan Leather Ankle Boots", "color": "tan", "formality": "smart_casual", "tags": ["work", "casual", "weekend"]},
+    {"id": "S005", "name": "Black Running Shoes", "color": "black", "formality": "athletic", "tags": ["gym", "running", "workout"]}
+  ],
+  "accessories": [
+    {"id": "A001", "name": "Gold Hoop Earrings", "color": "gold", "formality": "versatile", "tags": ["work", "dinner", "casual", "evening"]},
+    {"id": "A002", "name": "Pearl Stud Earrings", "color": "white/gold", "formality": "formal", "tags": ["work", "formal", "dinner"]},
+    {"id": "A003", "name": "Delicate Gold Chain Necklace", "color": "gold", "formality": "versatile", "tags": ["work", "dinner", "casual"]},
+    {"id": "A004", "name": "Black Structured Handbag", "color": "black", "formality": "business", "tags": ["work", "dinner", "evening"]},
+    {"id": "A005", "name": "Tan Leather Tote", "color": "tan", "formality": "casual", "tags": ["work", "casual", "weekend"]},
+    {"id": "A006", "name": "Silk Scarf (Burnt Orange & Cream)", "color": "burnt orange", "formality": "smart_casual", "tags": ["casual", "work", "weekend"]}
+  ]
+}

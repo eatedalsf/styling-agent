@@ -1,0 +1,23 @@
+{
+  "warm olive": {
+    "best_colors": ["terracotta", "burnt orange", "camel", "olive", "burgundy", "warm white", "gold", "deep teal", "mustard", "chocolate brown"],
+    "good_colors": ["black", "navy", "blush", "cream", "sage green", "rust"],
+    "avoid_colors": ["cool grey", "icy pink", "lavender", "silver"],
+    "metal_preference": "gold",
+    "notes": "Warm earth tones are most flattering. Gold jewelry enhances warm undertones."
+  },
+  "cool fair": {
+    "best_colors": ["navy", "icy blue", "lavender", "cool grey", "silver", "emerald", "royal blue", "raspberry"],
+    "good_colors": ["black", "white", "pink", "plum", "burgundy"],
+    "avoid_colors": ["orange", "warm brown", "gold-heavy palettes"],
+    "metal_preference": "silver",
+    "notes": "Cool jewel tones and icy neutrals are most flattering."
+  },
+  "deep warm": {
+    "best_colors": ["cobalt", "emerald", "bright red", "gold", "orange", "white", "camel", "purple"],
+    "good_colors": ["black", "navy", "burgundy", "teal"],
+    "avoid_colors": ["muted beige", "dusty pink", "light grey"],
+    "metal_preference": "gold",
+    "notes": "Bold, saturated colors and bright whites create stunning contrast."
+  }
+}
