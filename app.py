@@ -493,22 +493,26 @@ if result:
     col_outfit, col_score = st.columns([3, 2], gap="large")
 
     with col_outfit:
-        items_html = ""
+        item_rows = []
         for item in outfit:
             e = item_emoji(item)
-            items_html += f"""
-            <div class="outfit-item">
-                <span style="font-size:1.1rem">{e}</span>
-                <span style="font-weight:500">{item['name']}</span>
-                <span class="item-color-chip">{item.get('color','')}</span>
-            </div>"""
+            row = (
+                '<div class="outfit-item">'
+                '<span style="font-size:1.1rem">' + e + '</span>'
+                '<span style="font-weight:500">' + item["name"] + '</span>'
+                '<span class="item-color-chip">' + item.get("color", "") + '</span>'
+                '</div>'
+            )
+            item_rows.append(row)
 
-        st.markdown(f"""
-        <div class="card">
-            <div class="card-title">Your Outfit — {len(outfit)} pieces</div>
-            {items_html if items_html else "<p style='color:#9C8A7A'>No items selected.</p>"}
-        </div>
-        """, unsafe_allow_html=True)
+        inner = "".join(item_rows) if item_rows else "<p style='color:#9C8A7A'>No items selected.</p>"
+        outfit_html = (
+            '<div class="card">'
+            '<div class="card-title">Your Outfit &mdash; ' + str(len(outfit)) + ' pieces</div>'
+            + inner +
+            '</div>'
+        )
+        st.markdown(outfit_html, unsafe_allow_html=True)
 
     with col_score:
         score_val = color.get("score", 0)
