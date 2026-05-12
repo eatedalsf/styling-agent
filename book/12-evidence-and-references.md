@@ -55,6 +55,20 @@ Wearly uses **content-based, rule-driven recommendation** — not collaborative 
 
 ---
 
+## The citation chain — runtime to rule pack
+
+Reasoning lines aren't just prose. Where the agent acted on a Skill rule, the line ends with a compact tag such as `[occasion-rules#R3]` or `[weather#R4]`. Those tags are sourced from a single registry, `rule_refs.py`, that maps each slug to:
+
+- the Skill file it points at (`skills/wearly-styling-agent/*.md`),
+- the `R<N>` heading inside that file,
+- a one-line body-positive summary.
+
+A documentation-integrity test (`tests/test_rule_refs.py`) asserts that every registered slug resolves to a real rule heading and that the agent's default-occasion runs always emit at least one citation. If a rule is renumbered without updating the registry, the test fails — citations cannot silently drift.
+
+This closes the chain **evidence category → rule pack → rule ID → reasoning line**. The Skill rule packs *are* the source of truth; `rule_refs.py` is the index that keeps the runtime aligned with them. See `docs/evidence-and-references.md` §6a for the longer explanation.
+
+---
+
 ## Verification status
 
 Today, **zero citations have been individually verified.** Every section in `docs/evidence-and-references.md` currently relies on:

@@ -126,9 +126,9 @@ The script makes this an **Advanced**-tier skill per the meta-skills lecture: re
 
 All Wearly skill output obeys four contract rules:
 
-1. **Cite the rule.** No magic recommendations. Every decision points back to an inspectable rule.
+1. **Cite the rule.** No magic recommendations. Every rule-driven decision ends with a compact tag (e.g. `[occasion-rules#R3]`) sourced from the canonical registry in [`rule_refs.py`](https://github.com/eatedalsf/styling-agent/blob/main/rule_refs.py) at the repo root. A documentation-integrity test asserts every slug resolves to a real rule heading and that the agent's default runs emit at least one citation per occasion.
 2. **Surface the why.** A user reading the reasoning trail must find each rule that drove each line.
-3. **Respect the user.** Body-positive language. No corrective vocabulary. Honest gaps over forced pieces.
+3. **Respect the user.** Body-positive language. No vocabulary that frames the body as a problem. Honest gaps over forced pieces.
 4. **Styling is not an exact science.** The skill says *"tends to work well,"* never *"is correct."*
 
 The body-positive contract is enforced *twice*:

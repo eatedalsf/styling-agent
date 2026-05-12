@@ -258,6 +258,33 @@ The `color_rules.json` palettes (warm olive, cool fair, deep warm) are **design-
 
 ---
 
+## 6a. How reasoning lines cite rules (the citation chain)
+
+Wearly's recommendation outputs are designed to be **traceable end-to-end**:
+
+```
+evidence category  ->  Skill rule pack  ->  rule ID  ->  reasoning line
+   (this doc §3)         (skills/*.md)        (R<N>)      (result.reasoning)
+```
+
+The mechanism is a single registry, `rule_refs.py`, holding canonical slugs of the form `<pack>#R<N>` (e.g. `occasion#R3`, `weather#R4`, `color#R2`). Each slug names:
+
+- the Skill file it points at,
+- the `R<N>` heading inside that file,
+- a short body-positive one-liner summary.
+
+`styling_agent.py` calls `cite('occasion#R3')` while building reasoning lines, which produces a compact trailing tag such as `[occasion-rules#R3]`. A UI layer can detect that tag and turn it into a deep link; a reviewer can grep for it; a documentation-integrity test asserts that every slug still resolves to a real rule heading. If a rule is renamed or renumbered without updating the registry, `tests/test_rule_refs.py` fails immediately — citations cannot silently drift.
+
+This is the closest thing Wearly has to a single source of truth for "why this line is in the output." The Skill rule packs **are** that source; the registry is the index that keeps the runtime and the documentation aligned.
+
+What the registry deliberately does NOT do:
+
+- It does not duplicate rule prose. The body of each rule lives in its `*.md` file and is not copy-pasted.
+- It does not fail recommendations on a missing slug. `cite()` returns `""` for unknown slugs so a stale tag never crashes a result.
+- It does not claim every reasoning line carries a citation. Step 2 (load profile), Step 4 (filter announcement), and some fit-alignment notes are descriptive rather than rule-driven and stay unannotated. The test only asserts *at least one* citation per default occasion.
+
+---
+
 ## 6. How Wearly's rule packs map to evidence categories
 
 | Skill rule pack | Primary category | Secondary categories |

@@ -24,6 +24,17 @@ except ModuleNotFoundError:
     from wardrobe_tool import filter_items_by_occasion, get_owner_profile, check_gaps
     from color_tool import score_outfit_colors
 
+# Rule citations — see rule_refs.py and skills/wearly-styling-agent/.
+# `cite(slug)` returns "" silently for unknown slugs so the agent never
+# crashes on a missing citation. The reasoning trail is still readable
+# without the trailing tag; the tag adds traceability for UI deep-links
+# and for the documentation-integrity test.
+try:
+    from rule_refs import cite
+except Exception:
+    def cite(_slug):  # type: ignore[misc]
+        return ""
+
 
 # ─────────────────────────────────────────────
 # OCCASION LOGIC MAPS
@@ -273,7 +284,9 @@ def run_agent(
     for rej in rejection_reasons:
         nm = rej.get("item_name", "an item")
         rs = rej.get("reason", "rejected")
-        reasoning.append(f"Skipping '{nm}' — you flagged it as: {rs}.")
+        reasoning.append(
+            f"Skipping '{nm}' — you flagged it as: {rs}. {cite('wardrobe#R5')}"
+        )
 
     # ── Wear-history tie-breaker ──────────────────────────────────────────
     # Sort each pool so fresher items (less recently / less frequently worn)
@@ -340,7 +353,10 @@ def run_agent(
                 dresses.sort(key=lambda d: (0 if d["formality"] == "formal" else 1,
                                             -get_freshness(d.get("id", ""), _history)))
             outfit.append(dresses[0])
-            reasoning.append(f"Selected '{dresses[0]['name']}' as a one-piece solution for this {formality} occasion.")
+            reasoning.append(
+                f"Selected '{dresses[0]['name']}' as a one-piece solution "
+                f"for this {formality} occasion. {cite('occasion#R3')}"
+            )
             for _fnote in fit_alignment_notes(dresses[0], _fit_profile_full):
                 reasoning.append(_fnote)
             _note = _freshness_note(dresses[0])
@@ -356,7 +372,11 @@ def run_agent(
             if activewear:
                 chosen_active = activewear[:2]
                 outfit.extend(chosen_active)
-                reasoning.append(f"Selected activewear set: {', '.join(i['name'] for i in chosen_active)}.")
+                reasoning.append(
+                    f"Selected activewear set: "
+                    f"{', '.join(i['name'] for i in chosen_active)}. "
+                    f"{cite('occasion#R2')}"
+                )
                 for piece in chosen_active:
                     _note = _freshness_note(piece)
                     if _note: reasoning.append(_note)
@@ -365,14 +385,20 @@ def run_agent(
         else:
             if tops:
                 outfit.append(tops[0])
-                reasoning.append(f"Selected top: '{tops[0]['name']}' for its {tops[0]['formality']} formality.")
+                reasoning.append(
+                    f"Selected top: '{tops[0]['name']}' for its "
+                    f"{tops[0]['formality']} formality. {cite('wardrobe#R3')}"
+                )
                 for _fnote in fit_alignment_notes(tops[0], _fit_profile_full):
                     reasoning.append(_fnote)
                 _note = _freshness_note(tops[0])
                 if _note: reasoning.append(_note)
             if bottoms:
                 outfit.append(bottoms[0])
-                reasoning.append(f"Selected bottom: '{bottoms[0]['name']}' to pair with the top.")
+                reasoning.append(
+                    f"Selected bottom: '{bottoms[0]['name']}' to pair with the top. "
+                    f"{cite('occasion#R2')}"
+                )
                 for _fnote in fit_alignment_notes(bottoms[0], _fit_profile_full):
                     reasoning.append(_fnote)
                 _note = _freshness_note(bottoms[0])
@@ -403,7 +429,8 @@ def run_agent(
         if outer_pool:
             outfit.append(outer_pool[0])
             reasoning.append(
-                f"Added '{outer_pool[0]['name']}' as outerwear — temperature is {temp}°F and {weather['layer_advice']}"
+                f"Added '{outer_pool[0]['name']}' as outerwear — temperature is "
+                f"{temp}°F and {weather['layer_advice']} {cite('weather#R4')}"
             )
         else:
             # No outerwear matches this occasion. Don't force a wrong-style coat
@@ -412,7 +439,7 @@ def run_agent(
             reasoning.append(
                 f"Note: temperature is {temp}°F, but no {occasion_tag}-appropriate "
                 f"outerwear was found in the wardrobe. Skipping outerwear rather "
-                f"than forcing a mismatched coat."
+                f"than forcing a mismatched coat. {cite('shopping#R2')}"
             )
 
     step5["output"] = f"Built outfit with {len(outfit)} pieces: {', '.join(i['name'] for i in outfit)}."
@@ -431,7 +458,9 @@ def run_agent(
         result["shopping_suggestions"] = suggestions
         reasoning.append(
             f"Your wardrobe is missing: {', '.join(gaps)} for this occasion. "
-            f"Shopping suggestion: {suggestions[0] if suggestions else 'Consider adding a versatile piece.'}"
+            f"Shopping suggestion: "
+            f"{suggestions[0] if suggestions else 'Consider adding a versatile piece.'} "
+            f"{cite('shopping#R3')}"
         )
     else:
         step6["output"] = "Outfit is complete — all required pieces present."
