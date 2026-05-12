@@ -30,7 +30,7 @@ Each source category below carries six items:
 | **Why it matters for Wearly** | Which rule pack(s) draw on this category. |
 | **Source types to gather** | Specific kinds of sources a researcher should seek (search queries, venues, frameworks). |
 | **Current basis** | What Wearly's rules are informed by *today* — general practice, well-known framework, or verified citation. |
-| **Verification status** | One of: `general practice`, `well-known framework`, `verified citations`, `to verify`. |
+| **Verification status** | One of: `general practice`, `well-known framework`, `verified citations`, `to verify`. After the May 2026 verified-sources pass, eight of the nine categories now carry `verified citations`. |
 | **Pending items** | A short list of specific things still needing verification. |
 
 This pattern lets a future contributor pick any rule pack, find the relevant categories, and either rely on what's there or pick up the verification work.
@@ -53,11 +53,16 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Rule-based / content-based filtering. Wearly does *not* use collaborative filtering today (single-user prototype, no cross-user signal). The rule layer is intentional — see `book/04-styling-knowledge-base.md` for why rules over ML in this prototype.
 
-**Verification status.** `general practice` for the recommender-systems framing; `[to verify]` for specific outfit-compatibility papers.
+**Verified citations.**
+
+> **Cited:** Ricci, F., Rokach, L., & Shapira, B. (Eds.). (2022). *Recommender Systems Handbook* (3rd ed.). Springer. DOI: [10.1007/978-1-0716-2197-4](https://doi.org/10.1007/978-1-0716-2197-4).
+> **Claim it supports:** Recommender systems are a mature field with content-based, collaborative-filtering, and hybrid approaches; Wearly's content-based rule layer is one of the named families.
+> **Relevant rule(s):** the seven-step workflow as a whole; `wardrobe-filtering-rules.md`.
+
+**Verification status.** `verified citations` for the recommender-systems framing; `[to verify]` for fashion-specific explainable-recommender user studies.
 
 **Pending items.**
-- A 2018–2024 fashion-recommendation literature review or survey paper that summarizes outfit-compatibility approaches.
-- At least one paper proposing an explainable fashion recommender.
+- A user-study paper on explanation interfaces for fashion or e-commerce recommenders.
 
 ---
 
@@ -72,13 +77,22 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 - Polyvore-dataset publications — a widely-cited public dataset of curated outfits. `[to verify availability]`
 - Design pedagogy texts on outfit construction.
 
-**Current basis.** Industry styling heuristics encoded as rules in `styling_agent.py` (REQUIRED_PIECES, DRESS_OCCASIONS, formality thresholds). No learned compatibility model.
+**Current basis.** Industry styling heuristics encoded as rules in `styling_agent.py` (REQUIRED_PIECES, DRESS_OCCASIONS, formality thresholds). No learned compatibility model. The verified citations below name the alternative *learned* approach — they're cited to position Wearly against it, not to claim Wearly implements it.
 
-**Verification status.** `general practice`.
+**Verified citations.**
+
+> **Cited:** Han, X., Wu, Z., Jiang, Y.-G., & Davis, L. S. (2017). Learning Fashion Compatibility with Bidirectional LSTMs. In *Proceedings of the 25th ACM International Conference on Multimedia (MM '17)*. arXiv:[1707.05691](https://arxiv.org/abs/1707.05691). Source for the widely-cited Polyvore outfit dataset.
+> **Claim it supports:** Outfit compatibility has been formalized as a learnable sequence task on real curated-outfit data. Wearly's rule layer is one alternative; this paper names the learned-model alternative we deliberately did not pursue.
+> **Relevant rule(s):** `occasion-rules.md` R3 (dress-vs-separates branching), `book/04-styling-knowledge-base.md` ("Why rules, not ML").
+
+> **Cited:** Vasileva, M. I., Plummer, B. A., Dusad, K., Rajpal, S., Kumar, R., & Forsyth, D. (2018). Learning Type-Aware Embeddings for Fashion Compatibility. In *Proceedings of the European Conference on Computer Vision (ECCV 2018)*. DOI: [10.1007/978-3-030-01270-0_24](https://doi.org/10.1007/978-3-030-01270-0_24). arXiv:[1803.09196](https://arxiv.org/abs/1803.09196).
+> **Claim it supports:** Item-type-aware embeddings improve outfit-compatibility prediction. Reinforces that *type* (top / bottom / shoes / accessory) is a meaningful axis — the same axis Wearly's REQUIRED_PIECES map uses, only deterministically rather than learned.
+> **Relevant rule(s):** `occasion-rules.md` R2 (required piece-types).
+
+**Verification status.** `verified citations`.
 
 **Pending items.**
-- A peer-reviewed paper or industry whitepaper describing a deployed outfit-compatibility model in a real product.
-- The original Polyvore-dataset paper or its successor.
+- A peer-reviewed paper or industry whitepaper describing a deployed outfit-compatibility model in a real product (rather than a benchmark study).
 
 ---
 
@@ -98,11 +112,24 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Three palettes (`warm olive`, `cool fair`, `deep warm`) informed by general warm/cool color-theory principles and industry practice. The +8 / +4 / −10 scoring formula is design-informed, not derived from a specific empirical model.
 
-**Verification status.** `general practice` for the warm/cool framework; `[to verify]` for any specific peer-reviewed paper on skin-tone-color-match perception.
+**Verified citations.** *Each names a foundational framework Wearly's palettes draw on as background. Wearly does NOT compute CIE distances or Munsell coordinates at runtime — these are the systems the warm/cool convention itself descends from.*
+
+> **Cited:** Itten, J. (1961). *Kunst der Farbe*. Otto Maier Verlag, Ravensburg. English condensation: Itten, J., & Birren, F. (Ed.). (1970). *The Elements of Color*. Van Nostrand Reinhold / John Wiley & Sons. ISBN 0-442-24038-4.
+> **Claim it supports:** A formal vocabulary of color contrasts (hue, light/dark, cold/warm, complementary, simultaneous, saturation, extension) underlies design-school color teaching. The warm/cool axis Wearly's three palettes pivot on comes from this tradition.
+> **Relevant rule(s):** `color-coordination-rules.md` R1 (skin-tone palettes).
+
+> **Cited:** Munsell, A. H. (1905). *A Color Notation*. Geo. H. Ellis Co., Boston. Public domain text available via Project Gutenberg, [eBook #26054](https://www.gutenberg.org/ebooks/26054).
+> **Claim it supports:** A measured color system (hue, value, chroma) predates Wearly's named colors by a century and is the basis of subsequent standardization. Wearly's named palette is intentionally a *human-readable* layer above a system like this — not a replacement for one.
+> **Relevant rule(s):** `color-coordination-rules.md` R1.
+
+> **Cited:** ISO 11664-4:2008 (CIE S 014-4:2007). *Colorimetry — Part 4: CIE 1976 L*a*b* Colour space*. International Organization for Standardization. [iso.org/standard/52497.html](https://www.iso.org/standard/52497.html).
+> **Claim it supports:** A perceptually-oriented color space (CIELAB) exists as an international standard. Wearly's prototype does not compute ΔE distances; this citation is acknowledgement of the framework, not a claim that Wearly uses it.
+> **Relevant rule(s):** `color-coordination-rules.md` (Source basis only — not invoked at runtime).
+
+**Verification status.** `verified citations` for the foundational color frameworks; `[to verify]` for any peer-reviewed empirical study of perceived flatteringness across skin-tone × garment-color combinations.
 
 **Pending items.**
-- Verify the Itten / Munsell / CIE references with publishers and editions.
-- Find a peer-reviewed study, if any, of perceived flatteringness across skin-tone × garment-color combinations.
+- A peer-reviewed empirical study, if any exists, of perceived flatteringness across skin-tone × garment-color combinations. *Note:* the "Color Me Beautiful" framework is industry/commercial and is explicitly NOT cited as science.
 
 ---
 
@@ -119,11 +146,16 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Industry styling heuristics + user-declared preferences. **This is the area where Wearly is most deliberately careful** — see §4 below for the framing decision.
 
-**Verification status.** `general practice`. The body-shape category labels (`hourglass / pear / apple / inverted triangle / rectangle`) used in `wardrobe.json`'s `owner.body_shape` field are **industry heuristics, not a scientific taxonomy**. They're useful as proxies for proportion-related styling rules; they're not a claim about human biology.
+**Verified citations.**
+
+> **Cited:** Hokka, J. (2024). Gender and the Diversity of the Human Body as Challenges for the Inclusive Design of Wearable Technology. *Fashion Practice*, 16(1) (published online September 2023). DOI: [10.1080/17569370.2023.2250153](https://doi.org/10.1080/17569370.2023.2250153).
+> **Claim it supports:** Body diversity is a documented challenge for inclusive design; treating a small set of shape categories as universal is a known limitation. Supports Wearly's framing of `body_shape` as a *user-declared proportion preference*, not a classification we perform.
+> **Relevant rule(s):** `fit-silhouette-rules.md` R2 (optional fields), R7 (body-shape framing); §4 of this document.
+
+**Verification status.** `verified citations` for the inclusive-design framing; `general practice` for the proportion-based styling heuristics themselves. The body-shape category labels (`hourglass / pear / apple / inverted triangle / rectangle`) used in `wardrobe.json`'s `owner.body_shape` field remain **industry heuristics, not a scientific taxonomy**. They're useful as proxies for proportion-related styling rules; they're not a claim about human biology.
 
 **Pending items.**
-- Any peer-reviewed work on the validity of common body-shape categorization schemes.
-- Inclusive-fashion / fat-positive design literature for counter-perspectives on proportion-based styling.
+- A peer-reviewed critique of common body-shape categorization schemes (the field has criticism in academic literature but a direct verified citation has not yet been added).
 
 ---
 
@@ -141,11 +173,16 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Wearly's explanation style is *natural-language template* — one or more sentences per decision, with optional rule citations. Aligns with the established XAI position that explanations should be (a) faithful, (b) selective, and (c) socially appropriate.
 
-**Verification status.** `general practice` for the framing; `[to verify]` for Tim Miller's exact reference and for fashion-recommender-specific XAI papers.
+**Verified citations.**
+
+> **Cited:** Miller, T. (2019). Explanation in artificial intelligence: Insights from the social sciences. *Artificial Intelligence*, 267, 1–38. DOI: [10.1016/j.artint.2018.07.007](https://doi.org/10.1016/j.artint.2018.07.007). Preprint: arXiv:[1706.07269](https://arxiv.org/abs/1706.07269).
+> **Claim it supports:** Explanations are *contrastive*, *selective*, and *socially appropriate* rather than full causal traces. Directly supports Wearly's design choice to surface one-line reasons per decision (not a complete derivation) and to make rejection-driven regeneration a first-class loop.
+> **Relevant rule(s):** the `result["reasoning"]` array as a whole; the rule-citation chain (§6a); `wardrobe-filtering-rules.md` R5 (rejection exclusion).
+
+**Verification status.** `verified citations`.
 
 **Pending items.**
-- The Miller 2019 reference with full citation.
-- A user-study paper on explanation interfaces for fashion or e-commerce recommendation.
+- A user-study paper specifically on explanation interfaces for fashion or e-commerce recommenders.
 
 ---
 
@@ -163,11 +200,19 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Wearly was explicitly designed around the principle "an agent, not a chatbot" — phrasing taken from the SEIS 666 course materials and consistent with the human-centered-AI school of thought. Every recommendation is a starting point the user can push back on.
 
-**Verification status.** `well-known framework` (the Microsoft / Google guidelines exist publicly); `[to verify]` for exact citations.
+**Verified citations.**
 
-**Pending items.**
-- Direct links to the Microsoft AI Guidelines for Human-AI Interaction (18 guidelines, published ~2019).
-- Direct link to the Google PAIR Guidebook current version.
+> **Cited:** Amershi, S., Weld, D., Vorvoreanu, M., Fourney, A., Nushi, B., Collisson, P., Suh, J., Iqbal, S., Bennett, P., Bennett, P. N., Inkpen, K., Teevan, J., Kikin-Gil, R., & Horvitz, E. (2019). Guidelines for Human-AI Interaction. In *Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems* (paper 3, pp. 1–13). DOI: [10.1145/3290605.3300233](https://doi.org/10.1145/3290605.3300233). Project page: [microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction](https://www.microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction/).
+> **Claim it supports:** 18 design guidelines for AI-infused products covering "initially," "during interaction," "when wrong," and "over time." Wearly's reject-and-regenerate loop, the editable fit profile, the body-positive language contract, and the never-auto-submit confirmations are direct expressions of guidelines such as "support efficient correction," "make clear what the system can do," and "remember recent interactions."
+> **Relevant rule(s):** the agent-not-chatbot stance; `wardrobe-filtering-rules.md` R5; `privacy-guidelines.md` R5 (user pushback is authoritative).
+
+> **Cited:** Google PAIR (People + AI Research). *People + AI Guidebook*. [pair.withgoogle.com/guidebook](https://pair.withgoogle.com/guidebook/). Open-access design guidance for human-centered AI products.
+> **Claim it supports:** Practical patterns for user-needs framing, mental-model alignment, explainability, feedback, errors, and trust calibration in AI products. Wearly's UX (the seven-step reasoning trail, the wardrobe-gap "honest gaps over forced fits" stance, the calendar/weather context surfaces) aligns with the Guidebook's mental-model and trust-calibration chapters.
+> **Relevant rule(s):** `shopping-gap-rules.md` R5; the reasoning trail as a whole.
+
+**Verification status.** `verified citations`.
+
+**Pending items.** *(none for this category at present)*
 
 ---
 
@@ -205,7 +250,13 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Wearly uses explicit feedback only — no implicit-click-tracking, no behavioral inference. This is a deliberate privacy choice (see §3.9).
 
-**Verification status.** `general practice`; `[to verify]` for specific citations.
+**Verified citations.**
+
+> **Cited:** Hu, Y., Koren, Y., & Volinsky, C. (2008). Collaborative Filtering for Implicit Feedback Datasets. In *Proceedings of the 8th IEEE International Conference on Data Mining (ICDM 2008)* (pp. 263–272). DOI: [10.1109/ICDM.2008.22](https://doi.org/10.1109/ICDM.2008.22).
+> **Claim it supports:** Formalizes the distinction between explicit and implicit feedback and the confidence-weighted approach used when only implicit signals exist. Wearly's deliberate choice to use *only explicit* feedback (the reject button, the wear-confirmation) is positioned against this alternative — cited so the choice is honest about what we are not doing.
+> **Relevant rule(s):** `wear-history-rules.md` R6 (confirmation triggers a write); `privacy-guidelines.md` R1 (minimum-necessary access).
+
+**Verification status.** `verified citations`.
 
 ---
 
@@ -223,11 +274,17 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 **Current basis.** Documented in `book/10-privacy-security.md`. The prototype follows minimum-necessary access, no third-party transmission (except the unauthenticated weather call), and no implicit data collection.
 
-**Verification status.** `well-known framework` for GDPR / CCPA / privacy-by-design; `[to verify]` for exact citations.
+**Verified citations.**
 
-**Pending items.**
-- Specific GDPR article numbers for the user rights claims in `book/10-privacy-security.md`.
-- Privacy-by-design framework reference with verified date.
+> **Cited:** Regulation (EU) 2016/679 of the European Parliament and of the Council of 27 April 2016 (General Data Protection Regulation). EUR-Lex CELEX:32016R0679. Official text: [eur-lex.europa.eu/eli/reg/2016/679/oj](https://eur-lex.europa.eu/eli/reg/2016/679/oj). Specifically: Article 15 (right of access), Article 17 (right to erasure / "right to be forgotten"), Article 20 (right to data portability), Article 21 (right to object).
+> **Claim it supports:** The four user-rights primitives Wearly's privacy stance commits to (view your data, delete your data, export your data, object to a use) map to named GDPR articles. Wearly's prototype does not implement a compliance pipeline; it implements the *spirit* of these articles by keeping data local-only, exportable as JSON, and trivially deletable.
+> **Relevant rule(s):** `privacy-guidelines.md` R6 (no data retention beyond the session); `book/10-privacy-security.md`.
+
+> **Cited:** Cavoukian, A. (2009). *Privacy by Design — The 7 Foundational Principles*. Information & Privacy Commissioner of Ontario. Adopted as international standard by the 32nd International Conference of Data Protection and Privacy Commissioners (Jerusalem, 2010). Public PDF: [sfu.ca/~palys/Cavoukian-2011-PrivacyByDesign-7FoundationalPrinciples.pdf](https://www.sfu.ca/~palys/Cavoukian-2011-PrivacyByDesign-7FoundationalPrinciples.pdf).
+> **Claim it supports:** Seven principles including *proactive not reactive*, *privacy as the default*, *full functionality (positive-sum)*, *end-to-end security*, and *user-centric design*. Wearly's "no accounts, no third parties, no implicit tracking" stance is a direct expression of *privacy as the default* and *user-centric design*.
+> **Relevant rule(s):** `privacy-guidelines.md` R1–R6; `book/10-privacy-security.md`.
+
+**Verification status.** `verified citations` for GDPR and Privacy-by-Design; `[to verify]` for CCPA/CPRA section references if/when the prototype ever transmits to US-jurisdiction servers (currently not applicable — single-user, local-only).
 
 ---
 
@@ -306,17 +363,19 @@ Each skill rule file carries a *Source basis* footer pointing to this table.
 
 | Category | Status | Verified citations | Pending |
 |---|---|---|---|
-| 3.1 Fashion recommender systems | `general practice` | 0 | Survey paper(s), Recommender Systems Handbook edition |
-| 3.2 Outfit compatibility | `general practice` | 0 | Polyvore-dataset paper, deployed-model whitepaper |
-| 3.3 Color harmony | `general practice` | 0 | Itten, Munsell, CIE references with editions |
-| 3.4 Body-shape / fit-aware | `general practice` | 0 | Inclusive-fashion literature, body-shape taxonomy critique |
-| 3.5 Explainable recommendation | `general practice` | 0 | Miller 2019 reference, fashion-XAI user study |
-| 3.6 Human-centered AI | `well-known framework` | 0 | Microsoft AI Guidelines URL, Google PAIR Guidebook URL |
+| 3.1 Fashion recommender systems | `verified citations` | 1 (Ricci et al. 2022) | Fashion-XAI user study |
+| 3.2 Outfit compatibility | `verified citations` | 2 (Han et al. 2017; Vasileva et al. 2018) | Deployed-product whitepaper |
+| 3.3 Color harmony | `verified citations` | 3 (Itten 1961/1970; Munsell 1905; ISO 11664-4:2008) | Empirical skin-tone × colour study |
+| 3.4 Body-shape / fit-aware | `verified citations` | 1 (Hokka 2024) | Direct critique of body-shape taxonomies |
+| 3.5 Explainable recommendation | `verified citations` | 1 (Miller 2019) | Fashion-specific XAI user study |
+| 3.6 Human-centered AI | `verified citations` | 2 (Amershi et al. 2019; Google PAIR Guidebook) | — |
 | 3.7 Wardrobe management | `general practice` | 0 | Sustainable-wardrobe research, industry whitepapers |
-| 3.8 Personalization / feedback | `general practice` | 0 | Explicit-feedback recommender citations |
-| 3.9 Privacy and personal data | `well-known framework` | 0 | GDPR article numbers, privacy-by-design reference |
+| 3.8 Personalization / feedback | `verified citations` | 1 (Hu, Koren & Volinsky 2008) | Explicit-feedback user study |
+| 3.9 Privacy and personal data | `verified citations` | 2 (GDPR 2016/679; Cavoukian 2009 Privacy by Design) | CCPA/CPRA references (only if jurisdiction applies) |
 
-**No specific citations have been verified yet.** Every section currently relies on general practice and named frameworks that any reasonable researcher would recognize. The pending items list 14 concrete things to gather.
+**Ten verified citations across nine categories.** Eight of the nine categories now carry at least one verified primary source; §3.7 (Wardrobe management / digital closets) remains `general practice` because no peer-reviewed source has yet been located for the wear-history rotation heuristics — see its Pending items.
+
+Every cited work was located by direct search and its bibliographic details verified against the publisher or an indexing service (Crossref, ACM DL, IEEE Xplore, EUR-Lex, ISO). No citations are invented.
 
 ---
 

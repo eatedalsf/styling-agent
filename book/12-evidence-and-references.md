@@ -71,14 +71,22 @@ This closes the chain **evidence category → rule pack → rule ID → reasonin
 
 ## Verification status
 
-Today, **zero citations have been individually verified.** Every section in `docs/evidence-and-references.md` currently relies on:
+After a verified-sources pass, **ten primary citations have been added** across eight of the nine source categories. Each was located by direct search and its bibliographic details verified against the publisher or an indexing service (Crossref, ACM Digital Library, IEEE Xplore, EUR-Lex, ISO). No citations are invented.
 
-- General practice (industry styling heuristics and design conventions).
-- Well-known frameworks (Itten color theory, GDPR, privacy-by-design, Microsoft AI Guidelines).
+Highlights:
 
-The references document lists 14 specific pending verification items — concrete searches a future contributor can complete. When a citation is verified, it gets added to the appropriate category, the verification-status table updates, and the relevant Skill rule's *Source basis* footer gets a citation link.
+- **Recommender systems:** Ricci, Rokach & Shapira (Eds.), *Recommender Systems Handbook*, 3rd ed., Springer 2022.
+- **Outfit compatibility:** Han et al. 2017 (Polyvore dataset, ACM MM); Vasileva et al. 2018 (type-aware embeddings, ECCV).
+- **Color frameworks:** Itten 1961 (*The Art of Color*); Munsell 1905 (*A Color Notation*); ISO 11664-4:2008 (CIELAB).
+- **Inclusive design:** Hokka 2024 (*Fashion Practice*).
+- **Explainable AI:** Miller 2019 (*Artificial Intelligence* 267).
+- **Human-centered AI:** Amershi et al. 2019 (CHI, Microsoft's 18 guidelines); Google PAIR *People + AI Guidebook*.
+- **Implicit-vs-explicit feedback:** Hu, Koren & Volinsky 2008 (ICDM).
+- **Privacy:** GDPR Regulation (EU) 2016/679 (Articles 15, 17, 20, 21); Cavoukian 2009 *Privacy by Design — The 7 Foundational Principles*.
 
-This is honest framing for a prototype: the *categories* are right, the *specific support* still needs work.
+§3.7 (Wardrobe management / digital closets) remains `general practice` — no peer-reviewed source has yet been located for the wear-history rotation heuristics. The full per-category status table lives in `docs/evidence-and-references.md` §7.
+
+Honest framing: citations name the *frameworks Wearly's rules draw on*. They do not claim Wearly has implemented those frameworks' algorithms (e.g., Wearly does not compute CIE ΔE distances). Where a citation names an *alternative* approach Wearly deliberately did not take (e.g., learned outfit-compatibility models, implicit-feedback collaborative filtering), the citation is included so the design choice is honest about what was considered and rejected.
 
 ---
 

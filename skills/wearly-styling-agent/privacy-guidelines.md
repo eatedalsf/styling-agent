@@ -65,4 +65,10 @@ Refusal is part of the skill, not a failure mode.
 **Primary category:** Privacy and personal data (`docs/evidence-and-references.md` §3.9).
 **Secondary:** Human-centered AI / personalization (§3.6).
 **Current basis:** Privacy-by-design principles + minimum-necessary access. Wearly's production data-handling roadmap aligns with publicly available frameworks (GDPR, CCPA, privacy-by-design) — see `book/10-privacy-security.md`.
-**Pending verification:** Specific GDPR article numbers, privacy-by-design framework citation with verified date (Ann Cavoukian), and direct URLs for the Microsoft AI Guidelines for Human-AI Interaction and Google PAIR Guidebook.
+**Verified citations:**
+- Regulation (EU) 2016/679 (GDPR). EUR-Lex CELEX:32016R0679. Specifically: Articles 15 (right of access), 17 (right to erasure), 20 (data portability), 21 (right to object). These are the four user-rights primitives Wearly's stance commits to in spirit.
+- Cavoukian, A. (2009). *Privacy by Design — The 7 Foundational Principles*. Information & Privacy Commissioner of Ontario.
+- Amershi, S., et al. (2019). "Guidelines for Human-AI Interaction." Proc. CHI 2019. DOI: 10.1145/3290605.3300233. (For the user-pushback / efficient-correction guidelines.)
+- Google PAIR. *People + AI Guidebook*. https://pair.withgoogle.com/guidebook/
+
+See `docs/evidence-and-references.md` §3.6 and §3.9 for full citations.
