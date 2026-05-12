@@ -6,6 +6,7 @@ Run with: streamlit run app.py
 import sys
 import os
 import streamlit as st
+import streamlit.components.v1 as components
 
 # Support both structured layout (agent/styling_agent.py) and
 # flat layout (styling_agent.py directly in the same folder)
@@ -903,6 +904,41 @@ def _render_outfit_result(result: dict):
         for i, r in enumerate([x for x in reasons if x.strip()], 1):
             r_html += f'<div class="reason-item"><span class="reason-num">{i}</span><span>{r}</span></div>'
         st.markdown(f'<div class="card" style="margin-top:0">{r_html}</div>', unsafe_allow_html=True)
+
+    # ── Reasoning graph (live, interactive — built from THIS result) ──────────
+    # This is the "agent, not chatbot" feature in graph form. The schema view
+    # lives on the Before / After screen; here we render the actual traversal
+    # the agent just performed: User → CalendarEvent → Weather → wardrobe
+    # items → OutfitRecommendation, with any gaps or rejection feedback
+    # surfaced visibly. Built dynamically every run, so the graph changes
+    # whenever the outfit does.
+    if outfit:
+        with st.expander("Reasoning graph — how this outfit emerged"):
+            try:
+                from graph_tool import render_run_graph_html, run_graph_summary
+                summary = run_graph_summary(result)
+                st.caption(
+                    f"{summary['nodes']} nodes · {summary['items']} item"
+                    f"{'' if summary['items'] == 1 else 's'} · "
+                    f"{summary['gaps']} gap{'' if summary['gaps'] == 1 else 's'}"
+                    + (f" · {summary['rejections']} rejection"
+                       + ('' if summary['rejections'] == 1 else 's')
+                       if summary['rejections'] else "")
+                    + " — drag nodes to rearrange, hover for details."
+                )
+                html_doc = render_run_graph_html(result)
+                components.html(html_doc, height=560, scrolling=False)
+                st.caption(
+                    "This graph is generated from the agent's *current* result. "
+                    "Tap **Plan today's outfit →** or reject an item and "
+                    "regenerate — the graph rebuilds. The abstract model that "
+                    "shapes every run lives in the **Before / After** section "
+                    "as the **schema graph**."
+                )
+            except ImportError as _e:
+                st.info(f"Graph rendering unavailable: {_e}")
+            except Exception as _e:
+                st.warning(f"Graph could not render: {_e}")
 
     # ── Wear-today: record this outfit in wear history ──────────
     # Tells Wearly "I'm actually wearing this." Next time the agent runs,
@@ -2317,6 +2353,13 @@ def _render_profile():
         <strong style="color:#7C6F64; letter-spacing:0.04em;">Privacy.</strong>
         Your profile is stored locally in this prototype. Real authentication and cloud sync are future work.
     </p>
+    <div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EDE5DC;">
+        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">Learn more</div>
+        <p style="font-size:0.82rem; color:#4A3D36; line-height:1.6;">
+            The <a href="https://eatedalsf.github.io/styling-agent/" target="_blank" style="color:#9F5A36; text-decoration:underline;">Wearly Intelligent Book</a>
+            documents the agent's design principles, evidence categories, skill rules, knowledge graph, and architecture — all searchable in one place.
+        </p>
+    </div>
     """, unsafe_allow_html=True)
 
 
@@ -2376,6 +2419,43 @@ def _render_demo():
         <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Live result</div>
         """, unsafe_allow_html=True)
         _render_outfit_result(st.session_state["result"])
+
+    # ── Schema graph (the abstract knowledge graph) ─────────
+    # Sits at the bottom of the demo screen so a reviewer who's just
+    # seen the live agent run can step up one level of abstraction and
+    # see HOW the system models the world. Read alongside the live-run
+    # graph rendered inside any outfit result.
+    st.markdown("<div style='height:1.6rem'></div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style="font-family:'DM Serif Display',serif; font-size:1.45rem; color:#1C1917; line-height:1.2;">
+        How Wearly models your day
+    </div>
+    <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem; margin-bottom:0.7rem; line-height:1.55;">
+        The knowledge graph below shows the entity types and relations Wearly
+        reasons over. Every recommendation traces through this graph — the
+        live-run graph inside an outfit result shows one specific traversal.
+    </div>
+    """, unsafe_allow_html=True)
+
+    with st.expander("View the schema graph (interactive)"):
+        try:
+            from graph_tool import render_schema_graph_html, schema_graph_summary
+            summary = schema_graph_summary()
+            st.caption(
+                f"{summary['entities']} entities · {summary['edges']} relations · "
+                f"drag nodes to rearrange, hover for definitions, scroll to zoom."
+            )
+            html_doc = render_schema_graph_html()
+            components.html(html_doc, height=600, scrolling=False)
+            st.caption(
+                "Canonical source: `graph/graph.json` and `graph/schema.md`. "
+                "Read more in the **Knowledge Graph** section of the "
+                "[Intelligent Book](https://eatedalsf.github.io/styling-agent/)."
+            )
+        except ImportError as _e:
+            st.info(f"Graph rendering unavailable: {_e}")
+        except Exception as _e:
+            st.warning(f"Graph could not render: {_e}")
 
 
 # ─────────────────────────────────────────────
