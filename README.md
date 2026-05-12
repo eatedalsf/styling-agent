@@ -6,6 +6,21 @@
 
 A mobile-first, clean-luxury personal styling agent that recommends complete outfits using your calendar, real-time weather, wardrobe, and color profile — with full reasoning at every step.
 
+<!-- HERO BLOCK — once deployed, replace the placeholder URL below with the live Streamlit Cloud URL,
+     and drop a screenshot or GIF into docs/assets/ and reference it here. -->
+
+> **Live demo:** _coming soon · deploy this repo to [Streamlit Community Cloud](https://share.streamlit.io) to enable._
+>
+> ![Wearly home — placeholder for hero screenshot/GIF](docs/assets/hero-placeholder.png)
+
+**Why Wearly is an agent, not a chatbot**
+- 📅 Reads your **calendar** and turns the next event into a styling occasion.
+- 🌤 Weighs the **weather** — temperature, precipitation, wind — to choose layers and fabrics.
+- 👗 Filters your real **closet** by occasion, season, and what you've already worn.
+- 🎨 Scores **color harmony** against your skin tone with a 0–100 score and per-item flags.
+- 💡 **Explains every choice** — every recommendation comes with a numbered reasoning trail.
+- ✕ **Reject & regenerate.** Push back on any item with a reason; the agent re-runs and tells you what changed.
+
 ---
 
 ## What This Is
