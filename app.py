@@ -1234,6 +1234,105 @@ def _render_today():
 # WARDROBE — coming-soon stub
 # ─────────────────────────────────────────────
 
+def _render_backup_restore():
+    """
+    Backup + restore expander rendered at the top of the Wardrobe screen.
+
+    Why this exists: Streamlit Cloud's container filesystem is ephemeral.
+    Anything the user adds (wardrobe items, profile edits, wear history,
+    favorite stores, wishlist items) is wiped when the container restarts.
+    Downloading the bundle preserves their entire personal Wearly state
+    in one file they can re-upload later. On localhost the same UI is
+    useful for portability and version-controlling your closet — files
+    persist on disk there.
+    """
+    try:
+        from backup_tool import (
+            export_user_data_bytes, suggested_backup_filename,
+            import_user_data, is_wearly_backup,
+        )
+    except ImportError as _e:
+        st.warning(f"Backup tool unavailable: {_e}")
+        return
+
+    with st.expander("Backup & restore your closet", expanded=False):
+        st.markdown("""
+        <div style="font-size:0.82rem; color:#4A3D36; line-height:1.55; margin-bottom:0.8rem;">
+            <strong style="color:#9F5A36;">Why this matters.</strong>
+            On Streamlit Cloud, anything you save (wardrobe items, profile
+            preferences, wear history, favorite stores, wishlist) is
+            cleared when the container restarts. Download the backup
+            after a session and re-upload it the next time to keep
+            everything. On localhost your data persists on disk —
+            backups still help for moving between devices or
+            version-controlling your closet.
+        </div>
+        <div style="font-size:0.74rem; color:#9C8A7A; line-height:1.55; margin-bottom:1rem;">
+            <strong style="color:#7C6F64;">What's in a backup.</strong>
+            One JSON file bundling your wardrobe (manually added pieces),
+            profile, wear history, favorite stores, and wishlist. Seed
+            wardrobe and color rules aren't included — those ship with
+            the app.
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_dl, col_ul = st.columns(2, gap="medium")
+
+        with col_dl:
+            st.markdown(
+                '<div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Download backup</div>',
+                unsafe_allow_html=True,
+            )
+            st.download_button(
+                "Download my Wearly backup",
+                data=export_user_data_bytes(),
+                file_name=suggested_backup_filename(),
+                mime="application/json",
+                use_container_width=True,
+                help=("Saves a single JSON containing your wardrobe, profile, "
+                      "wear history, favorite stores, and wishlist."),
+            )
+
+        with col_ul:
+            st.markdown(
+                '<div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Restore from a backup</div>',
+                unsafe_allow_html=True,
+            )
+            uploaded = st.file_uploader(
+                "Pick a Wearly backup JSON",
+                type=["json"],
+                accept_multiple_files=False,
+                key="backup_upload",
+                label_visibility="collapsed",
+            )
+
+            if uploaded is not None:
+                raw = uploaded.getvalue()
+                if not is_wearly_backup(raw):
+                    st.error(
+                        "This file doesn't look like a Wearly backup. "
+                        "Re-export from the Download button to produce a valid file."
+                    )
+                else:
+                    st.caption(
+                        "Restoring will **overwrite** your current wardrobe, "
+                        "profile, wear history, favorite stores, and wishlist "
+                        "with the contents of this backup."
+                    )
+                    if st.button("Restore now", key="backup_restore_btn",
+                                 type="primary", use_container_width=True):
+                        res = import_user_data(raw)
+                        if res.get("success"):
+                            restored = ", ".join(res.get("restored") or [])
+                            st.success(
+                                f"Restored: {restored or 'nothing changed'}. "
+                                f"Reloading the app to pick up the new state…"
+                            )
+                            st.rerun()
+                        else:
+                            st.error(f"Restore failed: {res.get('error', 'unknown error')}")
+
+
 def _render_wardrobe():
     # ── Page header ─────────────────────────────────────────────
     st.markdown("""
@@ -1242,6 +1341,13 @@ def _render_wardrobe():
         <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Your digital closet — seed pieces plus anything you've added.</div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Backup & Restore ────────────────────────────────────────
+    # The persistence path. On localhost, files persist on disk and the
+    # backup is for portability / safekeeping. On Streamlit Cloud, the
+    # container filesystem is ephemeral — backups are the way your
+    # closet survives between sessions. Same UI either way.
+    _render_backup_restore()
 
     # ── Inventory summary (seed + user counts) ───────────────────
     seed_clothing = seed_shoes = seed_accessories = 0
