@@ -541,6 +541,29 @@ if "signed_in" not in st.session_state:
     st.session_state["signed_in"] = True
 if "everyday_choice" not in st.session_state:
     st.session_state["everyday_choice"] = "Work"
+if "last_run" not in st.session_state:
+    # Remember the most recent invocation so "Regenerate" can replay it
+    # with accumulated rejection context.
+    st.session_state["last_run"] = {"mode": "calendar", "everyday_request": None}
+if "rejected_ids" not in st.session_state:
+    st.session_state["rejected_ids"] = []
+if "rejection_reasons" not in st.session_state:
+    st.session_state["rejection_reasons"] = []
+
+
+def _run_and_store(mode: str, everyday_request: str = None,
+                   rejected_ids=None, rejection_reasons=None) -> dict:
+    """Wrapper: runs the agent, stores result + the invocation params so
+    a later 'Regenerate' can replay the same mode with rejection context."""
+    res = run_agent(
+        mode=mode,
+        everyday_request=everyday_request,
+        rejected_ids=rejected_ids,
+        rejection_reasons=rejection_reasons,
+    )
+    st.session_state["result"] = res
+    st.session_state["last_run"] = {"mode": mode, "everyday_request": everyday_request}
+    return res
 
 
 def _profile_display():
@@ -626,11 +649,10 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     if st.button("Plan this occasion →", key="sidebar_everyday", use_container_width=True):
+        st.session_state["rejected_ids"] = []
+        st.session_state["rejection_reasons"] = []
         with st.spinner("Reading your closet · scoring color harmony…"):
-            st.session_state["result"] = run_agent(
-                mode="everyday",
-                everyday_request=st.session_state["everyday_choice"],
-            )
+            _run_and_store("everyday", st.session_state["everyday_choice"])
         _goto("today")
 
     st.markdown("---")
@@ -787,6 +809,104 @@ def _render_outfit_result(result: dict):
             r_html += f'<div class="reason-item"><span class="reason-num">{i}</span><span>{r}</span></div>'
         st.markdown(f'<div class="card" style="margin-top:0">{r_html}</div>', unsafe_allow_html=True)
 
+    # ── Refine this outfit (reject & regenerate) ──────────
+    # This is the "agent, not chatbot" moment — the user can push back
+    # on the recommendation with specific reasons and the agent re-runs
+    # with those constraints, surfacing every reason in the reasoning
+    # trail so the user sees WHY the new outfit is different.
+    if outfit:
+        st.markdown("""
+        <div style="margin:1.6rem 0 0.8rem; padding-top:1.2rem; border-top:1px solid #EDE5DC;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.25rem; color:#1C1917; line-height:1.2;">
+                Not quite right?
+            </div>
+            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.35rem; line-height:1.55;">
+                Tell Wearly what to swap out and why. The agent will re-run with your feedback —
+                and explain every change.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Build a label → id map for the multiselect
+        _id_by_label = {it.get("name", "—"): it.get("id") for it in outfit if it.get("id")}
+        _labels = list(_id_by_label.keys())
+
+        _reasons_options = [
+            "Wore it recently",
+            "Too formal",
+            "Too casual",
+            "Uncomfortable",
+            "Not suitable for weather",
+            "Doesn't fit well",
+            "Not modest enough",
+            "Don't like this color today",
+            "Unavailable / in laundry",
+        ]
+
+        _swap = st.multiselect(
+            "Items to swap out",
+            options=_labels,
+            key="refine_items",
+            help="Pick one or more pieces you'd rather not wear today.",
+        )
+        _reason = st.selectbox(
+            "Reason",
+            options=_reasons_options,
+            key="refine_reason",
+            help="Wearly will record this reason in the reasoning trail.",
+        )
+
+        if st.button(
+            "Regenerate with these changes →",
+            key="refine_regenerate",
+            type="primary",
+            use_container_width=True,
+            disabled=not _swap,
+        ):
+            # Accumulate the new rejections on top of any previous ones
+            # in this session, so successive "Regenerate" presses keep
+            # narrowing the candidate pool.
+            new_ids = [_id_by_label[lbl] for lbl in _swap if lbl in _id_by_label]
+            new_reasons = [
+                {"item_id": _id_by_label[lbl], "item_name": lbl, "reason": _reason}
+                for lbl in _swap if lbl in _id_by_label
+            ]
+            prior_ids = st.session_state.get("rejected_ids", [])
+            prior_reasons = st.session_state.get("rejection_reasons", [])
+            st.session_state["rejected_ids"] = list({*prior_ids, *new_ids})
+            st.session_state["rejection_reasons"] = prior_reasons + new_reasons
+
+            last = st.session_state.get("last_run", {"mode": "calendar", "everyday_request": None})
+            with st.spinner("Re-reading your context · applying your feedback…"):
+                _run_and_store(
+                    last.get("mode", "calendar"),
+                    last.get("everyday_request"),
+                    rejected_ids=st.session_state["rejected_ids"],
+                    rejection_reasons=st.session_state["rejection_reasons"],
+                )
+            st.rerun()
+
+        # If we already regenerated at least once, show a small "what changed" banner.
+        prior = result.get("rejected_context", {})
+        prior_reasons_list = prior.get("reasons", []) if isinstance(prior, dict) else []
+        if prior_reasons_list:
+            chips = "".join(
+                f'<span style="display:inline-block; font-size:0.74rem; color:#9F5A36; padding:0.32rem 0.8rem; background:#FAF3EE; border:1px solid #EAD7C9; border-radius:99px; margin:0 0.4rem 0.4rem 0;">{r.get("item_name","—")} · {r.get("reason","rejected")}</span>'
+                for r in prior_reasons_list
+            )
+            st.markdown(f"""
+            <div style="margin-top:1.1rem; padding:1rem 1.1rem; background:#FDFAF7; border:1px solid #EDE5DC; border-radius:6px;">
+                <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">
+                    What changed in this run
+                </div>
+                <div>{chips}</div>
+                <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.65rem; line-height:1.55;">
+                    These items were excluded from the candidate pool. The reasoning trail above shows what Wearly chose instead.
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+
 # ─────────────────────────────────────────────
 # HOME — landing screen with personalized "Today" preview
 # ─────────────────────────────────────────────
@@ -868,8 +988,10 @@ def _render_home():
     """, unsafe_allow_html=True)
 
     if st.button("Plan today's outfit →", key="home_cta", type="primary", use_container_width=True):
+        st.session_state["rejected_ids"] = []
+        st.session_state["rejection_reasons"] = []
         with st.spinner("Reading your calendar · checking the weather · filtering your closet · scoring color harmony…"):
-            st.session_state["result"] = run_agent(mode="calendar")
+            _run_and_store("calendar")
         _goto("today")
 
     st.markdown("""
@@ -940,8 +1062,11 @@ def _render_today():
         _render_outfit_result(res)
         st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
         if st.button("Replan from scratch", key="replan_today", use_container_width=False):
+            st.session_state["rejected_ids"] = []
+            st.session_state["rejection_reasons"] = []
+            last = st.session_state.get("last_run", {"mode": "calendar", "everyday_request": None})
             with st.spinner("Re-running the agent…"):
-                st.session_state["result"] = run_agent(mode="calendar")
+                _run_and_store(last.get("mode", "calendar"), last.get("everyday_request"))
             st.rerun()
     else:
         st.markdown("""
@@ -958,8 +1083,10 @@ def _render_today():
         """, unsafe_allow_html=True)
         st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
         if st.button("Plan today's outfit →", key="today_cta", type="primary", use_container_width=True):
+            st.session_state["rejected_ids"] = []
+            st.session_state["rejection_reasons"] = []
             with st.spinner("Reading your calendar · checking the weather · filtering your closet · scoring color harmony…"):
-                st.session_state["result"] = run_agent(mode="calendar")
+                _run_and_store("calendar")
             st.rerun()
 
 
@@ -1112,8 +1239,10 @@ def _render_demo():
 
     st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
     if st.button("See it live →", key="demo_live", type="primary", use_container_width=True):
+        st.session_state["rejected_ids"] = []
+        st.session_state["rejection_reasons"] = []
         with st.spinner("Running the agent live…"):
-            st.session_state["result"] = run_agent(mode="calendar")
+            _run_and_store("calendar")
         st.rerun()
 
     if st.session_state.get("result"):

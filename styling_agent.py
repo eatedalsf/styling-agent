@@ -87,12 +87,27 @@ SHOPPING_SUGGESTIONS = {
 # MAIN AGENT WORKFLOW
 # ─────────────────────────────────────────────
 
-def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
+def run_agent(
+    mode: str = "calendar",
+    everyday_request: str = None,
+    rejected_ids: list = None,
+    rejection_reasons: list = None,
+) -> dict:
     """
     Main agent entry point.
 
     mode = "calendar"  → reads next upcoming event automatically
     mode = "everyday"  → uses everyday_request string (e.g. "gym", "work")
+
+    rejected_ids:
+        Optional list of wardrobe item ids the user has rejected. The
+        agent will exclude these from the wardrobe pool in Step 4.
+
+    rejection_reasons:
+        Optional list of {"item_id", "item_name", "reason"} dicts that
+        accompany rejected_ids. Used purely for the reasoning trace —
+        every rejection reason is surfaced so the user can see WHY the
+        outfit changed.
 
     Returns a full result dict with:
       - steps: list of workflow steps with status and output
@@ -106,6 +121,8 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
     """
 
     steps = []
+    rejected_ids = list(rejected_ids or [])
+    rejection_reasons = list(rejection_reasons or [])
     result = {
         "steps": steps,
         "recommendation": None,
@@ -116,6 +133,10 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
         "weather": None,
         "event": None,
         "profile": None,
+        "rejected_context": {
+            "ids": rejected_ids,
+            "reasons": rejection_reasons,
+        },
         "error": None
     }
 
@@ -222,9 +243,23 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
     shoes_pool = wardrobe_result["shoes"]
     accessories_pool = wardrobe_result["accessories"]
 
+    # Apply user rejections: drop any item the user previously rejected.
+    rejected_set = set(rejected_ids)
+    if rejected_set:
+        before_total = len(clothing_pool) + len(shoes_pool) + len(accessories_pool)
+        clothing_pool = [i for i in clothing_pool if i.get("id") not in rejected_set]
+        shoes_pool = [i for i in shoes_pool if i.get("id") not in rejected_set]
+        accessories_pool = [i for i in accessories_pool if i.get("id") not in rejected_set]
+        after_total = len(clothing_pool) + len(shoes_pool) + len(accessories_pool)
+        excluded = before_total - after_total
+        step4_note = f" Excluded {excluded} previously rejected item(s)."
+    else:
+        step4_note = ""
+
     step4["output"] = (
         f"Found {len(clothing_pool)} clothing items, {len(shoes_pool)} shoe options, "
         f"{len(accessories_pool)} accessories for occasion: {occasion_tag} in {season}."
+        + step4_note
     )
     steps.append(step4)
 
@@ -232,6 +267,13 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
     step5 = {"step": 5, "name": "Build Outfit", "status": "ok", "output": ""}
     outfit = []
     reasoning = []
+
+    # Surface every rejection reason in the reasoning trail so the user
+    # can see WHY this regenerated outfit is different from the previous one.
+    for rej in rejection_reasons:
+        nm = rej.get("item_name", "an item")
+        rs = rej.get("reason", "rejected")
+        reasoning.append(f"Skipping '{nm}' — you flagged it as: {rs}.")
 
     formality = occasion.get("formality", "casual")
 
