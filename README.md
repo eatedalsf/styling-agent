@@ -52,6 +52,21 @@ streamlit run app.py
 
 ---
 
+## Deploy
+
+Wearly AI is configured to deploy to **[Streamlit Community Cloud](https://streamlit.io/cloud)** with zero changes:
+
+1. Push this repository to GitHub (already done if you cloned from there).
+2. Go to <https://share.streamlit.io>, sign in with GitHub, and click **New app**.
+3. Select this repository, branch `main`, and entry-point file `app.py`.
+4. Click **Deploy**.
+
+The brand theme, mobile-first layout, and runtime config are picked up automatically from `.streamlit/config.toml`. No environment variables required — the live weather call uses Open-Meteo (no API key).
+
+> **Note:** The hosted URL is the canonical demo surface for SEIS 666 grading. Local install instructions above remain available for offline review.
+
+---
+
 ## Project Structure
 
 The repository currently uses a flat layout — all source, data, and docs sit at the project root:
