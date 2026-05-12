@@ -1,0 +1,4 @@
+{
+  "_comment": "Wear history. Created and updated when the user confirms an outfit via the 'Wear this outfit today' button. The agent reads this to choose fresher items when multiple candidates are equally eligible.",
+  "history": {}
+}

@@ -837,6 +837,51 @@ def _render_outfit_result(result: dict):
             r_html += f'<div class="reason-item"><span class="reason-num">{i}</span><span>{r}</span></div>'
         st.markdown(f'<div class="card" style="margin-top:0">{r_html}</div>', unsafe_allow_html=True)
 
+    # ── Wear-today: record this outfit in wear history ──────────
+    # Tells Wearly "I'm actually wearing this." Next time the agent runs,
+    # the freshness tie-breaker prefers items you haven't just worn.
+    # This is the second "agent, not chatbot" signal (paired with reject/regenerate):
+    # the system LEARNS from accepted recommendations, not just from declined ones.
+    if outfit:
+        outfit_key = "|".join(sorted(i.get("id", "") for i in outfit))
+        already_worn = st.session_state.get("worn_outfit_key") == outfit_key
+
+        st.markdown("""
+        <div style="margin:1.4rem 0 0.6rem; padding-top:1.2rem; border-top:1px solid #EDE5DC;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.25rem; color:#1C1917; line-height:1.2;">
+                Wearing this today?
+            </div>
+            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.35rem; line-height:1.55;">
+                Mark the outfit worn so Wearly can rotate fresher pieces into your next recommendation.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        if not already_worn:
+            if st.button(
+                "✓ Wear this outfit today",
+                key="wear_today_btn", type="primary", use_container_width=True,
+            ):
+                try:
+                    from history_tool import record_wear
+                except ImportError:
+                    from tools.history_tool import record_wear  # legacy layout
+                item_ids = [i.get("id") for i in outfit if i.get("id")]
+                event_name = (result.get("event") or {}).get("title") or "Today"
+                rec = record_wear(item_ids, event_name=event_name)
+                if rec.get("success"):
+                    st.session_state["worn_outfit_key"] = outfit_key
+                    st.success(
+                        f"Recorded — {rec.get('recorded_count', 0)} piece"
+                        f"{'s' if rec.get('recorded_count', 0) != 1 else ''} marked worn. "
+                        f"Wearly will prefer fresher options for your next recommendation."
+                    )
+                    st.rerun()
+                else:
+                    st.error(f"Could not record wear: {rec.get('error', 'unknown error')}")
+        else:
+            st.success("Marked worn — Wearly will prefer fresher pieces next time.")
+
     # ── Refine this outfit (reject & regenerate) ──────────
     # This is the "agent, not chatbot" moment — the user can push back
     # on the recommendation with specific reasons and the agent re-runs

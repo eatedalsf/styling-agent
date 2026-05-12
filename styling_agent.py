@@ -275,17 +275,62 @@ def run_agent(
         rs = rej.get("reason", "rejected")
         reasoning.append(f"Skipping '{nm}' — you flagged it as: {rs}.")
 
+    # ── Wear-history tie-breaker ──────────────────────────────────────────
+    # Sort each pool so fresher items (less recently / less frequently worn)
+    # are picked first when multiple candidates are equally eligible. This
+    # is a TIE-BREAKER, never a filter — see skill rule R3 in
+    # skills/wearly-styling-agent/wear-history-rules.md.
+    try:
+        from history_tool import get_history, get_freshness, days_since_last_worn
+        _history = get_history().get("history", {})
+    except Exception:
+        _history = {}
+        def get_freshness(*_a, **_k): return 1.0  # type: ignore[assignment]
+        def days_since_last_worn(*_a, **_k): return None  # type: ignore[assignment]
+
+    def _by_freshness(items):
+        return sorted(items, key=lambda x: -get_freshness(x.get("id", ""), _history))
+
+    def _freshness_note(item):
+        """Return an extra reasoning line if the chosen item is recently
+        worn (low freshness) or under-worn (long unseen). Otherwise None."""
+        iid = item.get("id", "")
+        if not iid:
+            return None
+        f = get_freshness(iid, _history)
+        days = days_since_last_worn(iid, _history)
+        worn = _history.get(iid, {}).get("worn_count", 0)
+        if f < 0.7:
+            return (
+                f"  Note: you've worn '{item['name']}' recently"
+                + (f" ({days} day{'s' if days != 1 else ''} ago)" if isinstance(days, int) else "")
+                + " — it's still the strongest fit for today."
+            )
+        if worn >= 1 and isinstance(days, int) and days >= 30:
+            return (
+                f"  Note: you haven't worn '{item['name']}' in {days} days "
+                f"— bringing it back today."
+            )
+        return None
+
+    clothing_pool    = _by_freshness(clothing_pool)
+    shoes_pool       = _by_freshness(shoes_pool)
+    accessories_pool = _by_freshness(accessories_pool)
+
     formality = occasion.get("formality", "casual")
 
     # Check for dress-worthy occasions first
     if occasion_tag in DRESS_OCCASIONS and formality in ["formal", "smart_casual"]:
         dresses = [i for i in clothing_pool if i["type"] == "dress"]
         if dresses:
-            # Prefer higher formality dresses for formal occasions
+            # Prefer higher formality dresses for formal occasions, then freshness.
             if formality == "formal":
-                dresses.sort(key=lambda d: 0 if d["formality"] == "formal" else 1)
+                dresses.sort(key=lambda d: (0 if d["formality"] == "formal" else 1,
+                                            -get_freshness(d.get("id", ""), _history)))
             outfit.append(dresses[0])
             reasoning.append(f"Selected '{dresses[0]['name']}' as a one-piece solution for this {formality} occasion.")
+            _note = _freshness_note(dresses[0])
+            if _note: reasoning.append(_note)
 
     # If no dress selected, build top + bottom
     if not any(i["type"] == "dress" for i in outfit):
@@ -295,27 +340,39 @@ def run_agent(
 
         if occasion_tag == "gym":
             if activewear:
-                outfit.extend(activewear[:2])
-                reasoning.append(f"Selected activewear set: {', '.join(i['name'] for i in outfit)}.")
+                chosen_active = activewear[:2]
+                outfit.extend(chosen_active)
+                reasoning.append(f"Selected activewear set: {', '.join(i['name'] for i in chosen_active)}.")
+                for piece in chosen_active:
+                    _note = _freshness_note(piece)
+                    if _note: reasoning.append(_note)
             else:
                 reasoning.append("No activewear found in wardrobe for this gym occasion.")
         else:
             if tops:
                 outfit.append(tops[0])
                 reasoning.append(f"Selected top: '{tops[0]['name']}' for its {tops[0]['formality']} formality.")
+                _note = _freshness_note(tops[0])
+                if _note: reasoning.append(_note)
             if bottoms:
                 outfit.append(bottoms[0])
                 reasoning.append(f"Selected bottom: '{bottoms[0]['name']}' to pair with the top.")
+                _note = _freshness_note(bottoms[0])
+                if _note: reasoning.append(_note)
 
     # Add shoes
     if shoes_pool:
         outfit.append(shoes_pool[0])
         reasoning.append(f"Added shoes: '{shoes_pool[0]['name']}' appropriate for the occasion.")
+        _note = _freshness_note(shoes_pool[0])
+        if _note: reasoning.append(_note)
 
     # Add accessories (up to 2)
     for acc in accessories_pool[:2]:
         outfit.append(acc)
         reasoning.append(f"Added accessory: '{acc['name']}'.")
+        _note = _freshness_note(acc)
+        if _note: reasoning.append(_note)
 
     # Add outerwear if weather requires it.
     # Use the CURRENT occasion (not a hardcoded "work" tag) so a gym outfit
