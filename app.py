@@ -1,5 +1,5 @@
 """
-app.py — Streamlit Web Interface for the AI Personal Styling Agent
+app.py — Streamlit Web Interface for Wearly AI
 Run with: streamlit run app.py
 """
 
@@ -25,7 +25,7 @@ except ModuleNotFoundError:
 # PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
-    page_title="Style Agent",
+    page_title="Wearly AI",
     page_icon="👗",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -322,7 +322,8 @@ def score_color(score):
 # ─────────────────────────────────────────────
 
 with st.sidebar:
-    st.markdown("### 👗 Style Agent")
+    st.markdown("### 👗 Wearly AI")
+    st.markdown("<p style='font-size:0.72rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-top:-0.4rem;'>Your style, reasoned.</p>", unsafe_allow_html=True)
     st.markdown("---")
 
     mode = st.radio(
@@ -343,6 +344,18 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("""
+    <p style="font-size:0.7rem; color:#A8937E; letter-spacing:0.06em; text-transform:uppercase; margin-bottom:0.4rem;">
+    Privacy
+    </p>
+    <p style="font-size:0.72rem; color:#C9B99A; line-height:1.6;">
+    Your calendar, weather/location, wardrobe, and profile data are used <strong>only</strong>
+    for outfit planning in this prototype. Nothing is sent to third parties and no account
+    is created.
+    </p>
+    """, unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown("""
     <p style="font-size:0.72rem; color:#6B5C52; line-height:1.7;">
     SEIS 666 — Spring 2026<br>
     Track B: Agentic AI System<br>
@@ -357,7 +370,7 @@ with st.sidebar:
 # ─────────────────────────────────────────────
 
 st.markdown('<p class="main-title">Your Style,<br><em>Reasoned.</em></p>', unsafe_allow_html=True)
-st.markdown('<p class="main-subtitle">AI Personal Styling Agent — SEIS 666 Capstone</p>', unsafe_allow_html=True)
+st.markdown('<p class="main-subtitle">Wearly AI — Personal Styling Agent · SEIS 666 Capstone</p>', unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────
@@ -388,7 +401,7 @@ if "Before" in mode and run_btn:
     with col2:
         st.markdown("""
         <div class="compare-col compare-after">
-            <div class="compare-label">After — Style Agent</div>
+            <div class="compare-label">After — Wearly AI</div>
             <div class="compare-row"><span class="compare-key">Time to decide</span><span class="compare-val">~3 seconds</span></div>
             <div class="compare-row"><span class="compare-key">Weather check</span><span class="compare-val">Automatic (live API)</span></div>
             <div class="compare-row"><span class="compare-key">Color coordination</span><span class="compare-val">0–100 score</span></div>

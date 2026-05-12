@@ -1,6 +1,6 @@
 """
-main.py — Styling Agent Runner
-Run this file to use the AI Personal Styling Agent.
+main.py — Wearly AI CLI Runner
+Run this file to use Wearly AI from the command line.
 
 Usage:
   python main.py                          → reads next calendar event
@@ -142,7 +142,7 @@ def print_before_after():
   Time spent: ~15 minutes. Confidence: low. Missed the coat.
 """)
 
-    print(f"{BOLD}AFTER: AI Personal Styling Agent{RESET}")
+    print(f"{BOLD}AFTER: Wearly AI{RESET}")
     print(DIVIDER)
     print("""  Agent reads the calendar → finds "Dinner with Clients" tonight.
   Agent checks real-time weather → 49°F, partly cloudy.
@@ -163,7 +163,7 @@ def print_before_after():
 # ─────────────────────────────────────────────
 
 def main():
-    parser = argparse.ArgumentParser(description="AI Personal Styling Agent")
+    parser = argparse.ArgumentParser(description="Wearly AI — Personal Styling Agent")
     parser.add_argument("--everyday", type=str, help='Everyday request, e.g. "gym" or "work"')
     parser.add_argument("--compare", action="store_true", help="Show before/after comparison demo")
     args = parser.parse_args()
@@ -172,16 +172,16 @@ def main():
         print_before_after()
         print("\nNow running a live calendar-based recommendation:\n")
         result = run_agent(mode="calendar")
-        print_header("AI PERSONAL STYLING AGENT — LIVE RUN")
+        print_header("WEARLY AI — LIVE RUN")
         display_result(result)
 
     elif args.everyday:
-        print_header(f"AI PERSONAL STYLING AGENT — Everyday: {args.everyday.upper()}")
+        print_header(f"WEARLY AI — Everyday: {args.everyday.upper()}")
         result = run_agent(mode="everyday", everyday_request=args.everyday)
         display_result(result)
 
     else:
-        print_header("AI PERSONAL STYLING AGENT — Calendar Mode")
+        print_header("WEARLY AI — Calendar Mode")
         result = run_agent(mode="calendar")
         display_result(result)
 

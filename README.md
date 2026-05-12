@@ -1,6 +1,10 @@
-# AI Personal Styling Agent
+# Wearly AI
+*Your style, reasoned.*
+
 **SEIS 666 — Digital Transformation 2.0 | Spring 2026**
 **Track B: Agentic AI System**
+
+A mobile-first, clean-luxury personal styling agent that recommends complete outfits using your calendar, real-time weather, wardrobe, and color profile — with full reasoning at every step.
 
 ---
 
