@@ -1736,20 +1736,34 @@ def _render_wardrobe():
 # ─────────────────────────────────────────────
 
 def _render_profile():
-    p_res = get_owner_profile()
-    profile = p_res.get("profile", {}) if p_res.get("success") else {}
-    name = profile.get("name", "You")
-    body = profile.get("body_shape", "—")
-    skin = profile.get("skin_tone", "—")
-    fit  = profile.get("preferred_fit", "—")
+    # Pull the merged fit profile (seed owner + user overlay).
+    try:
+        from fit_tool import get_fit_profile, save_fit_profile
+    except ImportError:
+        from tools.fit_tool import get_fit_profile, save_fit_profile  # legacy layout
+
+    fp_res = get_fit_profile()
+    profile = fp_res.get("profile", {}) if fp_res.get("success") else {}
+
+    name  = profile.get("name", "You")
+    body  = profile.get("body_shape", "—")
+    skin  = profile.get("skin_tone", "—")
+    fit_v = profile.get("preferred_fit", "—")
     prefs = profile.get("style_preferences", []) or []
     prefs_html = "".join(
         f'<span style="display:inline-block; font-size:0.78rem; color:#7C6F64; padding:0.34rem 0.85rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px; margin:0 0.35rem 0.45rem 0;">{x}</span>'
         for x in prefs
     ) or '<span style="font-size:0.84rem; color:#9C8A7A;">No preferences saved yet.</span>'
 
+    modesty   = profile.get("modesty_preference") or "—"
+    comfort   = profile.get("comfort_needs", []) or []
+    goals     = profile.get("style_goals", []) or []
+    highlights = profile.get("highlight_features", []) or []
+    balances   = profile.get("balance_areas", []) or []
+
     initial = (name[:1] or "Y").upper()
 
+    # ── Header card ──
     st.markdown(f"""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Profile</div>
@@ -1767,33 +1781,131 @@ def _render_profile():
             </div>
         </div>
     </div>
+    """, unsafe_allow_html=True)
 
+    # ── Read-only "what Wearly knows" card ──
+    def _list_chips(values, empty="—"):
+        if not values:
+            return f'<span style="font-size:0.86rem; color:#9C8A7A;">{empty}</span>'
+        return "".join(
+            f'<span style="display:inline-block; font-size:0.78rem; color:#7C6F64; padding:0.32rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px; margin:0 0.35rem 0.4rem 0;">{x}</span>'
+            for x in values
+        )
+
+    st.markdown(f"""
     <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">
         <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.9rem;">Style profile</div>
         <div style="display:flex; flex-wrap:wrap; gap:1.4rem; row-gap:1rem;">
             <div style="flex:1; min-width:140px;">
                 <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Body shape</div>
-                <div style="font-size:0.95rem; color:#1C1917;">{body.title() if body else '—'}</div>
+                <div style="font-size:0.95rem; color:#1C1917;">{(body or '—').title() if isinstance(body, str) else '—'}</div>
             </div>
             <div style="flex:1; min-width:140px;">
                 <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Skin tone</div>
-                <div style="font-size:0.95rem; color:#1C1917;">{skin.title() if skin else '—'}</div>
+                <div style="font-size:0.95rem; color:#1C1917;">{(skin or '—').title() if isinstance(skin, str) else '—'}</div>
             </div>
             <div style="flex:1; min-width:140px;">
                 <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Preferred fit</div>
-                <div style="font-size:0.95rem; color:#1C1917;">{fit.title() if fit else '—'}</div>
+                <div style="font-size:0.95rem; color:#1C1917;">{(fit_v or '—').title() if isinstance(fit_v, str) else '—'}</div>
             </div>
         </div>
         <div style="margin-top:1.2rem;">
             <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style preferences</div>
             <div>{prefs_html}</div>
         </div>
+        <div style="margin-top:1.2rem;">
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Modesty preference</div>
+            <div style="font-size:0.9rem; color:#1C1917;">{(modesty or '—').title() if isinstance(modesty, str) else '—'}</div>
+        </div>
+        <div style="margin-top:1.2rem;">
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Comfort needs</div>
+            <div>{_list_chips(comfort)}</div>
+        </div>
+        <div style="margin-top:1.2rem;">
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style goals</div>
+            <div>{_list_chips(goals)}</div>
+        </div>
+        <div style="margin-top:1.2rem;">
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to highlight</div>
+            <div>{_list_chips(highlights)}</div>
+        </div>
+        <div style="margin-top:1.2rem;">
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to balance</div>
+            <div>{_list_chips(balances)}</div>
+        </div>
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Edit form (overlay only — never touches seed wardrobe) ──
+    with st.expander("Edit your fit & style preferences", expanded=False):
+        st.markdown("""
+        <div style="font-size:0.82rem; color:#7C6F64; line-height:1.55; margin-bottom:0.8rem;">
+            Every field is optional. Wearly applies a preference only when you've shared it.
+            <br><strong style="color:#9F5A36;">Body-positive language only.</strong>
+            Use words like <em>highlight, balance, support, improve, increase confidence</em>.
+            Wearly rejects corrective language like "hide," "fix," or "minimize" by design.
+        </div>
+        """, unsafe_allow_html=True)
+
+        _MODESTY_OPTIONS = ["", "low", "moderate", "high"]
+        _COMFORT_OPTIONS = ["soft fabrics", "stretchy fabrics", "no stiff collars",
+                            "breathable layers", "no tight waistbands", "no scratchy seams"]
+        _GOAL_OPTIONS = ["elevated", "modernized", "stay timeless", "more confident",
+                         "feel like myself", "look pulled together"]
+        _AREA_OPTIONS = ["shoulders", "neckline", "waist", "hips", "legs",
+                         "arms", "back", "collarbone"]
+
+        with st.form("profile_edit_form"):
+            col_a, col_b = st.columns(2, gap="medium")
+            with col_a:
+                new_modesty = st.selectbox(
+                    "Modesty preference",
+                    options=_MODESTY_OPTIONS,
+                    index=_MODESTY_OPTIONS.index(modesty) if modesty in _MODESTY_OPTIONS else 0,
+                    help="Optional. Higher modesty filters out very revealing pieces; 'low' applies no constraint.",
+                )
+                new_goals = st.multiselect(
+                    "Style goals", options=_GOAL_OPTIONS,
+                    default=[g for g in goals if g in _GOAL_OPTIONS],
+                )
+                new_highlights = st.multiselect(
+                    "Features to highlight", options=_AREA_OPTIONS,
+                    default=[h for h in highlights if h in _AREA_OPTIONS],
+                    help="Body areas you want to draw attention to.",
+                )
+            with col_b:
+                new_comfort = st.multiselect(
+                    "Comfort preferences", options=_COMFORT_OPTIONS,
+                    default=[c for c in comfort if c in _COMFORT_OPTIONS],
+                )
+                new_balances = st.multiselect(
+                    "Areas to balance", options=_AREA_OPTIONS,
+                    default=[b for b in balances if b in _AREA_OPTIONS],
+                    help="Body areas you'd like to bring into proportion. Wearly never frames these as flaws.",
+                )
+
+            save_btn = st.form_submit_button(
+                "Save profile", type="primary", use_container_width=True,
+            )
+            if save_btn:
+                upd = {
+                    "modesty_preference": (new_modesty or None),
+                    "comfort_needs":      new_comfort,
+                    "style_goals":        new_goals,
+                    "highlight_features": new_highlights,
+                    "balance_areas":      new_balances,
+                }
+                res = save_fit_profile(upd)
+                if res.get("success"):
+                    st.success("Profile updated. Wearly will reflect these preferences in your next outfit.")
+                    st.rerun()
+                else:
+                    st.error(f"Could not save: {res.get('error', 'unknown error')}")
+
+    # ── Auth placeholder + privacy note ──
     c1, c2 = st.columns(2, gap="small")
     with c1:
-        if st.button("Edit profile (coming soon)", key="profile_edit", disabled=True, use_container_width=True):
+        if st.button("Edit name & body shape (coming soon)", key="profile_edit_seed", disabled=True, use_container_width=True):
             pass
     with c2:
         if st.button("Sign in with Apple / Google (coming soon)", key="profile_signin", disabled=True, use_container_width=True):
@@ -1802,7 +1914,7 @@ def _render_profile():
     st.markdown("""
     <p style="font-size:0.74rem; color:#9C8A7A; line-height:1.55; margin-top:1rem;">
         <strong style="color:#7C6F64; letter-spacing:0.04em;">Privacy.</strong>
-        Your profile data is stored locally in this prototype. Real authentication and cloud sync are future work.
+        Your profile is stored locally in this prototype. Real authentication and cloud sync are future work.
     </p>
     """, unsafe_allow_html=True)
 

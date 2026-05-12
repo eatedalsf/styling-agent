@@ -288,6 +288,18 @@ def run_agent(
         def get_freshness(*_a, **_k): return 1.0  # type: ignore[assignment]
         def days_since_last_worn(*_a, **_k): return None  # type: ignore[assignment]
 
+    # ── Fit profile (merged owner + user overlay) ─────────────────────────
+    # Used for fit-alignment notes in the reasoning trail. The agent
+    # respects whatever fields the user has shared and silently ignores
+    # the rest. Body-positive language contract:
+    # skills/wearly-styling-agent/fit-silhouette-rules.md R1.
+    try:
+        from fit_tool import get_fit_profile, fit_alignment_notes
+        _fit_profile_full = get_fit_profile().get("profile", {})
+    except Exception:
+        _fit_profile_full = profile  # fall back to seed owner from step 2
+        def fit_alignment_notes(*_a, **_k): return []  # type: ignore[assignment]
+
     def _by_freshness(items):
         return sorted(items, key=lambda x: -get_freshness(x.get("id", ""), _history))
 
@@ -329,6 +341,8 @@ def run_agent(
                                             -get_freshness(d.get("id", ""), _history)))
             outfit.append(dresses[0])
             reasoning.append(f"Selected '{dresses[0]['name']}' as a one-piece solution for this {formality} occasion.")
+            for _fnote in fit_alignment_notes(dresses[0], _fit_profile_full):
+                reasoning.append(_fnote)
             _note = _freshness_note(dresses[0])
             if _note: reasoning.append(_note)
 
@@ -352,11 +366,15 @@ def run_agent(
             if tops:
                 outfit.append(tops[0])
                 reasoning.append(f"Selected top: '{tops[0]['name']}' for its {tops[0]['formality']} formality.")
+                for _fnote in fit_alignment_notes(tops[0], _fit_profile_full):
+                    reasoning.append(_fnote)
                 _note = _freshness_note(tops[0])
                 if _note: reasoning.append(_note)
             if bottoms:
                 outfit.append(bottoms[0])
                 reasoning.append(f"Selected bottom: '{bottoms[0]['name']}' to pair with the top.")
+                for _fnote in fit_alignment_notes(bottoms[0], _fit_profile_full):
+                    reasoning.append(_fnote)
                 _note = _freshness_note(bottoms[0])
                 if _note: reasoning.append(_note)
 
