@@ -66,13 +66,26 @@ Wearly's first pass at wear history is intentionally small:
 
 The point isn't a perfect rotation engine — it's a *visible* one. When a fresher item is chosen, the reasoning trail says so.
 
+## Image understanding (what ships today vs the production path)
+
+The Wardrobe Builder accepts a photo and uses it to **assist** the user — not to fully classify the garment. Concretely:
+
+| Today, in the prototype | Production path |
+|---|---|
+| **Pillow-only dominant-color extraction** — resize to 96×96, quantize to 8 colors with `Image.Quantize.MEDIANCUT`, count pixels per color, snap each to the closest named color in `NAMED_COLORS` via Euclidean distance in RGB. Return top 3 candidates with weights. | Real per-pixel segmentation against a fine-tuned model so we can extract the garment's colors specifically, not the background's. |
+| **No category recognition** — the user picks "top / bottom / dress / outerwear / activewear / shoes / accessory" from a dropdown. | Fine-tuned CLIP or a hosted vision API (Google Vision, AWS Rekognition) returning a category + formality estimate that the user can confirm or override. |
+| **Alpha → white composite, not true bg removal.** Images uploaded with transparency are placed on a white canvas. Photos with complex backgrounds are stored as-is. | `rembg` (ONNX models, ~120MB) for client-side bg removal, or a server-side service like Remove.bg / Cloudinary. |
+| **Local filesystem write** to `wardrobe_images/{id}.png`, downscaled to ≤1024 px on the longest side, PNG optimize=true. | Object storage (S3, Cloudflare R2) with signed URLs. Replaces the ephemeral Streamlit Cloud filesystem. |
+| **Ephemeral on Streamlit Cloud.** Saved images and added items survive only until the container restarts (Cloud free-tier filesystem is ephemeral). Surfaced to the user via a `st.info` notice on the photo tab. | Real database + blob store. The prototype's `user_wardrobe.json` becomes a per-user row in a managed DB. |
+| **No URL import** yet. | A small parser pulling `og:image` and `application/ld+json` Product fields, with manual user confirmation. Per-store adapters for the top retailers. |
+
+**Why "upload + review" rather than fully autonomous?** Garment classification needs either a 100MB+ trained model or a paid hosted API — both violate the safe-on-Streamlit-Cloud constraint. Color extraction is cheap, Pillow ships transitively with Streamlit, and the user is right there to confirm the suggestion. The honest path is: extract what we can extract cheaply, ask the user for the rest, and document the production-grade automation as the next step.
+
 ## Future wardrobe extensions
 
-- **Add by photo** — Streamlit file uploader, background → white-bg composite (Phase 4).
-- **Add by URL** — paste a product link, fill in fields manually for prototype, then per-store adapters in production (Phase 4 + 5).
-- **Edit / delete** — straightforward CRUD on `wardrobe.json` (Phase 4).
+- **Edit / delete** — straightforward CRUD on `user_wardrobe.json` (Phase 4).
 - **Modesty / comfort / fabric** fields — used by the agent once the fit profile is fully wired (Phase 3 / 4).
-- **Availability** — "in laundry" / "loaned out" — directly drops items from the pool (Phase 4).
+- **Availability** — `"in laundry"` / `"loaned out"` — already drops items from the pool today via `filter_items_by_occasion()` (shipped in the Wardrobe Builder pass).
 
 ## Where to verify
 

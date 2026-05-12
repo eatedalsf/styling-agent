@@ -29,6 +29,11 @@ htmlcov/
 # Streamlit
 .streamlit/secrets.toml
 
+# Wardrobe Builder runtime artifacts
+# Per-user images saved by save_user_item(). Ephemeral on Streamlit Cloud;
+# kept out of version control so the repo doesn't bloat with user uploads.
+wardrobe_images/
+
 # Environment variables
 .env
 .env.*

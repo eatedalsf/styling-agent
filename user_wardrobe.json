@@ -1,0 +1,6 @@
+{
+  "_comment": "User-added wardrobe items. Created and maintained by the Wardrobe Builder. Items here are MERGED with wardrobe.json at read time by wardrobe_tool.get_wardrobe().",
+  "clothing": [],
+  "shoes": [],
+  "accessories": []
+}

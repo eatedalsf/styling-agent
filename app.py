@@ -18,12 +18,18 @@ try:
     from agent.styling_agent import run_agent
     from tools.calendar_tool import get_upcoming_events
     from tools.weather_tool import get_weather
-    from tools.wardrobe_tool import get_owner_profile
+    from tools.wardrobe_tool import (
+        get_owner_profile, get_wardrobe, get_user_wardrobe,
+        save_user_item, suggest_colors_from_image,
+    )
 except ModuleNotFoundError:
     from styling_agent import run_agent
     from calendar_tool import get_upcoming_events
     from weather_tool import get_weather
-    from wardrobe_tool import get_owner_profile
+    from wardrobe_tool import (
+        get_owner_profile, get_wardrobe, get_user_wardrobe,
+        save_user_item, suggest_colors_from_image,
+    )
 
 from datetime import datetime
 
@@ -506,6 +512,28 @@ COLOR_HEX = {
     "silver":        "#BFC1C2",
     "white/gold":    "#E8DAA8",
 }
+
+def _resolve_image_path(rel_or_abs: str) -> str:
+    """Resolve a wardrobe image path (typically `wardrobe_images/UC001.png`)
+    to an absolute path that lives next to wardrobe.json."""
+    if not rel_or_abs:
+        return ""
+    if os.path.isabs(rel_or_abs):
+        return rel_or_abs
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(here, rel_or_abs)
+
+
+def _image_to_data_uri(path: str) -> str:
+    """Return a `data:image/png;base64,...` URI for a local image, or '' on any failure."""
+    try:
+        import base64
+        with open(_resolve_image_path(path), "rb") as f:
+            data = base64.b64encode(f.read()).decode("ascii")
+        return f"data:image/png;base64,{data}"
+    except Exception:
+        return ""
+
 
 def color_to_swatch(color_str: str) -> str:
     """Return a display hex for a garment color name (graceful fallback)."""
@@ -1095,28 +1123,567 @@ def _render_today():
 # ─────────────────────────────────────────────
 
 def _render_wardrobe():
+    # ── Page header ─────────────────────────────────────────────
     st.markdown("""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Wardrobe</div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Your digital closet — coming soon.</div>
+        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Your digital closet — seed pieces plus anything you've added.</div>
     </div>
-    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:2.4rem 1.6rem; text-align:center;">
-        <div style="display:inline-block; padding:4px 11px; background:#FAF3EE; color:#9F5A36; border:1px solid #EAD7C9; border-radius:99px; font-size:0.66rem; letter-spacing:0.12em; text-transform:uppercase; font-weight:600; margin-bottom:1rem;">In design</div>
-        <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1.2; max-width:24rem; margin:0 auto;">
-            Build a real closet, one piece at a time.
+    """, unsafe_allow_html=True)
+
+    # ── Inventory summary (seed + user counts) ───────────────────
+    seed_clothing = seed_shoes = seed_accessories = 0
+    user_clothing = user_shoes = user_accessories = 0
+    try:
+        full = get_wardrobe()
+        if full.get("success"):
+            user_only = get_user_wardrobe().get("user_wardrobe", {})
+            user_clothing    = len(user_only.get("clothing", []))
+            user_shoes       = len(user_only.get("shoes", []))
+            user_accessories = len(user_only.get("accessories", []))
+            seed_clothing    = len(full["wardrobe"].get("clothing", []))    - user_clothing
+            seed_shoes       = len(full["wardrobe"].get("shoes", []))       - user_shoes
+            seed_accessories = len(full["wardrobe"].get("accessories", [])) - user_accessories
+    except Exception:
+        pass
+
+    total_seed = seed_clothing + seed_shoes + seed_accessories
+    total_user = user_clothing + user_shoes + user_accessories
+
+    st.markdown(f"""
+    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.2rem 1.4rem; margin-bottom:1.1rem;">
+        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.7rem;">Inventory</div>
+        <div style="display:flex; gap:1.2rem; flex-wrap:wrap;">
+            <div style="flex:1; min-width:120px;">
+                <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_clothing + user_clothing}</div>
+                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">clothing pieces</div>
+            </div>
+            <div style="flex:1; min-width:120px;">
+                <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_shoes + user_shoes}</div>
+                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">shoes</div>
+            </div>
+            <div style="flex:1; min-width:120px;">
+                <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_accessories + user_accessories}</div>
+                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">accessories</div>
+            </div>
         </div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.7rem; max-width:28rem; margin-left:auto; margin-right:auto; line-height:1.6;">
-            Snap a photo of any garment, drop in a product link, or type in pieces by hand.
-            Wearly remembers what you own, what you've worn recently, and what's missing.
-        </div>
-        <div style="display:flex; gap:0.6rem; flex-wrap:wrap; justify-content:center; margin-top:1.4rem;">
-            <span style="font-size:0.78rem; color:#7C6F64; padding:0.4rem 0.9rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Photo upload</span>
-            <span style="font-size:0.78rem; color:#7C6F64; padding:0.4rem 0.9rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Product link import</span>
-            <span style="font-size:0.78rem; color:#7C6F64; padding:0.4rem 0.9rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Wear history</span>
-            <span style="font-size:0.78rem; color:#7C6F64; padding:0.4rem 0.9rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Reject &amp; regenerate</span>
+        <div style="font-size:0.76rem; color:#9C8A7A; margin-top:0.85rem; line-height:1.55;">
+            {total_seed} seed piece{'' if total_seed == 1 else 's'} · <strong style="color:#9F5A36;">{total_user} added by you</strong>
         </div>
     </div>
     """, unsafe_allow_html=True)
+
+    # ── Add-item flows: manual + photo ──────────────────────────
+    st.markdown("""
+    <div style="margin-bottom:0.5rem;">
+        <div style="font-family:'DM Serif Display',serif; font-size:1.3rem; color:#1C1917; line-height:1.2;">Add an item</div>
+        <div style="font-size:0.82rem; color:#7C6F64; margin-top:0.25rem;">Type a piece in by hand, or upload a photo and let Wearly suggest the color. Either way, the item joins the candidate pool the next time you ask for an outfit.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _OCCASION_TAG_OPTIONS = [
+        "work", "dinner", "gym", "formal", "casual",
+        "weekend", "evening", "date", "travel", "versatile",
+    ]
+    _SEASON_OPTIONS = ["spring", "summer", "fall", "winter", "all"]
+    _CATEGORY_OPTIONS = [
+        "top", "bottom", "dress", "outerwear", "activewear", "shoes", "accessory",
+    ]
+    _FORMALITY_OPTIONS = [
+        "casual", "smart_casual", "business", "formal", "athletic",
+    ]
+
+    _tab_manual, _tab_photo, _tab_link = st.tabs(["Manual entry", "From a photo", "From a link"])
+
+    # ── Manual tab ──────────────────────────────────────────────
+    with _tab_manual:
+        with st.form("wardrobe_add_form_manual", clear_on_submit=True):
+            col_a, col_b = st.columns([3, 2], gap="small")
+            with col_a:
+                m_name = st.text_input("Name", placeholder="e.g. Cream Linen Blazer", key="m_name")
+            with col_b:
+                m_color = st.text_input("Color", placeholder="e.g. cream", key="m_color")
+
+            col_c, col_d = st.columns([1, 1], gap="small")
+            with col_c:
+                m_category = st.selectbox("Category", options=_CATEGORY_OPTIONS, key="m_category")
+            with col_d:
+                m_formality = st.selectbox("Formality", options=_FORMALITY_OPTIONS, key="m_formality")
+
+            m_seasons = st.multiselect(
+                "Seasons (leave empty to mean year-round)",
+                options=_SEASON_OPTIONS, default=["all"], key="m_seasons",
+            )
+            m_tags = st.multiselect(
+                "Suitable for these occasions", options=_OCCASION_TAG_OPTIONS, default=[], key="m_tags",
+            )
+            m_submit = st.form_submit_button("Add to wardrobe", type="primary", use_container_width=True)
+
+            if m_submit:
+                # availability defaults to "available" inside save_user_item().
+                # The closet-status flow (in laundry / loaned out / etc.) is a
+                # separate later feature, not part of item creation.
+                res = save_user_item(
+                    category=m_category,
+                    item_fields={
+                        "name":         m_name,
+                        "color":        m_color,
+                        "formality":    m_formality,
+                        "season":       m_seasons or ["all"],
+                        "tags":         m_tags or [m_category],
+                    },
+                )
+                if res.get("success"):
+                    added = res["item"]
+                    st.success(
+                        f"Saved **{added['name']}** ({added['color']}, {added['type']}) "
+                        f"as `{added['id']}`. It's now eligible for outfits tagged "
+                        f"{', '.join(added['tags']) or added['type']}."
+                    )
+                else:
+                    st.error(f"Could not save: {res.get('error', 'unknown error')}")
+
+    # ── Photo tab ───────────────────────────────────────────────
+    with _tab_photo:
+        st.markdown("""
+        <div style="font-size:0.82rem; color:#7C6F64; margin-bottom:0.7rem; line-height:1.5;">
+            Upload a photo of the piece. Wearly reads the dominant colors in the image and
+            suggests the closest named color — you confirm or override before saving.
+            <br><span style="color:#9C8A7A; font-size:0.74rem;">No AI category recognition yet; you'll fill in type, formality, and tags. <a href="#" style="color:#A8937E;">Production path is documented in the Intelligent Book.</a></span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        uploaded = st.file_uploader(
+            "Photo (PNG / JPG, up to ~4 MB)",
+            type=["png", "jpg", "jpeg", "webp"],
+            accept_multiple_files=False,
+            key="p_uploader",
+        )
+
+        suggested_color_default = ""
+        image_bytes_for_save = None
+
+        if uploaded is not None:
+            image_bytes_for_save = uploaded.getvalue()
+            prev_col, info_col = st.columns([2, 3], gap="medium")
+            with prev_col:
+                st.image(uploaded, caption=None, use_container_width=True)
+            with info_col:
+                with st.spinner("Reading colors…"):
+                    sugg = suggest_colors_from_image(image_bytes_for_save, top_n=3)
+                if sugg.get("success") and sugg["suggestions"]:
+                    top = sugg["suggestions"][0]
+                    suggested_color_default = top["name"]
+                    chips = ""
+                    for s in sugg["suggestions"]:
+                        pct = round(s["weight"] * 100)
+                        chips += (
+                            f'<div style="display:inline-flex; align-items:center; gap:0.45rem; '
+                            f'padding:0.35rem 0.75rem; background:#FDFAF7; border:1px solid #E8E0D8; '
+                            f'border-radius:99px; font-size:0.78rem; color:#3D332D; margin:0 0.4rem 0.4rem 0;">'
+                            f'<span style="width:14px; height:14px; border-radius:50%; background:{s["hex"]}; '
+                            f'border:1px solid rgba(28,25,23,0.10); display:inline-block;"></span>'
+                            f'{s["name"]} · {pct}%</div>'
+                        )
+                    st.markdown(f"""
+                    <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">
+                        Suggested colors
+                    </div>
+                    <div style="margin-bottom:0.6rem;">{chips}</div>
+                    <div style="font-size:0.76rem; color:#7C6F64; line-height:1.5;">
+                        The top suggestion is pre-filled below. You can keep it, pick one of the others,
+                        or type in any color.
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    st.warning(
+                        f"Couldn't read colors from this image — fill in the color field manually. "
+                        f"{sugg.get('error','')}"
+                    )
+
+        with st.form("wardrobe_add_form_photo", clear_on_submit=True):
+            col_a, col_b = st.columns([3, 2], gap="small")
+            with col_a:
+                p_name = st.text_input("Name", placeholder="e.g. Cream Linen Blazer", key="p_name")
+            with col_b:
+                p_color = st.text_input("Color", value=suggested_color_default, key="p_color")
+
+            col_c, col_d = st.columns([1, 1], gap="small")
+            with col_c:
+                p_category = st.selectbox("Category", options=_CATEGORY_OPTIONS, key="p_category")
+            with col_d:
+                p_formality = st.selectbox("Formality", options=_FORMALITY_OPTIONS, key="p_formality")
+
+            p_seasons = st.multiselect(
+                "Seasons (leave empty to mean year-round)",
+                options=_SEASON_OPTIONS, default=["all"], key="p_seasons",
+            )
+            p_tags = st.multiselect(
+                "Suitable for these occasions", options=_OCCASION_TAG_OPTIONS, default=[], key="p_tags",
+            )
+            p_submit = st.form_submit_button(
+                ("Save photo & add to wardrobe" if image_bytes_for_save else "Add to wardrobe (no photo attached)"),
+                type="primary", use_container_width=True,
+            )
+
+            if p_submit:
+                # availability defaults to "available" — closet status is a
+                # separate later feature, not part of item creation.
+                res = save_user_item(
+                    category=p_category,
+                    item_fields={
+                        "name":         p_name,
+                        "color":        p_color,
+                        "formality":    p_formality,
+                        "season":       p_seasons or ["all"],
+                        "tags":         p_tags or [p_category],
+                    },
+                    image_bytes=image_bytes_for_save,
+                )
+                if res.get("success"):
+                    added = res["item"]
+                    photo_note = ""
+                    if added.get("image_path"):
+                        photo_note = f" Photo saved at `{added['image_path']}`."
+                    elif added.get("_image_error"):
+                        photo_note = f" (Photo could not be saved: {added['_image_error']})"
+                    st.success(
+                        f"Saved **{added['name']}** ({added['color']}, {added['type']}) "
+                        f"as `{added['id']}`.{photo_note} It's now eligible for outfits tagged "
+                        f"{', '.join(added['tags']) or added['type']}."
+                    )
+                else:
+                    st.error(f"Could not save: {res.get('error', 'unknown error')}")
+
+        st.info(
+            "**Heads up.** On the live Streamlit Cloud demo, uploaded images and added items "
+            "persist only until the container restarts (Streamlit Cloud's filesystem is ephemeral). "
+            "For a permanent personal closet, run Wearly locally — or wait for the upcoming "
+            "real-storage release.",
+            icon="ℹ️",
+        )
+
+    # ── Link tab ────────────────────────────────────────────────
+    with _tab_link:
+        st.markdown("""
+        <div style="font-size:0.82rem; color:#7C6F64; margin-bottom:0.7rem; line-height:1.5;">
+            Paste a product URL. Wearly will infer the store, suggest an item name from the URL slug,
+            and try to read the page's public metadata (page title, og:title, og:image) to pre-fill
+            the form. Every field is yours to confirm or edit before saving.
+            <br><span style="color:#9C8A7A; font-size:0.74rem;">
+                Some retailers block automated requests. If the fetch fails we still pre-fill from the URL slug alone — no crashes.
+            </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Lazy import so the rest of the app stays decoupled.
+        try:
+            from link_import import import_product_link
+        except ImportError as _e:
+            st.error(f"Link import module unavailable: {_e}")
+            import_product_link = None
+
+        url_col_a, url_col_b = st.columns([5, 2], gap="small")
+        with url_col_a:
+            link_url = st.text_input(
+                "Product URL",
+                placeholder="https://www.example.com/products/cream-linen-blazer",
+                key="l_url_input",
+                label_visibility="collapsed",
+            )
+        with url_col_b:
+            link_analyze = st.button(
+                "Analyze link →", key="l_analyze",
+                type="primary", use_container_width=True,
+                disabled=(import_product_link is None),
+            )
+
+        # Reset the form state when the URL field is cleared.
+        if not link_url and "link_data" in st.session_state:
+            del st.session_state["link_data"]
+
+        if link_analyze and link_url and import_product_link is not None:
+            with st.spinner("Reading the page…"):
+                st.session_state["link_data"] = import_product_link(link_url)
+
+        link_data = st.session_state.get("link_data")
+
+        if link_data:
+            inferred = link_data.get("inferred", {})
+            meta = link_data.get("metadata", {})
+            fetched = link_data.get("fetched", False)
+            fetch_err = link_data.get("fetch_error")
+            source_image = link_data.get("source_image_url")
+
+            # ── Preview card ──────────────────────────────
+            # Image: real og:image if available; otherwise a calm placeholder
+            # that explicitly invites the user to upload a photo later.
+            if source_image:
+                preview_img_block = (
+                    f'<img src="{source_image}" alt="product image" '
+                    f'style="width:100%; max-width:220px; border-radius:6px; '
+                    f'border:1px solid #E8E0D8; display:block;" '
+                    f'onerror="this.style.display=\'none\'">'
+                )
+            else:
+                preview_img_block = (
+                    '<div style="width:160px; height:120px; background:#F5EDE3; '
+                    'border:1px dashed #D4C4B2; border-radius:6px; display:flex; '
+                    'align-items:center; justify-content:center; text-align:center; '
+                    'font-size:0.72rem; color:#9C8A7A; padding:0.6rem; line-height:1.35;">'
+                    'No image found —<br>upload a photo later'
+                    '</div>'
+                )
+
+            # Status chip: green when the page was read, warm-warning when not.
+            fetch_chip = (
+                '<span style="font-size:0.66rem; color:#3A6B4A; background:#EFF5EB; '
+                'border:1px solid #C9DDC1; padding:2px 9px; border-radius:99px; '
+                'letter-spacing:0.06em; text-transform:uppercase; font-weight:600;">Page read OK</span>'
+                if fetched else
+                '<span style="font-size:0.66rem; color:#8A4A20; background:#FDF3EE; '
+                'border:1px solid #E8C4A8; padding:2px 9px; border-radius:99px; '
+                'letter-spacing:0.06em; text-transform:uppercase; font-weight:600;">URL only</span>'
+            )
+
+            # Suggested-name placeholder: never show useless text like "Productpage."
+            suggested_name_display = inferred.get("name") or '<span style="color:#A8937E;">Review item name below</span>'
+
+            # When the fetch failed, surface a calm one-liner explaining the
+            # situation. The user can still save once they've reviewed fields.
+            fetch_explanation_block = ""
+            if not fetched:
+                fetch_explanation_block = (
+                    '<div style="font-size:0.78rem; color:#8A4A20; background:#FDF3EE; '
+                    'border:1px solid #E8C4A8; border-radius:6px; padding:0.7rem 0.95rem; '
+                    'margin-top:0.85rem; line-height:1.55;">'
+                    "We couldn't read this page automatically "
+                    f'<span style="color:#9C8A7A;">({fetch_err or "unknown reason"})</span>, '
+                    'but you can still save the item after reviewing the fields below.'
+                    '</div>'
+                )
+
+            st.markdown(f"""
+            <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.2rem 1.4rem; margin-top:0.4rem; margin-bottom:1rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
+                    <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600;">Link preview</div>
+                    {fetch_chip}
+                </div>
+                <div style="display:flex; gap:1.2rem; flex-wrap:wrap;">
+                    <div style="flex:0 0 auto; min-width:160px;">{preview_img_block}</div>
+                    <div style="flex:1; min-width:220px;">
+                        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Store</div>
+                        <div style="font-size:0.95rem; color:#1C1917; margin-bottom:0.6rem;">{link_data.get('source_store') or '—'}</div>
+                        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Suggested name</div>
+                        <div style="font-family:'DM Serif Display',serif; font-size:1.15rem; color:#1C1917; line-height:1.25;">{suggested_name_display}</div>
+                        <div style="font-size:0.76rem; color:#7C6F64; margin-top:0.5rem; line-height:1.5;">
+                            Category: <strong>{inferred.get('category') or '— (pick below)'}</strong><br>
+                            Color: <strong>{inferred.get('color') or '— (type below)'}</strong><br>
+                            Occasion tags: <strong>{', '.join(inferred.get('tags', [])) or '—'}</strong>
+                        </div>
+                    </div>
+                </div>
+                {fetch_explanation_block}
+            </div>
+            """, unsafe_allow_html=True)
+
+            # ── Review form (pre-filled from inference) ──
+            with st.form("wardrobe_add_form_link", clear_on_submit=False):
+                col_a, col_b = st.columns([3, 2], gap="small")
+                with col_a:
+                    l_name = st.text_input(
+                        "Name",
+                        value=inferred.get("name") or "",
+                        placeholder="Review item name…",
+                        key="l_name",
+                    )
+                with col_b:
+                    l_color = st.text_input(
+                        "Color",
+                        value=(inferred.get("color") or ""),
+                        placeholder="e.g. cream, navy, terracotta…",
+                        key="l_color",
+                    )
+
+                # Helpful nudge when color couldn't be inferred — never lie.
+                if not inferred.get("color"):
+                    msg = ("Enter the product color shown on the retailer page."
+                           if not fetched else
+                           "We couldn't spot a color word in the page text. "
+                           "Enter the product color shown on the retailer page.")
+                    st.caption(msg)
+
+                # Pre-select inferred category if it matches one of our options.
+                cat_default = inferred.get("category") if inferred.get("category") in _CATEGORY_OPTIONS else "top"
+                col_c, col_d = st.columns([1, 1], gap="small")
+                with col_c:
+                    l_category = st.selectbox(
+                        "Category", options=_CATEGORY_OPTIONS,
+                        index=_CATEGORY_OPTIONS.index(cat_default), key="l_category",
+                    )
+                with col_d:
+                    l_formality = st.selectbox("Formality", options=_FORMALITY_OPTIONS, key="l_formality")
+
+                l_seasons = st.multiselect(
+                    "Seasons (leave empty to mean year-round)",
+                    options=_SEASON_OPTIONS, default=["all"], key="l_seasons",
+                )
+
+                # Pre-select inferred tags, intersected with our known vocabulary.
+                pre_tags = [t for t in (inferred.get("tags") or []) if t in _OCCASION_TAG_OPTIONS]
+                l_tags = st.multiselect(
+                    "Suitable for these occasions",
+                    options=_OCCASION_TAG_OPTIONS, default=pre_tags, key="l_tags",
+                )
+
+                # Manual image URL fallback. Pre-filled with og:image when
+                # we found one; users can paste their own when we didn't
+                # (e.g. for retailers whose product page is a Single Page App
+                # that doesn't expose product metadata in the initial HTML).
+                l_image_url = st.text_input(
+                    "Image URL (optional)",
+                    value=(source_image or ""),
+                    placeholder="Paste a product image URL — shown next to the item in your wardrobe.",
+                    key="l_image_url",
+                    help=(
+                        "If we couldn't read the page automatically, open the retailer page "
+                        "in your browser, right-click the product image, choose "
+                        "'Copy image address', and paste it here. The image will appear "
+                        "next to this item in your wardrobe list."
+                    ),
+                )
+
+                l_submit = st.form_submit_button(
+                    "Save to wardrobe", type="primary", use_container_width=True,
+                )
+
+                if l_submit:
+                    # availability defaults to "available" — closet status is a
+                    # separate later feature, not part of item creation.
+                    effective_image_url = (l_image_url or "").strip() or None
+                    res = save_user_item(
+                        category=l_category,
+                        item_fields={
+                            "name":         l_name,
+                            "color":        l_color,
+                            "formality":    l_formality,
+                            "season":       l_seasons or ["all"],
+                            "tags":         l_tags or [l_category],
+                        },
+                        link_metadata={
+                            "source_url":       link_data.get("url"),
+                            "source_store":     link_data.get("source_store"),
+                            "source_image_url": effective_image_url,
+                        },
+                    )
+                    if res.get("success"):
+                        added = res["item"]
+                        chips = []
+                        if added.get("source_store"):
+                            chips.append(f"from `{added['source_store']}`")
+                        if added.get("source_url"):
+                            chips.append(f"[original link]({added['source_url']})")
+                        chip_str = " · ".join(chips)
+                        st.success(
+                            f"Saved **{added['name']}** ({added['color']}, {added['type']}) "
+                            f"as `{added['id']}` {chip_str}. It's now eligible for outfits tagged "
+                            f"{', '.join(added['tags']) or added['type']}."
+                        )
+                        # Clear the analyzed state so the next URL is a fresh start.
+                        st.session_state.pop("link_data", None)
+                    else:
+                        st.error(f"Could not save: {res.get('error', 'unknown error')}")
+        else:
+            st.markdown(
+                '<div style="font-size:0.82rem; color:#9C8A7A; margin-top:0.4rem;">'
+                "Paste a URL above and tap <strong>Analyze link →</strong> to see the inferred fields."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+    # ── Items you've added ──────────────────────────────────────
+    overlay = get_user_wardrobe().get("user_wardrobe", {"clothing": [], "shoes": [], "accessories": []})
+    user_rows = []
+    for section in ("clothing", "shoes", "accessories"):
+        for it in overlay.get(section, []):
+            user_rows.append(it)
+
+    if user_rows:
+        rows_html = ""
+        for it in user_rows:
+            swatch = color_to_swatch(it.get("color", ""))
+            tags_label = ", ".join(it.get("tags", []) or [])
+            avail = it.get("availability", "available")
+            avail_chip = ""
+            if avail != "available":
+                avail_chip = (
+                    f'<span style="margin-left:0.5rem; font-size:0.66rem; color:#8A4A20; '
+                    f'background:#FDF3EE; border:1px solid #E8C4A8; padding:1px 7px; '
+                    f'border-radius:99px; letter-spacing:0.06em;">{avail}</span>'
+                )
+            # Optional inline thumbnail. Priority:
+            #   1. Local image_path (from the Photo tab) — embedded as data URI.
+            #   2. Remote source_image_url (from the Link tab) — direct img src.
+            # `onerror` hides the element if the remote image fails to load.
+            thumb_html = ""
+            ipath = it.get("image_path")
+            src_image = it.get("source_image_url")
+            if ipath:
+                data_uri = _image_to_data_uri(ipath)
+                if data_uri:
+                    thumb_html = (
+                        f'<img src="{data_uri}" alt="" '
+                        f'style="width:42px; height:42px; object-fit:cover; '
+                        f'border-radius:4px; border:1px solid #E8E0D8; flex-shrink:0;" '
+                        f'onerror="this.style.display=\'none\'">'
+                    )
+            elif src_image:
+                thumb_html = (
+                    f'<img src="{src_image}" alt="" '
+                    f'style="width:42px; height:42px; object-fit:cover; '
+                    f'border-radius:4px; border:1px solid #E8E0D8; flex-shrink:0;" '
+                    f'onerror="this.style.display=\'none\'">'
+                )
+            rows_html += (
+                f'<div style="display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0; border-bottom:1px solid #EDE5DC; font-size:0.92rem;">'
+                f'{thumb_html}'
+                f'<span class="item-swatch" style="background:{swatch}"></span>'
+                f'<span style="font-weight:500; color:#1C1917;">{it.get("name","—")}</span>'
+                f'<span style="font-size:0.74rem; color:#9C8A7A; margin-left:auto; text-align:right;">'
+                f'{it.get("type","—")} · {it.get("formality","—")}<br>'
+                f'<span style="font-size:0.7rem;">{tags_label or "no tags"}</span></span>'
+                f'{avail_chip}'
+                f'</div>'
+            )
+        st.markdown(
+            f'<div style="margin-top:1.4rem;">'
+            f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.2rem; color:#1C1917; line-height:1.2; margin-bottom:0.4rem;">Items you\'ve added</div>'
+            f'<div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.4rem 1.2rem;">'
+            f'{rows_html}</div></div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="margin-top:1.2rem; font-size:0.82rem; color:#9C8A7A;">'
+            "No items added yet. The seed wardrobe is already available to Wearly — adding pieces here grows the candidate pool."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Coming-soon roadmap chips (preserved from prior pass) ───
+    st.markdown("""
+    <div style="margin-top:2rem; padding-top:1.05rem; border-top:1px solid #EDE5DC;">
+        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Coming soon</div>
+        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Photo upload</span>
+            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Product link import</span>
+            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Wear history</span>
+            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Item editing</span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
 
 
 # ─────────────────────────────────────────────
