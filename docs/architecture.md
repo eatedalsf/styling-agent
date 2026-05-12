@@ -127,6 +127,7 @@ If `rejected_ids` are supplied, Step 4 (wardrobe filter) drops them from every p
 | Weather | `weather_tool.py` | Open-Meteo API (`api.open-meteo.com`) | `{success, weather, error}` — never raises; falls back to a seasonal estimate on any network error |
 | Wardrobe | `wardrobe_tool.py` | `wardrobe.json` | `get_wardrobe()`, `get_owner_profile()`, `filter_items_by_occasion(tag, season)`, `check_gaps(outfit, required)` |
 | Color | `color_tool.py` | `color_rules.json` | `get_color_rules(skin_tone)`, `score_outfit_colors(items, skin_tone)` — returns score 0–100 + flags |
+| Graph | `graph_tool.py` | `graph/graph.json` (schema), agent `result` dicts (live-run) | `render_schema_graph_html()`, `render_run_graph_html(result)` — pyvis-based interactive HTML, embedded in the app via `st.components.v1.html()`. Schema view + dynamic per-run view. |
 
 Every tool uses a `_find_data_file()` helper that searches three candidate paths (`../data/`, `..`, same dir), so the flat layout works today and the structured layout will work later without code changes.
 
