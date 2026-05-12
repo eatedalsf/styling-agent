@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wearly — Knowledge Graph (interactive)</title>
+
+  <!--
+    Wearly Runtime Knowledge Graph — interactive vis-network.js view.
+    Renders graph/graph.json (the abstract schema + sample triples)
+    in an iframe-embeddable HTML page. Distinct from the LEARNING
+    GRAPH at ../learning-graph/ which models READER concepts.
+  -->
+
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    :root {
+      --paper: #F8F4ED; --card: #FDFAF7; --ink: #1C1917;
+      --body: #4A3D36; --secondary: #7C6F64; --eyebrow: #A8937E;
+      --edge: #C8B8A8; --accent: #C17F5A; --accent-deep: #9F5A36;
+      --border: #E8E0D8; --warm-card: #FAF3EE; --item-card: #F5EDE3;
+      --warn: #FDF3EE; --feedback: #EFE3CC;
+    }
+    html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink);
+                 font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+    .layout { display: grid; grid-template-columns: 1fr; grid-template-rows: auto 1fr; height: 100vh; }
+    @media (min-width: 900px) {
+      .layout { grid-template-columns: 260px 1fr; grid-template-rows: auto 1fr; }
+      .header { grid-column: 1 / span 2; }
+    }
+    .header {
+      padding: 0.85rem 1.2rem; background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .title { font-family: "DM Serif Display", "Times New Roman", serif; font-size: 1.3rem; }
+    .subtitle { font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em; }
+
+    .sidebar { background: var(--card); border-right: 1px solid var(--border);
+               padding: 0.9rem 1rem; overflow-y: auto; font-size: 0.86rem; }
+    .sidebar h3 {
+      font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--eyebrow); font-weight: 700; margin: 1.1rem 0 0.5rem;
+    }
+    .sidebar h3:first-child { margin-top: 0; }
+    .legend { display: flex; flex-direction: column; gap: 0.35rem; }
+    .legend-row { display: flex; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: var(--body); }
+    .legend-shape {
+      width: 16px; height: 16px; border: 2px solid var(--edge); flex-shrink: 0;
+    }
+    .legend-shape.dot      { border-radius: 50%; }
+    .legend-shape.box      { border-radius: 2px; }
+    .legend-shape.diamond  { transform: rotate(45deg); border-radius: 2px; }
+    .legend-shape.triangle { width: 0; height: 0; background: transparent !important;
+                              border-left: 8px solid transparent; border-right: 8px solid transparent;
+                              border-bottom: 14px solid var(--accent); border-top: 0; }
+    .legend-shape.square   { border-radius: 2px; }
+
+    .selected {
+      padding: 0.65rem 0.75rem; background: var(--paper);
+      border-left: 3px solid var(--accent); border-radius: 0 4px 4px 0;
+      margin-top: 0.4rem; font-size: 0.84rem;
+    }
+    .empty-state { color: var(--secondary); font-size: 0.84rem; padding: 0.5rem 0; }
+
+    .controls input, .controls select, .controls button {
+      width: 100%; padding: 0.45rem 0.6rem; border: 1px solid var(--border);
+      border-radius: 4px; background: var(--paper); font-size: 0.85rem;
+      color: var(--ink); font-family: inherit;
+    }
+    .controls label { display: block; font-size: 0.74rem; color: var(--secondary);
+                       margin: 0.6rem 0 0.25rem; }
+    .controls label:first-child { margin-top: 0; }
+    .controls button { background: var(--accent); color: var(--card); border: none;
+                        cursor: pointer; margin-top: 0.5rem; }
+    .controls button:hover { background: var(--accent-deep); }
+
+    #network { width: 100%; height: 100%; min-height: 500px; background: var(--paper); }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="header">
+      <div>
+        <div class="title">Wearly — Knowledge Graph</div>
+        <div class="subtitle">
+          <span id="stats">loading…</span> ·
+          the abstract entity/relation model the agent reasons over ·
+          click a node to inspect
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="controls">
+        <h3>Filter</h3>
+        <label for="search">Search entities</label>
+        <input id="search" placeholder="e.g. wardrobe, outfit, weather">
+        <label for="typeSel">Entity type</label>
+        <select id="typeSel"><option value="">All types</option></select>
+        <label for="layoutSel">Layout</label>
+        <select id="layoutSel">
+          <option value="physics">Physics (force-directed)</option>
+          <option value="hierarchical">Hierarchical (left → right)</option>
+        </select>
+        <button id="resetBtn">Reset view</button>
+      </div>
+
+      <h3>Legend</h3>
+      <div id="legend" class="legend"></div>
+
+      <h3>Selected node</h3>
+      <div id="selected" class="empty-state">Click a node to see its type, label, and outgoing edges.</div>
+    </div>
+
+    <div id="network"></div>
+  </div>
+
+  <script>
+  /* eslint-disable */
+  const STYLES = {
+    User:                 {bg: "#FDFAF7", border: "#C17F5A", shape: "dot",     size: 28, legendShape: "dot"},
+    FitProfile:           {bg: "#FAF3EE", border: "#9F5A36", shape: "box",     size: 20, legendShape: "box"},
+    CalendarEvent:        {bg: "#FAF3EE", border: "#9F5A36", shape: "box",     size: 22, legendShape: "box"},
+    WeatherSnapshot:      {bg: "#FAF3EE", border: "#9F5A36", shape: "box",     size: 20, legendShape: "box"},
+    WardrobeItem:         {bg: "#F5EDE3", border: "#A8937E", shape: "dot",     size: 18, legendShape: "dot"},
+    OutfitRecommendation: {bg: "#FDFAF7", border: "#1C1917", shape: "diamond", size: 30, legendShape: "diamond"},
+    WardrobeGap:          {bg: "#FDF3EE", border: "#C17F5A", shape: "triangleDown", size: 18, legendShape: "triangle"},
+    ShoppingSuggestion:   {bg: "#FDF3EE", border: "#9F5A36", shape: "triangleDown", size: 16, legendShape: "triangle"},
+    Feedback:             {bg: "#EFE3CC", border: "#7C6F64", shape: "square",  size: 16, legendShape: "square"},
+    Concept:              {bg: "#F5EDE3", border: "#A8937E", shape: "dot",     size: 14, legendShape: "dot"},
+  };
+
+  const candidatePaths = [
+    "../../../graph/graph.json",
+    "/styling-agent/graph/graph.json",
+    "/graph/graph.json",
+    "graph/graph.json",
+  ];
+
+  async function loadGraph() {
+    for (const p of candidatePaths) {
+      try { const r = await fetch(p, {cache: "no-cache"}); if (r.ok) return await r.json(); }
+      catch (e) { /* try next */ }
+    }
+    throw new Error("Could not load graph.json");
+  }
+
+  function renderLegend(typesPresent) {
+    const el = document.getElementById("legend");
+    el.innerHTML = Array.from(typesPresent).sort().map(t => {
+      const s = STYLES[t] || STYLES.Concept;
+      const shapeClass = s.legendShape;
+      const inlineStyle = shapeClass === "triangle"
+        ? `border-bottom-color: ${s.border}`
+        : `background:${s.bg}; border-color:${s.border}`;
+      return `<div class="legend-row">
+        <span class="legend-shape ${shapeClass}" style="${inlineStyle}"></span>
+        <span><strong>${t}</strong></span>
+      </div>`;
+    }).join("");
+
+    const sel = document.getElementById("typeSel");
+    Array.from(typesPresent).sort().forEach(t => {
+      const o = document.createElement("option");
+      o.value = t; o.textContent = t;
+      sel.appendChild(o);
+    });
+  }
+
+  function buildGraph(data) {
+    const entityMap = Object.fromEntries((data.entities || []).map(e => [e.id, e]));
+    const seenTypes = new Set();
+    const nodes = (data.entities || []).map(e => {
+      seenTypes.add(e.type);
+      const s = STYLES[e.type] || STYLES.Concept;
+      return {
+        id: e.id, label: e.label,
+        title: `${e.type}\n${e.label}`,
+        color: {background: s.bg, border: s.border},
+        shape: s.shape, size: s.size,
+        font: {color: "#1C1917", size: 13, face: "DM Sans, sans-serif"},
+        _entity: e,
+      };
+    });
+    const edges = [];
+    (data.edges || []).forEach(([s, p, t]) => {
+      // Concept fallback for predicate targets not in entities (e.g., "work").
+      if (!entityMap[t]) {
+        seenTypes.add("Concept");
+        nodes.push({
+          id: t, label: t,
+          title: `Concept · ${t}`,
+          color: {background: STYLES.Concept.bg, border: STYLES.Concept.border},
+          shape: STYLES.Concept.shape, size: STYLES.Concept.size,
+          font: {color: "#1C1917", size: 11, face: "DM Sans, sans-serif"},
+          _entity: {id: t, label: t, type: "Concept"},
+        });
+        entityMap[t] = {id: t, label: t, type: "Concept"};
+      }
+      edges.push({
+        from: s, to: t, label: p, title: p,
+        arrows: {to: {enabled: true, scaleFactor: 0.45}},
+        color: {color: "#C8B8A8", highlight: "#C17F5A"},
+        font: {size: 10, color: "#7C6F64", strokeWidth: 0, align: "middle"},
+        smooth: {type: "continuous"},
+      });
+    });
+    return {nodes, edges, types: seenTypes};
+  }
+
+  function showSelected(node) {
+    const el = document.getElementById("selected");
+    if (!node) {
+      el.innerHTML = `<div class="empty-state">Click a node to see its type, label, and outgoing edges.</div>`;
+      return;
+    }
+    const e = node._entity;
+    el.innerHTML = `<div class="selected">
+      <div style="font-weight:600; color:#1C1917; margin-bottom:0.2rem;">${e.label}</div>
+      <div style="font-size:0.72rem; color:#9F5A36; letter-spacing:0.06em; text-transform:uppercase;">${e.type}</div>
+    </div>`;
+  }
+
+  (async function main() {
+    let data;
+    try { data = await loadGraph(); }
+    catch (e) {
+      document.getElementById("network").innerHTML =
+        `<div class="empty-state" style="padding:1rem">Could not load graph.json (${e.message}).</div>`;
+      return;
+    }
+    const {nodes, edges, types} = buildGraph(data);
+    document.getElementById("stats").textContent =
+      `${nodes.length} entities · ${edges.length} relations · ${types.size} entity types`;
+    renderLegend(types);
+
+    const network = new vis.Network(
+      document.getElementById("network"),
+      {nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges)},
+      {
+        nodes: {borderWidth: 2},
+        edges: {smooth: {type: "continuous"}},
+        physics: {
+          barnesHut: {gravitationalConstant: -3500, centralGravity: 0.18,
+                       springLength: 130, springConstant: 0.04, damping: 0.5},
+          minVelocity: 0.5,
+        },
+        interaction: {hover: true, tooltipDelay: 100, navigationButtons: false},
+      }
+    );
+
+    network.on("selectNode", function (params) {
+      const id = params.nodes[0];
+      const node = network.body.data.nodes.get(id);
+      showSelected(node);
+    });
+    network.on("deselectNode", function () { showSelected(null); });
+    network.on("doubleClick", function (params) {
+      if (params.nodes && params.nodes.length) {
+        network.focus(params.nodes[0], {animation: true, scale: 1.3});
+      }
+    });
+
+    function applyFilters() {
+      const q = (document.getElementById("search").value || "").toLowerCase();
+      const t = document.getElementById("typeSel").value;
+      const visibleIds = new Set();
+      const ds = network.body.data.nodes;
+      ds.forEach(n => {
+        const e = n._entity;
+        const labelMatch = !q || (n.label || "").toLowerCase().includes(q) ||
+                          (e.type || "").toLowerCase().includes(q);
+        const typeMatch = !t || e.type === t;
+        const visible = labelMatch && typeMatch;
+        ds.update({id: n.id, hidden: !visible});
+        if (visible) visibleIds.add(n.id);
+      });
+      const eds = network.body.data.edges;
+      eds.forEach(ed => {
+        eds.update({id: ed.id,
+                    hidden: !(visibleIds.has(ed.from) && visibleIds.has(ed.to))});
+      });
+    }
+    document.getElementById("search").addEventListener("input", applyFilters);
+    document.getElementById("typeSel").addEventListener("change", applyFilters);
+
+    document.getElementById("layoutSel").addEventListener("change", function (e) {
+      const isHier = e.target.value === "hierarchical";
+      network.setOptions({
+        layout: {hierarchical: isHier ? {direction: "LR", sortMethod: "directed",
+                                         nodeSpacing: 130, levelSeparation: 180} : false},
+        physics: {enabled: !isHier},
+      });
+    });
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      document.getElementById("search").value = "";
+      document.getElementById("typeSel").value = "";
+      document.getElementById("layoutSel").value = "physics";
+      applyFilters();
+      network.setOptions({layout: {hierarchical: false}, physics: {enabled: true}});
+      network.fit({animation: true});
+    });
+  })();
+  </script>
+</body>
+</html>
