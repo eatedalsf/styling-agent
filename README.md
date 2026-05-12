@@ -1,6 +1,8 @@
 # Wearly AI
 *Your style, reasoned.*
 
+[![tests](https://github.com/eatedalsf/styling-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/eatedalsf/styling-agent/actions/workflows/tests.yml)
+
 **SEIS 666 — Digital Transformation 2.0 | Spring 2026**
 **Track B: Agentic AI System**
 
