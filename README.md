@@ -8,12 +8,15 @@
 
 A mobile-first, clean-luxury personal styling agent that recommends complete outfits using your calendar, real-time weather, wardrobe, and color profile — with full reasoning at every step.
 
-<!-- HERO BLOCK — once deployed, replace the placeholder URL below with the live Streamlit Cloud URL,
-     and drop a screenshot or GIF into docs/assets/ and reference it here. -->
+<!-- HERO BLOCK — drop a hero screenshot or GIF into docs/assets/hero.png and the image below
+     will pick it up. The live-demo button is wired to the deployed Streamlit Cloud app. -->
 
-> **Live demo:** _coming soon · deploy this repo to [Streamlit Community Cloud](https://share.streamlit.io) to enable._
+### 🔗 [**Open the live app →**](https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/)
+
+> **Live demo:** <https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/> — hosted on Streamlit Community Cloud.
+> No install, no signup — works in any browser, mobile or desktop.
 >
-> ![Wearly home — placeholder for hero screenshot/GIF](docs/assets/hero-placeholder.png)
+> ![Wearly home — hero screenshot](docs/assets/hero.png)
 
 **Why Wearly is an agent, not a chatbot**
 - 📅 Reads your **calendar** and turns the next event into a styling occasion.
@@ -71,16 +74,38 @@ streamlit run app.py
 
 ## Deploy
 
-Wearly AI is configured to deploy to **[Streamlit Community Cloud](https://streamlit.io/cloud)** with zero changes:
-
-1. Push this repository to GitHub (already done if you cloned from there).
-2. Go to <https://share.streamlit.io>, sign in with GitHub, and click **New app**.
-3. Select this repository, branch `main`, and entry-point file `app.py`.
-4. Click **Deploy**.
+✅ **This app is live at <https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/>** — hosted on Streamlit Community Cloud, redeployed automatically on every push.
 
 The brand theme, mobile-first layout, and runtime config are picked up automatically from `.streamlit/config.toml`. No environment variables required — the live weather call uses Open-Meteo (no API key).
 
-> **Note:** The hosted URL is the canonical demo surface for SEIS 666 grading. Local install instructions above remain available for offline review.
+> **The hosted URL is the canonical demo surface.** Local install instructions above remain available for offline review.
+
+### Reproduce this deployment
+
+To redeploy a fork:
+
+1. Push this repository to your GitHub account.
+2. Go to <https://share.streamlit.io>, sign in with GitHub, and click **New app**.
+3. Select your repository, the branch you want to deploy, and entry-point `app.py`.
+4. Click **Deploy** — first build takes ~2 minutes; every subsequent push redeploys automatically.
+
+---
+
+## Project Status
+
+| Phase | Title | State |
+|---|---|---|
+| 0 | Foundation reliability | ✅ Shipped |
+| 1 | Rebrand + demo polish | ✅ Shipped |
+| 2 | Mobile-first UI shell + section nav + profile | ✅ Shipped |
+| 4 *(partial)* | Reject & regenerate — the agent-not-chatbot moment | ✅ Shipped |
+| 6 | Intelligent Book + Knowledge Graph + Agent Skill package | ✅ Shipped |
+| 7 *(partial)* | Smoke tests (32) + architecture doc + GitHub Actions CI | ✅ Shipped |
+| 3 | Data-model split + fit-tool wiring | ⏳ Deferred (Profile screen reads `wardrobe.json` directly) |
+| 4 *(remaining)* | Wardrobe builder (photo / URL import) + wear-history rotation | ⏳ Deferred |
+| 5 | Shopping + wishlist + favorite stores | ⏳ Deferred |
+
+See `Wearly_Product_Brief.md` for the full vision and `book/` for the Intelligent Book chapters that document the agent's reasoning. The Master Implementation Plan lives at `C:\Users\eated\.claude\plans\now-that-the-two-polymorphic-fiddle.md` (local).
 
 ---
 
