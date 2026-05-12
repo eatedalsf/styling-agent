@@ -47,9 +47,21 @@ _FILES_TO_COPY = [
 ]
 
 # Markdown subpaths within _DIRS_TO_COPY that we DO NOT publish in the
-# Intelligent Book. (Internal asset / housekeeping docs.)
+# Intelligent Book at their original location. (Some are internal
+# housekeeping; some are re-targeted to a different path in the stage.)
 _PATHS_TO_EXCLUDE = {
     os.path.normpath("docs/assets/README.md"),
+    # docs/home.md is special: it's the canonical source for the SITE
+    # ROOT landing page. The staging step writes it to _docs_build/index.md
+    # explicitly (see below), so don't also leave a docs/home.md copy.
+    os.path.normpath("docs/home.md"),
+}
+
+# Files copied to a DIFFERENT name/location in the stage tree. Used to
+# produce a site-root index.html from a source file we keep alongside
+# the rest of the docs.
+_REMAPPED_FILES = {
+    "docs/home.md": "index.md",
 }
 
 
@@ -109,6 +121,18 @@ def main() -> int:
         shutil.copy2(src, os.path.join(_STAGE, fname))
         total += 1
         print(f"  - {fname}")
+
+    # Files mapped to a different stage location (e.g. site-root index).
+    for src_rel, dst_rel in _REMAPPED_FILES.items():
+        src = os.path.join(_ROOT, src_rel)
+        if not os.path.isfile(src):
+            print(f"  - skip {src_rel} (not present; no site-root index will be generated)")
+            continue
+        dst = os.path.join(_STAGE, dst_rel)
+        os.makedirs(os.path.dirname(dst) or ".", exist_ok=True)
+        shutil.copy2(src, dst)
+        total += 1
+        print(f"  - {src_rel} -> {dst_rel}  (remapped)")
 
     print(f"Done. {total} files staged.")
     return 0

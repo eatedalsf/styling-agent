@@ -107,8 +107,13 @@ extra:
   generator: false  # hide the small "Made with Material for MkDocs" footer
 
 # The nav lists every documentation file by its on-disk path. No moves.
+#
+# Note: "Home" maps to index.md (created by scripts/stage_docs.py from
+# docs/home.md). That produces a real index.html at the site root.
+# "The Book → Overview" still maps to book/index.md so the book's own
+# table of contents stays the entry point for the book section.
 nav:
-  - Home: book/index.md
+  - Home: index.md
 
   - The Book:
     - Overview: book/index.md
