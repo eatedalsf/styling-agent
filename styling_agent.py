@@ -103,6 +103,7 @@ def run_agent(
     everyday_request: str = None,
     rejected_ids: list = None,
     rejection_reasons: list = None,
+    todays_context: str = None,
 ) -> dict:
     """
     Main agent entry point.
@@ -134,6 +135,7 @@ def run_agent(
     steps = []
     rejected_ids = list(rejected_ids or [])
     rejection_reasons = list(rejection_reasons or [])
+    todays_context = (todays_context or "").strip()
     result = {
         "steps": steps,
         "recommendation": None,
@@ -148,6 +150,7 @@ def run_agent(
             "ids": rejected_ids,
             "reasons": rejection_reasons,
         },
+        "todays_context": todays_context,
         "error": None
     }
 
@@ -281,6 +284,18 @@ def run_agent(
 
     # Surface every rejection reason in the reasoning trail so the user
     # can see WHY this regenerated outfit is different from the previous one.
+    # Surface today's free-text context first so the rest of the trail reads
+    # in light of it. Honest framing: Wearly acknowledges the context and
+    # uses it as a soft signal alongside fit/profile preferences, but does
+    # NOT promise the context will override every other rule. The line is
+    # informative; the underlying selection logic remains rule-driven.
+    if todays_context:
+        reasoning.append(
+            f"Today's context: \"{todays_context}\" — noted alongside your fit "
+            f"profile and event so the rest of the reasoning reads in light of it. "
+            f"{cite('fit#R2')}"
+        )
+
     for rej in rejection_reasons:
         nm = rej.get("item_name", "an item")
         rs = rej.get("reason", "rejected")

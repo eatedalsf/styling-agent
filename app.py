@@ -581,17 +581,27 @@ if "rejection_reasons" not in st.session_state:
 
 
 def _run_and_store(mode: str, everyday_request: str = None,
-                   rejected_ids=None, rejection_reasons=None) -> dict:
+                   rejected_ids=None, rejection_reasons=None,
+                   todays_context: str = None) -> dict:
     """Wrapper: runs the agent, stores result + the invocation params so
-    a later 'Regenerate' can replay the same mode with rejection context."""
+    a later 'Regenerate' can replay the same mode with rejection context.
+    todays_context is a free-text "what's going on right now" field — a
+    pattern borrowed from a classmate's dream-journal project where adding
+    real-life context made the AI's reasoning feel grounded."""
+    ctx = todays_context if todays_context is not None else st.session_state.get("todays_context", "")
     res = run_agent(
         mode=mode,
         everyday_request=everyday_request,
         rejected_ids=rejected_ids,
         rejection_reasons=rejection_reasons,
+        todays_context=ctx,
     )
     st.session_state["result"] = res
-    st.session_state["last_run"] = {"mode": mode, "everyday_request": everyday_request}
+    st.session_state["last_run"] = {
+        "mode": mode,
+        "everyday_request": everyday_request,
+        "todays_context": ctx,
+    }
     return res
 
 
@@ -940,6 +950,32 @@ def _render_outfit_result(result: dict):
             except Exception as _e:
                 st.warning(f"Graph could not render: {_e}")
 
+    # ── Compact knowledge-graph export ─────────────────────────────────
+    # Pattern borrowed from the SEIS 666 instructor: "save the entire
+    # session as a compact knowledge graph at the MD level and use it
+    # as a startup." One outfit becomes a small, portable JSON graph
+    # that mirrors graph/schema.md — so it can be opened in the same
+    # in-app and in-book viewers without translation.
+    if outfit:
+        try:
+            from compact_kg import to_json as _kg_to_json
+            import datetime as _dt_local
+            kg_blob = _kg_to_json(result).encode("utf-8")
+            fname = f"wearly-outfit-{_dt_local.datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+            st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
+            st.download_button(
+                label="Export today's reasoning as a compact knowledge graph",
+                data=kg_blob,
+                file_name=fname,
+                mime="application/json",
+                use_container_width=True,
+                key="compact_kg_dl",
+                help="One outfit → one small JSON graph. Same shape as graph/schema.md. "
+                     "Open it in the in-book Knowledge-Graph viewer or share it with a stylist.",
+            )
+        except Exception as _e:
+            st.caption(f"Compact-KG export unavailable: {_e}")
+
     # ── Wear-today: record this outfit in wear history ──────────
     # Tells Wearly "I'm actually wearing this." Next time the agent runs,
     # the freshness tie-breaker prefers items you haven't just worn.
@@ -1257,7 +1293,24 @@ def _render_today():
             </div>
         </div>
         """, unsafe_allow_html=True)
-        st.markdown("<div style='height:1rem'></div>", unsafe_allow_html=True)
+        # Today's context — free-text "what's going on right now" field.
+        # Pattern borrowed from a classmate's dream-journal project where
+        # adding real-life context grounded the AI's analysis.
+        st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div style='font-size:0.78rem; color:#7C6F64; margin-bottom:0.3rem;'>"
+            "Anything Wearly should know about today? <em>(optional — "
+            "e.g. \"tired and want comfort\", \"first day at a new job\", "
+            "\"traveling, packable\")</em></div>",
+            unsafe_allow_html=True,
+        )
+        st.text_input(
+            label="Today's context",
+            label_visibility="collapsed",
+            key="todays_context",
+            placeholder="e.g. tired, comfort over polish today",
+        )
+        st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
         if st.button("Plan today's outfit →", key="today_cta", type="primary", use_container_width=True):
             st.session_state["rejected_ids"] = []
             st.session_state["rejection_reasons"] = []
@@ -1369,6 +1422,82 @@ def _render_backup_restore():
                             st.error(f"Restore failed: {res.get('error', 'unknown error')}")
 
 
+def _render_ask_wardrobe():
+    """Pre-baked queries over the wardrobe + wear-history.
+
+    Each question is answered by `wardrobe_query.CANNED_QUERIES` —
+    deterministic Python over the same data the agent uses, surfaced
+    as an interactive panel so the user can explore their own closet.
+    No LLM is called; the rule citation on each answer ties back to the
+    Skill rule pack that defines the underlying filter."""
+    with st.expander("Ask your wardrobe", expanded=False):
+        st.markdown(
+            "<div style='font-size:0.82rem; color:#6B5F55; line-height:1.55; "
+            "margin-bottom:0.8rem;'>Pre-baked questions Wearly can answer about "
+            "your closet — same data the agent uses at recommendation time, "
+            "queried directly.</div>",
+            unsafe_allow_html=True,
+        )
+        try:
+            from wardrobe_query import CANNED_QUERIES
+        except Exception as _e:
+            st.caption(f"Query module unavailable: {_e}")
+            return
+
+        # Each question gets a button; clicking stores the result for display.
+        cols = st.columns(2, gap="small")
+        for i, (label, fn) in enumerate(CANNED_QUERIES):
+            col = cols[i % 2]
+            with col:
+                if st.button(label, key=f"wq_{i}", use_container_width=True):
+                    try:
+                        st.session_state["wq_result"] = fn()
+                    except Exception as _e:
+                        st.session_state["wq_result"] = {
+                            "question": label,
+                            "items": [],
+                            "summary": f"Query failed: {_e}",
+                            "rule": "",
+                        }
+
+        wq = st.session_state.get("wq_result")
+        if wq:
+            st.markdown(
+                f"<div style='margin-top:1rem; padding:0.9rem 1rem; "
+                f"background:#FBF6F0; border:1px solid #ECDFD0; border-radius:6px;'>"
+                f"<div style='font-size:0.78rem; color:#7C6F64; text-transform:uppercase; "
+                f"letter-spacing:0.4px;'>{wq.get('question', '')}</div>"
+                f"<div style='font-size:0.92rem; color:#2E2A27; line-height:1.55; margin-top:0.4rem;'>"
+                f"{wq.get('summary', '')}"
+                f"</div>"
+                f"<div style='font-size:0.72rem; color:#9C8A7A; margin-top:0.5rem;'>"
+                f"{wq.get('rule', '')}"
+                f"</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            items = wq.get("items") or []
+            if items:
+                st.markdown("<div style='height:0.5rem'></div>", unsafe_allow_html=True)
+                grid = st.columns(min(3, max(1, len(items))), gap="small")
+                for j, it in enumerate(items[:6]):
+                    with grid[j % len(grid)]:
+                        nm = it.get("name", "—")
+                        tp = (it.get("type") or "").title()
+                        co = it.get("color", "")
+                        st.markdown(
+                            f"<div style='padding:0.6rem 0.7rem; background:#FFFFFF; "
+                            f"border:1px solid #E8E0D8; border-radius:6px; "
+                            f"font-size:0.82rem; color:#2E2A27; line-height:1.4;'>"
+                            f"<strong>{nm}</strong>"
+                            f"<div style='font-size:0.72rem; color:#7C6F64;'>"
+                            f"{tp}{' · ' + co if co else ''}</div></div>",
+                            unsafe_allow_html=True,
+                        )
+                if len(items) > 6:
+                    st.caption(f"…and {len(items) - 6} more.")
+
+
 def _render_wardrobe():
     # ── Page header ─────────────────────────────────────────────
     st.markdown("""
@@ -1384,6 +1513,14 @@ def _render_wardrobe():
     # container filesystem is ephemeral — backups are the way your
     # closet survives between sessions. Same UI either way.
     _render_backup_restore()
+
+    # ── Ask your wardrobe (pre-baked queries over the closet) ────────
+    # Pattern borrowed from a classmate's project that lets the user
+    # query the knowledge graph in plain language ("what did I dream
+    # about when anxious?"). Wearly's version is a small set of canned
+    # questions that traverse the wardrobe + wear-history files and
+    # surface a body-positive plain-English summary.
+    _render_ask_wardrobe()
 
     # ── Inventory summary (seed + user counts) ───────────────────
     seed_clothing = seed_shoes = seed_accessories = 0

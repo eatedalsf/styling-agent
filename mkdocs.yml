@@ -159,6 +159,8 @@ nav:
     - "System architecture": docs/architecture.md
     - "Workflow diagram": workflow_diagram.md
     - "Demo script": docs/demo_script.md
+    - "Track B evaluation": docs/track-b-evaluation.md
+    - "Business model": docs/business-model.md
 
   - Project Vision:
     - "Product brief": Wearly_Product_Brief.md
