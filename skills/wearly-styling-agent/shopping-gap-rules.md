@@ -72,3 +72,13 @@ When wishlists ship, each suggestion becomes a card with:
 - a clear "we don't sell this" disclaimer.
 
 Until then, suggestion lines are read-only text.
+
+---
+
+## Source basis
+
+**Primary category:** Fashion recommender systems (`docs/evidence-and-references.md` §3.1).
+**Secondary:** Wardrobe management (§3.7), Privacy (§3.9).
+**Current basis:** Industry styling practice for gap detection + a deliberate product stance on commerce.
+**Stance worth naming:** Wearly's gap-suggestion text is **descriptive, not promotional**. The product brief commits to this. No affiliate links. No retailer scraping. Favorite stores act as personalization hints, never as paid placements.
+**Pending verification:** Industry whitepapers or case studies from closet-management apps; any peer-reviewed work on shopping recommendations that handles owned-vs-suggested distinction respectfully.

@@ -53,3 +53,11 @@ If, after all filters and exclusions, a pool is empty:
 - The reasoning trail surfaces the constraint that led to the empty pool.
 
 The agent never fakes a piece. An empty pool is honest data.
+
+---
+
+## Source basis
+
+**Primary category:** Wardrobe management / digital closets (`docs/evidence-and-references.md` §3.7).
+**Secondary:** Personalization and user feedback (§3.8).
+**Current basis:** Industry closet-management heuristics. The pool-relaxation rule (R4) is a design-informed UX choice — "a slightly-wrong-season piece beats no piece." No specific peer-reviewed citation yet.

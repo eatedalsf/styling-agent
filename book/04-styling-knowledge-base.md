@@ -71,8 +71,22 @@ A small rule system, by contrast:
 
 Each of these is a future rule layer, not a future ML feature. The system's structure stays inspectable as it grows.
 
+## What informs these rules
+
+Each rule system is **evidence-informed, design-informed, and user-preference-driven** — not claimed to be exact or objectively correct. The canonical sourcing lives in [`docs/evidence-and-references.md`](../docs/evidence-and-references.md). Quick map:
+
+| Rule system | Primary evidence category | Current basis |
+|---|---|---|
+| Occasion → tag map | Outfit compatibility (§3.2) | Industry styling heuristics — five canonical occasion types are widely recognized in fashion-product UX. |
+| Required-pieces map | Outfit compatibility (§3.2) | Industry styling heuristics. |
+| Color palettes | Color harmony (§3.3) | Design-informed conventions (warm / cool color-theory). The "Best for warm olive" claim is *"these tend to read well under warm/cool conventions"* — not an empirical claim. |
+| Color scoring formula (+8 / +4 / −10) | Color harmony (§3.3) | UX choice for readability — not derived from a specific empirical model. |
+
+The honesty contract from chapter 12: Wearly says *"tends to work well,"* not *"is correct."*
+
 ## Where to verify
 
 - The maps: `styling_agent.py` (`OCCASION_TAG_MAP`, `REQUIRED_PIECES`).
 - The palettes: `color_rules.json`.
 - The skin-tone scoring: `color_tool.py` · `score_outfit_colors()`.
+- The canonical sourcing: `docs/evidence-and-references.md`.

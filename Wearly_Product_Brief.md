@@ -320,9 +320,33 @@ It should combine:
 - user rejection reasons, and
 - user feedback.
 
-### 11.1 References (placeholder)
+### 11.1 References
 
-> *This section is reserved for future academic and expert references — peer-reviewed research, color theory sources, fit and silhouette literature, and styling industry frameworks. To be populated as the product matures.*
+The canonical references document is **[`docs/evidence-and-references.md`](docs/evidence-and-references.md)**. It organizes source material into nine categories and tracks which categories rely on general practice vs. verified citations.
+
+**Source categories Wearly draws on:**
+
+1. Fashion recommender systems
+2. Outfit compatibility
+3. Color harmony
+4. Body-shape-aware / fit-aware styling
+5. Explainable recommendation systems
+6. Human-centered AI / personalization
+7. Wardrobe management / digital closets
+8. Personalization and user feedback
+9. Privacy and personal data
+
+**Verification status:** as of this writing, *zero specific citations have been verified.* Every category currently relies on general practice and well-known frameworks (e.g., Itten color theory, GDPR, privacy-by-design). The references document lists 14 concrete pending verification items — specific searches a future contributor can complete.
+
+**The honesty contract:**
+
+- Styling is not an exact science.
+- Wearly's logic is *evidence-informed*, *design-informed*, and *user-preference-driven* — never described as "correct" or "optimal."
+- Body-shape category labels (`hourglass / pear / apple / etc.`) are **industry heuristics, not scientific taxonomy.** Wearly treats them as user-declared proportion preferences only — never as classifications it computes.
+- Body-positive language is enforced as a runtime contract in code (`fit_tool.check_reasoning_for_forbidden_language`) and as a static contract across documentation (`tests/test_documentation_language.py`).
+- This brief, the Intelligent Book, and the Skill package never fabricate citations.
+
+For per-rule sourcing, see the *Source basis* footer on every file in `skills/wearly-styling-agent/`. For the integrated narrative, see `book/12-evidence-and-references.md`.
 
 ---
 

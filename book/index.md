@@ -22,6 +22,7 @@ The book **supports** the working product; it does not replace it. The product i
 | 09 | [Before / after demo](09-before-after-demo.md) | The delta between manual planning and an agentic system |
 | 10 | [Privacy & security](10-privacy-security.md) | Data handling, today and in production |
 | 11 | [Product roadmap](11-product-roadmap.md) | Where Wearly is going |
+| 12 | [Evidence and references](12-evidence-and-references.md) | What informs Wearly's recommendation logic, and what still needs citation work |
 
 ---
 

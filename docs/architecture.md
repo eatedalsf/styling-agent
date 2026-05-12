@@ -1,8 +1,10 @@
 # Wearly — Architecture
 
 > Snapshot of the current Wearly prototype as of Phase 2.
-> Supplements `workflow_diagram.md` (which documents the agent's decision flow)
-> with a system-level view of code, data, surfaces, and dependencies.
+> Supplements `workflow_diagram.md` (which documents the agent's decision flow),
+> `evidence-and-references.md` (which documents what informs the agent's logic),
+> and `book/` (which narrates the design choices) with a system-level view
+> of code, data, surfaces, and dependencies.
 
 ---
 

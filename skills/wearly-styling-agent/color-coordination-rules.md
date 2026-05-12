@@ -67,3 +67,11 @@ No greens, no cool tones. The score-color system stays inside the brand palette.
 ## R7 — Cross-item color harmony (future)
 
 The current scoring is **per-item only**. A future Phase 4 enhancement scores the outfit as a whole — checking that the items don't visually clash with each other. Hue clusters, neutral counts, and accent management would all factor in. The per-item score remains for transparency.
+
+---
+
+## Source basis
+
+**Primary category:** Color harmony (`docs/evidence-and-references.md` §3.3).
+**Current basis:** Color-theory conventions (warm / cool framework, complementary / analogous principles). The named-color palettes are design-informed; they do **not** claim empirical proof that these specific colors are "objectively best" for a given skin tone. The honest claim is *"these colors tend to read well under warm/cool color-theory conventions."*
+**Pending verification:** Itten color wheel, Munsell color system, CIE color spaces — well-known foundational frameworks worth verifying with publishers and editions. Any peer-reviewed perceptual-psychology study on skin-tone × garment-color preference would significantly strengthen this rule pack. See `docs/evidence-and-references.md` §3.3.

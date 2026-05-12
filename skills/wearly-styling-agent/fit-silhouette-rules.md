@@ -62,3 +62,13 @@ A user's `preferred_fit` (tailored / relaxed / structured) is a strong tiebreake
 ## R7 — Color is the most-wired piece today
 
 Skin tone is the only fit-profile field already wired into the agent. Step 7 uses it for the 0–100 color harmony score with per-item flags. The remaining fit rules are documented here and live in the codebase as Phase 3 work.
+
+---
+
+## Source basis
+
+**Primary category:** Body-shape-aware / fit-aware styling (`docs/evidence-and-references.md` §3.4).
+**Secondary:** Human-centered AI (§3.6).
+**Current basis:** Industry fit heuristics + the body-positive language contract, enforced at runtime by `fit_tool.check_reasoning_for_forbidden_language()`.
+**Important framing:** The body-shape category labels (`hourglass / pear / apple / etc.`) are **industry heuristics, not scientific taxonomy.** Wearly treats them as user-declared proportion preferences — a proxy for a small set of proportion-related styling rules, never as a claim about the user's body. See `docs/evidence-and-references.md` §4 and `book/06-fit-profile-logic.md`.
+**No specific peer-reviewed citation yet** — see verification status at `docs/evidence-and-references.md` §7.

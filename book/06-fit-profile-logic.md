@@ -62,8 +62,25 @@ Phase 3 wiring plan:
 - Step 5 (build outfit) consults the fit profile when ordering candidate items: a tailored preference prefers structured pieces over drapey ones; a modesty preference filters out high necklines or short hemlines.
 - Reasoning lines surface fit decisions: *"Selected the silk blouse — its drape supports your preferred silhouette."*
 
+## On body-shape categories — a deliberate framing
+
+The `owner.body_shape` field in `wardrobe.json` accepts labels like `"hourglass"`, `"pear"`, `"apple"`, `"rectangle"`, `"inverted triangle"`. These are **industry heuristics, not scientific taxonomy.** They have no agreed academic standing.
+
+Wearly handles this carefully:
+
+- The agent **never analyzes images** to infer a body shape. There is no image classifier, no body-detection model, no measurement extraction.
+- A body-shape label is treated as a **user-declared proportion preference** — a proxy for a small set of proportion-related styling rules, not a claim about the user's body.
+- The user can leave `body_shape` blank, and no proportion-rule fires. Wearly works fine without it.
+- User-facing copy is calibrated: *"if you've shared a body shape preference,"* not *"based on your body type."*
+
+The body-positive language contract enforces this through `fit_tool.FORBIDDEN_TOKENS` at runtime and through `tests/test_documentation_language.py` across documentation.
+
+For the full evidence framing — what category supports the fit logic and what's still pending verification — see [`docs/evidence-and-references.md`](../docs/evidence-and-references.md) §3.4 and §4.
+
 ## Where to verify
 
 - Today's fit data: `wardrobe.json` → `owner` block.
 - The Profile screen: `app.py` → `_render_profile()`.
+- The body-positive contract: `fit_tool.FORBIDDEN_TOKENS` + `tests/test_documentation_language.py`.
 - Phase 3 data plan: `Wearly_Product_Brief.md` §7.5.
+- Canonical sourcing: `docs/evidence-and-references.md`.

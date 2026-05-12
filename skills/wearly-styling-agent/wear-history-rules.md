@@ -64,3 +64,12 @@ The agent never writes to wear history without explicit user confirmation. A use
 ## R7 — Privacy
 
 Wear history is purely local in the prototype. In production it lives encrypted per-user and is deletable in one tap. The system does not surface aggregated wear-history insights ("you wear black 80% of the time") without opt-in — wear history is decision data, not feedback for the user.
+
+---
+
+## Source basis
+
+**Primary category:** Wardrobe management / digital closets (`docs/evidence-and-references.md` §3.7).
+**Secondary:** Personalization and user feedback (§3.8).
+**Current basis:** Design-informed rotation heuristic. The freshness formula (frequency penalty + recency penalty, floor of 0.4) is calibrated for the prototype's small wardrobe. The 0.4 floor is a deliberate values choice — *"a much-loved piece is never exiled."*
+**Pending verification:** Academic literature on consumer wardrobe utilization (search terms: *"wardrobe-30," "Project 333," "cost-per-wear analysis"*).

@@ -49,3 +49,10 @@ This rule was added specifically to prevent a gym outfit from getting a formal w
 ## R6 — Fallback
 
 If the weather API errors for any reason, fall back to a seasonal estimate (52°F, partly cloudy, light jacket advice) and mark the step status `fallback`. The agent continues; the user sees a calm note that an estimate is being used.
+
+---
+
+## Source basis
+
+**Primary category:** Outfit compatibility (`docs/evidence-and-references.md` §3.2).
+**Current basis:** Industry layering practice + common-sense temperature thresholds. Open-Meteo as the data source is a verified public, no-key, freely-licensed API. The temperature → layer-advice mapping is design-informed (calibrated for the prototype), not derived from a published comfort-temperature study.

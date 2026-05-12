@@ -52,8 +52,17 @@ A future version of this skill will refuse to run in a child-profile context unt
 
 The skill should **refuse** and surface a clear message when:
 
-- A user requests fashion advice that depends on body image judgment (e.g., "make me look thinner").
+- A user requests fashion advice that depends on body image judgment (e.g., language framed as needing correction).
 - A user requests that the skill exfiltrate their own data.
 - A caller tries to use the skill for any task outside the Scope Boundary in `SKILL.md`.
 
 Refusal is part of the skill, not a failure mode.
+
+---
+
+## Source basis
+
+**Primary category:** Privacy and personal data (`docs/evidence-and-references.md` §3.9).
+**Secondary:** Human-centered AI / personalization (§3.6).
+**Current basis:** Privacy-by-design principles + minimum-necessary access. Wearly's production data-handling roadmap aligns with publicly available frameworks (GDPR, CCPA, privacy-by-design) — see `book/10-privacy-security.md`.
+**Pending verification:** Specific GDPR article numbers, privacy-by-design framework citation with verified date (Ann Cavoukian), and direct URLs for the Microsoft AI Guidelines for Human-AI Interaction and Google PAIR Guidebook.

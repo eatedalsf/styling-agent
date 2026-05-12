@@ -37,3 +37,11 @@ Otherwise, build top + bottom (or two activewear pieces for gym).
 ## R4 — Accessory cap
 
 Add up to **two** accessories from the pool. Never more — over-accessorizing is the most common visual misstep in algorithmically-built outfits.
+
+---
+
+## Source basis
+
+**Primary category:** Outfit compatibility (`docs/evidence-and-references.md` §3.2).
+**Secondary:** Fashion recommender systems (§3.1).
+**Current basis:** Industry styling heuristics. The five-occasion taxonomy (work / dinner / gym / formal / casual) is broadly recognized in fashion-product UX. No specific peer-reviewed paper cited yet — see verification status at `docs/evidence-and-references.md` §7.

@@ -147,21 +147,51 @@ It should combine:
 
 ---
 
-## 8. Future Academic and Expert References to Add
+## 8. Academic and Expert References
 
-Placeholder list for future sources to be researched, cited, and integrated:
+The canonical, structured references document is **[`docs/evidence-and-references.md`](docs/evidence-and-references.md)** — see also Intelligent Book chapter [`book/12-evidence-and-references.md`](book/12-evidence-and-references.md). Nine source categories, mapped to each Skill rule pack, with a verification-status table.
 
-- fashion recommender systems,
-- body-shape-aware recommendation,
-- color harmony in clothing,
-- explainable recommendation systems,
-- human-centered AI and personalization,
-- privacy and security for personal data,
-- mobile-first wardrobe and styling app UX,
-- fashion retail and ecommerce product data extraction, and
-- image background removal and clothing item recognition.
+### Source categories Wearly draws on
 
-*Sources to be populated as the product matures. Each entry should eventually include: citation, link, relevance to Wearly AI, and where the source informs the codebase.*
+| # | Category | Status |
+|---|---|---|
+| 1 | Fashion recommender systems | General practice |
+| 2 | Outfit compatibility | General practice |
+| 3 | Color harmony | General practice (warm/cool framework, Itten / Munsell / CIE pending verification) |
+| 4 | Body-shape-aware / fit-aware styling | General practice (industry heuristic, not scientific taxonomy) |
+| 5 | Explainable recommendation systems | General practice (Miller 2019 pending verification) |
+| 6 | Human-centered AI / personalization | Well-known framework (Microsoft AI Guidelines, Google PAIR pending verification) |
+| 7 | Wardrobe management / digital closets | General practice |
+| 8 | Personalization and user feedback | General practice |
+| 9 | Privacy and personal data | Well-known framework (GDPR, privacy-by-design pending verification) |
+
+### Honesty contract
+
+- **No fabricated citations.** Categories are named when they're textbook common knowledge; specific authors, papers, and findings appear only after verification.
+- **Body-shape category labels are industry heuristic, not scientific taxonomy** — Wearly never claims a user "is" a body shape; the label is a user-declared proportion preference.
+- **Color palettes are design-informed conventions, not deterministic claims** — the language is *"tends to read well,"* not *"is correct."*
+- **Body-positive language is enforced** at runtime in code and statically across documentation.
+
+### 14 pending verification items
+
+Concrete searches a future contributor can complete — full list in `docs/evidence-and-references.md` §7. Highlights:
+
+1. Recommender Systems Handbook (Ricci, Rokach, Shapira) — edition.
+2. Polyvore-dataset paper or successor (outfit-compatibility benchmark).
+3. Itten color wheel — verified publisher / edition.
+4. Munsell color system — verified standard reference.
+5. CIE color spaces — CIELAB / CIELUV standard numbers.
+6. Tim Miller, "Explanation in Artificial Intelligence" — verified citation.
+7. Microsoft AI Guidelines for Human-AI Interaction (18 guidelines) — URL + version.
+8. Google PAIR Guidebook — URL + current version.
+9. GDPR — specific article numbers for user-rights claims in `book/10-privacy-security.md`.
+10. Ann Cavoukian privacy-by-design framework — title + year.
+11. Peer-reviewed study (if any) of skin-tone × garment-color preference.
+12. Peer-reviewed work on body-shape taxonomy validity (or counter-perspectives).
+13. Inclusive-fashion / fat-positive design research.
+14. A fashion-XAI user study (HCI / IUI venue).
+
+When a citation is verified, the workflow is in `docs/evidence-and-references.md` §8.
 
 ---
 
