@@ -152,6 +152,9 @@ nav:
   - Learning Graph:
     - "Concept map (interactive)": docs/sims/learning-graph/index.md
 
+  - Micro-sims:
+    - "Color harmony score": docs/sims/color-harmony/index.md
+
   - Architecture:
     - "System architecture": docs/architecture.md
     - "Workflow diagram": workflow_diagram.md

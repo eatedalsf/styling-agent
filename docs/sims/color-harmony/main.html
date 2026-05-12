@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Wearly — Color Harmony Score (micro-sim)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://unpkg.com/p5@1.9.4/lib/p5.min.js"></script>
+<style>
+  :root {
+    --ivory: #F4EFE8;
+    --warm-ivory: #F1E7D6;
+    --terracotta: #C17F5A;
+    --rust: #A85A3C;
+    --ink: #1C1917;
+    --muted: #6B5F55;
+    --line: #E8E0D8;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    font-family: "DM Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+    background: var(--ivory);
+    color: var(--ink);
+  }
+  .wrap {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 18px;
+    padding: 18px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  @media (max-width: 720px) {
+    .wrap { grid-template-columns: 1fr; }
+  }
+  h1 { font-size: 20px; margin: 0 0 4px 0; font-weight: 600; letter-spacing: 0.2px; }
+  .lead { font-size: 13px; color: var(--muted); margin: 0 0 14px 0; line-height: 1.5; }
+  .panel {
+    background: #FFFFFF;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-top: 12px;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  select, button {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #FFFFFF;
+    font-family: inherit;
+    font-size: 14px;
+    color: var(--ink);
+  }
+  button {
+    background: var(--terracotta);
+    color: #FFFFFF;
+    border: none;
+    cursor: pointer;
+    margin-top: 14px;
+    font-weight: 600;
+  }
+  button:hover { background: var(--rust); }
+  .slot-row {
+    display: grid;
+    grid-template-columns: 24px 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-top: 6px;
+  }
+  .swatch {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 1px solid var(--line);
+  }
+  #canvas-host { display: flex; justify-content: center; }
+  .notes {
+    margin-top: 14px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .notes .good { color: #2E6B3F; }
+  .notes .flag { color: #A03A32; }
+  .notes ul { margin: 6px 0; padding-left: 18px; }
+  .source {
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 10px;
+    border-top: 1px solid var(--line);
+    padding-top: 8px;
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="panel">
+      <h1>Color harmony score</h1>
+      <p class="lead">
+        Wearly grades an outfit's colors against the wearer's skin-tone palette
+        using a small additive rule: <strong>+8</strong> for a best-palette
+        match, <strong>+4</strong> for a good match, <strong>−10</strong> for
+        an avoid match. Try the controls and watch the score change live.
+      </p>
+
+      <label for="skin">Skin tone</label>
+      <select id="skin">
+        <option value="warm olive">Warm olive</option>
+        <option value="cool fair">Cool fair</option>
+        <option value="deep warm">Deep warm</option>
+      </select>
+
+      <label>Outfit</label>
+      <div class="slot-row">
+        <div class="swatch" id="sw-top"></div>
+        <select id="top" data-slot="top"></select>
+      </div>
+      <div class="slot-row">
+        <div class="swatch" id="sw-bottom"></div>
+        <select id="bottom" data-slot="bottom"></select>
+      </div>
+      <div class="slot-row">
+        <div class="swatch" id="sw-shoes"></div>
+        <select id="shoes" data-slot="shoes"></select>
+      </div>
+      <div class="slot-row">
+        <div class="swatch" id="sw-acc"></div>
+        <select id="acc" data-slot="accessory"></select>
+      </div>
+
+      <button id="randomize">Randomize outfit</button>
+
+      <div class="notes" id="notes"></div>
+
+      <div class="source">
+        Rules source: <code>color_rules.json</code> in the Wearly repo. Identical
+        formula to <code>color_tool.score_outfit_colors()</code>.
+      </div>
+    </div>
+
+    <div class="panel" id="canvas-host"></div>
+  </div>
+
+<script>
+// --- Color rules (mirrors color_rules.json) ---
+const RULES = {
+  "warm olive": {
+    best:  ["terracotta","burnt orange","camel","olive","burgundy","warm white","gold","deep teal","mustard","chocolate brown"],
+    good:  ["black","navy","blush","cream","sage green","rust"],
+    avoid: ["cool grey","icy pink","lavender","silver"],
+    notes: "Warm earth tones are most flattering. Gold jewelry enhances warm undertones."
+  },
+  "cool fair": {
+    best:  ["navy","icy blue","lavender","cool grey","silver","emerald","royal blue","raspberry"],
+    good:  ["black","white","pink","plum","burgundy"],
+    avoid: ["orange","warm brown","gold-heavy palettes"],
+    notes: "Cool jewel tones and icy neutrals are most flattering."
+  },
+  "deep warm": {
+    best:  ["cobalt","emerald","bright red","gold","orange","white","camel","purple"],
+    good:  ["black","navy","burgundy","teal"],
+    avoid: ["muted beige","dusty pink","light grey"],
+    notes: "Bold, saturated colors and bright whites create stunning contrast."
+  }
+};
+
+// Approximate display hexes (mirror COLOR_HEX in app.py, extended).
+const HEX = {
+  "white":"#F4EFE8","warm white":"#F1E7D6","cream":"#EFE3CC","ivory":"#F1E7D6",
+  "black":"#1C1917","charcoal":"#2E2A27",
+  "cool grey":"#A9ADB1","light grey":"#C9CCCE","grey":"#9A938C",
+  "navy":"#1F2A44","cobalt":"#2347B5","royal blue":"#2A4FB0","icy blue":"#C2D9E6","deep teal":"#1F5A5E","teal":"#2E7E80",
+  "olive":"#7A7548","sage green":"#9DA88B","emerald":"#1F6B4C",
+  "camel":"#B89878","tan":"#C9A77F","warm brown":"#7A4A2E","chocolate brown":"#4A2A1C","muted beige":"#D2C5B0",
+  "blush":"#E5BBAD","pink":"#E8B6B0","dusty pink":"#D6A8A5","icy pink":"#F3D6DD","raspberry":"#A12A4A",
+  "burgundy":"#6B2C2A","bright red":"#B92B2B","red":"#A03A32","rust":"#A85A3C",
+  "terracotta":"#C17F5A","burnt orange":"#B2562E","orange":"#D06A2A",
+  "gold":"#C9A968","gold-heavy palettes":"#C9A968","silver":"#BFC1C2",
+  "lavender":"#B5A8D6","plum":"#5E2A4E","purple":"#6B3A8A","mustard":"#C8A02A"
+};
+
+function hexFor(name) { return HEX[name] || "#C8B8A8"; }
+
+// Slot palettes — what colors are pickable for each garment slot.
+const SLOT_COLORS = {
+  top:       ["warm white","cream","black","navy","terracotta","burnt orange","blush","emerald","cobalt","sage green","mustard","plum"],
+  bottom:    ["black","navy","camel","olive","cream","charcoal","warm brown","burgundy"],
+  shoes:     ["black","camel","tan","white","burgundy","navy","silver","gold"],
+  accessory: ["gold","silver","camel","terracotta","burgundy","navy","emerald","blush"]
+};
+
+function classifyColor(skin, color) {
+  const r = RULES[skin];
+  if (!r) return "neutral";
+  const c = color.toLowerCase();
+  if (r.best.some(b => b === c || b.includes(c) || c.includes(b)))  return "best";
+  if (r.good.some(g => g === c || g.includes(c) || c.includes(g)))  return "good";
+  if (r.avoid.some(a => a === c || a.includes(c) || c.includes(a))) return "avoid";
+  return "neutral";
+}
+
+function scoreOutfit(skin, items) {
+  let score = 60;
+  const notes = [];
+  const flags = [];
+  items.forEach(it => {
+    const cls = classifyColor(skin, it.color);
+    if (cls === "best")  { score += 8;  notes.push({ kind:"good", text: `+8  ${it.slot} (${it.color}) — best-palette match.` }); }
+    else if (cls === "good")  { score += 4;  notes.push({ kind:"good", text: `+4  ${it.slot} (${it.color}) — works well.` }); }
+    else if (cls === "avoid") { score -= 10; flags.push({ kind:"flag", text: `-10 ${it.slot} (${it.color}) — less flattering.` }); }
+    else { notes.push({ kind:"neutral", text: `0  ${it.slot} (${it.color}) — neutral.` }); }
+  });
+  score = Math.max(0, Math.min(100, score));
+  return { score, notes, flags, palette_note: RULES[skin].notes };
+}
+
+// --- DOM setup ---
+function populateSlots() {
+  const slots = ["top","bottom","shoes","acc"];
+  const slotKey = { top:"top", bottom:"bottom", shoes:"shoes", acc:"accessory" };
+  slots.forEach(s => {
+    const sel = document.getElementById(s);
+    sel.innerHTML = "";
+    SLOT_COLORS[slotKey[s]].forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c;
+      opt.textContent = c;
+      sel.appendChild(opt);
+    });
+  });
+  document.getElementById("top").value = "terracotta";
+  document.getElementById("bottom").value = "camel";
+  document.getElementById("shoes").value = "tan";
+  document.getElementById("acc").value = "gold";
+}
+
+function readOutfit() {
+  return [
+    { slot:"top",       color: document.getElementById("top").value },
+    { slot:"bottom",    color: document.getElementById("bottom").value },
+    { slot:"shoes",     color: document.getElementById("shoes").value },
+    { slot:"accessory", color: document.getElementById("acc").value },
+  ];
+}
+
+function refreshSwatches() {
+  document.getElementById("sw-top").style.background    = hexFor(document.getElementById("top").value);
+  document.getElementById("sw-bottom").style.background = hexFor(document.getElementById("bottom").value);
+  document.getElementById("sw-shoes").style.background  = hexFor(document.getElementById("shoes").value);
+  document.getElementById("sw-acc").style.background    = hexFor(document.getElementById("acc").value);
+}
+
+function refreshNotes(result) {
+  const host = document.getElementById("notes");
+  host.innerHTML = "";
+  const ul = document.createElement("ul");
+  [...result.notes, ...result.flags].forEach(n => {
+    const li = document.createElement("li");
+    li.textContent = n.text;
+    if (n.kind === "good") li.className = "good";
+    if (n.kind === "flag") li.className = "flag";
+    ul.appendChild(li);
+  });
+  host.appendChild(ul);
+  const p = document.createElement("p");
+  p.style.color = "var(--muted)";
+  p.style.fontSize = "12px";
+  p.textContent = result.palette_note;
+  host.appendChild(p);
+}
+
+// --- p5.js sketch: outfit silhouette + score gauge ---
+let currentResult = { score: 60, notes: [], flags: [], palette_note: "" };
+let currentOutfit = [];
+
+const sketch = (p) => {
+  p.setup = () => {
+    const host = document.getElementById("canvas-host");
+    const w = Math.min(host.clientWidth - 28, 640);
+    const c = p.createCanvas(w, 480);
+    c.parent(host);
+    p.noLoop();
+    refreshAll();
+  };
+
+  p.windowResized = () => {
+    const host = document.getElementById("canvas-host");
+    const w = Math.min(host.clientWidth - 28, 640);
+    p.resizeCanvas(w, 480);
+    p.redraw();
+  };
+
+  p.draw = () => {
+    p.background(244, 239, 232); // ivory
+
+    const o = currentOutfit;
+    if (o.length < 4) return;
+    const colTop    = hexFor(o[0].color);
+    const colBottom = hexFor(o[1].color);
+    const colShoes  = hexFor(o[2].color);
+    const colAcc    = hexFor(o[3].color);
+
+    // Silhouette
+    const cx = p.width * 0.32;
+    p.noStroke();
+
+    // Head
+    p.fill("#E8D5BD");
+    p.ellipse(cx, 70, 60, 70);
+
+    // Top (torso)
+    p.fill(colTop);
+    p.beginShape();
+    p.vertex(cx - 60, 110);
+    p.vertex(cx + 60, 110);
+    p.vertex(cx + 70, 230);
+    p.vertex(cx - 70, 230);
+    p.endShape(p.CLOSE);
+
+    // Accessory (necklace dot)
+    p.fill(colAcc);
+    p.ellipse(cx, 125, 14, 14);
+
+    // Bottom
+    p.fill(colBottom);
+    p.beginShape();
+    p.vertex(cx - 70, 230);
+    p.vertex(cx + 70, 230);
+    p.vertex(cx + 50, 380);
+    p.vertex(cx - 50, 380);
+    p.endShape(p.CLOSE);
+    // leg split
+    p.fill(244, 239, 232);
+    p.rect(cx - 3, 300, 6, 80);
+
+    // Shoes
+    p.fill(colShoes);
+    p.rect(cx - 50, 380, 38, 20, 4);
+    p.rect(cx + 12, 380, 38, 20, 4);
+
+    // --- Score gauge on the right ---
+    const gx = p.width * 0.72;
+    const gy = 240;
+    const gr = 130;
+    drawGauge(p, gx, gy, gr, currentResult.score);
+
+    // Skin-tone palette swatch under gauge
+    drawPalette(p, gx - 110, gy + 160);
+  };
+
+  function drawGauge(p, cx, cy, r, score) {
+    // Background arc
+    p.noFill();
+    p.strokeWeight(18);
+    p.stroke(232, 224, 216);
+    p.arc(cx, cy, r * 2, r * 2, p.PI, p.TWO_PI);
+
+    // Score arc — color tinted by tier
+    let col;
+    if (score >= 80) col = p.color("#2E6B3F");
+    else if (score >= 60) col = p.color("#C17F5A");
+    else col = p.color("#A03A32");
+    p.stroke(col);
+    const t = p.map(score, 0, 100, p.PI, p.TWO_PI);
+    p.arc(cx, cy, r * 2, r * 2, p.PI, t);
+
+    // Score text
+    p.noStroke();
+    p.fill(28, 25, 23);
+    p.textAlign(p.CENTER, p.CENTER);
+    p.textSize(48);
+    p.textStyle(p.BOLD);
+    p.text(score, cx, cy - 8);
+    p.textSize(12);
+    p.textStyle(p.NORMAL);
+    p.fill(107, 95, 85);
+    p.text("color score", cx, cy + 28);
+  }
+
+  function drawPalette(p, x, y) {
+    const skin = document.getElementById("skin").value;
+    const palette = RULES[skin].best.slice(0, 8);
+    p.noStroke();
+    p.fill(107, 95, 85);
+    p.textAlign(p.LEFT, p.CENTER);
+    p.textSize(11);
+    p.text(`Best palette for ${skin}:`, x, y);
+    palette.forEach((name, i) => {
+      p.fill(hexFor(name));
+      p.rect(x + (i % 8) * 26, y + 12, 22, 22, 4);
+    });
+  }
+};
+
+let p5Instance;
+
+function refreshAll() {
+  refreshSwatches();
+  currentOutfit = readOutfit();
+  currentResult = scoreOutfit(document.getElementById("skin").value, currentOutfit);
+  refreshNotes(currentResult);
+  if (p5Instance) p5Instance.redraw();
+}
+
+function randomChoice(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+window.addEventListener("DOMContentLoaded", () => {
+  populateSlots();
+
+  document.getElementById("skin").addEventListener("change", refreshAll);
+  ["top","bottom","shoes","acc"].forEach(id => {
+    document.getElementById(id).addEventListener("change", refreshAll);
+  });
+  document.getElementById("randomize").addEventListener("click", () => {
+    document.getElementById("top").value    = randomChoice(SLOT_COLORS.top);
+    document.getElementById("bottom").value = randomChoice(SLOT_COLORS.bottom);
+    document.getElementById("shoes").value  = randomChoice(SLOT_COLORS.shoes);
+    document.getElementById("acc").value    = randomChoice(SLOT_COLORS.accessory);
+    refreshAll();
+  });
+
+  p5Instance = new p5(sketch);
+});
+</script>
+</body>
+</html>
