@@ -455,6 +455,21 @@ def run_agent(
         if outer_suggestion not in result["shopping_suggestions"]:
             result["shopping_suggestions"].append(outer_suggestion)
 
+    # Augment suggestions with the user's favorite stores, when any are saved.
+    # Adds a single extra line: "Check {stores} first — your saved favorite
+    # store(s)." See shopping_tool.store_aware_suggestions().
+    if result["gaps"] and result["shopping_suggestions"]:
+        try:
+            from shopping_tool import store_aware_suggestions
+            result["shopping_suggestions"] = store_aware_suggestions(
+                result["shopping_suggestions"],
+                occasion_tag=occasion_tag,
+            )
+        except Exception:
+            # Tool unavailable → leave suggestions unchanged. Never block the
+            # agent on shopping tool failures.
+            pass
+
     # ── STEP 7: Color Check ────────────────────────────────────────────────────
     step7 = {"step": 7, "name": "Color Coordination Check", "status": "ok", "output": ""}
     skin_tone = profile.get("skin_tone", "warm olive")

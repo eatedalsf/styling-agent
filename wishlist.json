@@ -1,0 +1,4 @@
+{
+  "_comment": "Wishlist. Saved suggestions and items the user wants to acquire. Each item carries an optional linked_gap (when added from a wardrobe-gap suggestion) so the agent can flag when a gap has been queued.",
+  "items": []
+}

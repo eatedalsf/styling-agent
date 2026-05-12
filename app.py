@@ -642,6 +642,7 @@ _SECTIONS = [
     ("home",     "Home"),
     ("today",    "Today"),
     ("wardrobe", "Wardrobe"),
+    ("shop",     "Shop"),
     ("profile",  "Profile"),
     ("demo",     "Before / After"),
 ]
@@ -807,6 +808,9 @@ def _render_outfit_result(result: dict):
 
     # ── Gaps ────────────────────────────────────────────────
     if gaps:
+        # Render the alert text as HTML, then drop interactive
+        # "Save to wishlist" buttons immediately below — Streamlit
+        # buttons can't live inside an unsafe_allow_html block.
         gap_items = "".join(f"<div class='gap-item'>→ {s}</div>" for s in shopping)
         st.markdown(f"""
         <div class="gap-alert">
@@ -814,6 +818,69 @@ def _render_outfit_result(result: dict):
             {gap_items}
         </div>
         """, unsafe_allow_html=True)
+
+        # ── Save-to-wishlist actions ──
+        # Each shopping suggestion gets its own per-gap save button so the
+        # user can queue the right piece into their wishlist with the gap
+        # type already linked. Already-queued gaps surface a calm chip
+        # instead of the button.
+        try:
+            from shopping_tool import add_wishlist_item, gap_is_on_wishlist
+            _shopping_ok = True
+        except ImportError:
+            _shopping_ok = False
+
+        if _shopping_ok and shopping:
+            # Use the FIRST gap type as the canonical linked_gap. Outerwear
+            # gaps come from Step 5 (always type 'outerwear'); required-piece
+            # gaps come from Step 6 (type matches REQUIRED_PIECES entries).
+            primary_gap = gaps[0]
+            occ_tag = (result.get("event") or {}).get("type", "casual") or "casual"
+
+            if gap_is_on_wishlist(primary_gap):
+                st.markdown(
+                    f'<div style="margin-top:0.6rem; padding:0.55rem 0.9rem; '
+                    f'background:#FAF3EE; border:1px solid #EAD7C9; border-radius:99px; '
+                    f'display:inline-block; font-size:0.78rem; color:#9F5A36;">'
+                    f"✓ '{primary_gap}' is already on your wishlist"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<div style="font-size:0.74rem; color:#9C8A7A; margin-top:0.65rem;">'
+                    "Save a suggestion to your wishlist for later:"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                # One button per suggestion line. Hash the text into the key.
+                import hashlib as _hashlib
+                for sug_idx, sug_text in enumerate(shopping):
+                    # Skip the "Check {stores} first" augmentation line —
+                    # it's a prompt, not a saveable suggestion.
+                    if sug_text.lower().startswith("check ") and "favorite store" in sug_text.lower():
+                        continue
+                    btn_key = "save_wl_" + _hashlib.md5(
+                        f"{primary_gap}|{sug_idx}|{sug_text[:30]}".encode()
+                    ).hexdigest()[:10]
+                    label = f"Save: {sug_text[:60]}{'…' if len(sug_text) > 60 else ''}"
+                    if st.button(label, key=btn_key, use_container_width=True):
+                        rr = add_wishlist_item({
+                            "name":       sug_text,
+                            "category":   primary_gap,
+                            "tags":       [occ_tag] if occ_tag else [],
+                            "priority":   "medium",
+                            "linked_gap": primary_gap,
+                            "notes":      f"Saved from a wardrobe-gap suggestion ({occ_tag}).",
+                        })
+                        if rr.get("success"):
+                            st.success(
+                                f"Added to wishlist as {rr['item']['id']}. "
+                                f"View it on the Shop tab."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(rr.get("error", "Could not save."))
 
     # ── Workflow Steps ──────────────────────────────────────
     st.markdown("<div style='margin-top:1.5rem'></div>", unsafe_allow_html=True)
@@ -1732,6 +1799,234 @@ def _render_wardrobe():
 
 
 # ─────────────────────────────────────────────
+# SHOP — Favorite stores + Wishlist
+# ─────────────────────────────────────────────
+
+def _render_shop():
+    """Two-tab management surface for the shopping-gap loop.
+
+    Tab 1 — Wishlist: list saved items, add new items manually, remove.
+    Tab 2 — Favorite stores: list stores, add new, remove.
+
+    Wardrobe gaps surfaced in the Today result get a "Save to wishlist"
+    button (rendered in _render_outfit_result below); items added that
+    way carry a linked_gap field so the user can later see which gap
+    each wishlist entry was queued for.
+    """
+    try:
+        from shopping_tool import (
+            get_favorite_stores, add_favorite_store, remove_favorite_store,
+            get_wishlist, add_wishlist_item, remove_wishlist_item,
+            VALID_PRIORITIES,
+        )
+    except ImportError as _e:
+        st.error(f"Shopping tool unavailable: {_e}")
+        return
+
+    st.markdown("""
+    <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
+        <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Shop</div>
+        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">
+            Favorite stores and a wishlist of pieces you want to acquire.
+            Wearly uses both to make gap suggestions feel personal.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    _tab_wishlist, _tab_stores = st.tabs(["Wishlist", "Favorite stores"])
+
+    # ── Wishlist tab ──────────────────────────────────────────
+    with _tab_wishlist:
+        wl = get_wishlist().get("items", [])
+        stores_for_select = [s.get("name", "") for s in get_favorite_stores().get("stores", []) if s.get("name")]
+
+        if wl:
+            st.markdown(f"""
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
+                {len(wl)} item{'' if len(wl) == 1 else 's'} on your wishlist
+            </div>
+            """, unsafe_allow_html=True)
+
+            for it in wl:
+                priority = (it.get("priority") or "medium").lower()
+                pri_color = {"high": "#9F5A36", "medium": "#C17F5A", "low": "#A8937E"}.get(priority, "#A8937E")
+                meta_bits = []
+                if it.get("category"): meta_bits.append(it["category"])
+                if it.get("preferred_store"): meta_bits.append(f"@ {it['preferred_store']}")
+                if it.get("tags"): meta_bits.append(", ".join(it["tags"]))
+                meta = " · ".join(meta_bits) or "—"
+                linked = (
+                    f'<span style="display:inline-block; font-size:0.66rem; color:#8A4A20; '
+                    f'background:#FDF3EE; border:1px solid #E8C4A8; padding:1px 7px; '
+                    f'border-radius:99px; letter-spacing:0.06em; margin-left:0.5rem;">'
+                    f'from a wardrobe gap · {it["linked_gap"]}</span>'
+                ) if it.get("linked_gap") else ""
+                source_link = (
+                    f' · <a href="{it["source_url"]}" target="_blank" style="color:#C17F5A;">link</a>'
+                ) if it.get("source_url") else ""
+                notes_block = (
+                    f'<div style="font-size:0.8rem; color:#7C6F64; margin-top:0.3rem; font-style:italic;">{it["notes"]}</div>'
+                ) if it.get("notes") else ""
+
+                row_a, row_b = st.columns([5, 1], gap="small")
+                with row_a:
+                    st.markdown(f"""
+                    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
+                        <div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
+                            <span style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{it.get('name','—')}</span>
+                            <span style="font-size:0.66rem; color:{pri_color}; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;">{priority}</span>
+                            {linked}
+                        </div>
+                        <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.3rem;">{meta}{source_link}</div>
+                        {notes_block}
+                    </div>
+                    """, unsafe_allow_html=True)
+                with row_b:
+                    if st.button("Remove", key=f"wl_rm_{it.get('id','')}", use_container_width=True):
+                        rr = remove_wishlist_item(it.get("id", ""))
+                        if rr.get("success"):
+                            st.success(f"Removed {it.get('id','')}.")
+                            st.rerun()
+                        else:
+                            st.error(rr.get("error", "Could not remove."))
+        else:
+            st.markdown(
+                '<div style="font-size:0.82rem; color:#9C8A7A; margin-bottom:1rem;">'
+                'No wishlist items yet. Add one below, or save a wardrobe-gap suggestion '
+                'from a recommended outfit.'
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── Add form ──
+        st.markdown("""
+        <div style="margin-top:1.4rem; margin-bottom:0.4rem;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.2rem; color:#1C1917;">Add to wishlist</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("wishlist_add_form", clear_on_submit=True):
+            col_a, col_b = st.columns([3, 2], gap="small")
+            with col_a:
+                w_name = st.text_input("Item name or gap description", placeholder="e.g. Tailored cream blazer")
+            with col_b:
+                w_category = st.selectbox(
+                    "Category (optional)",
+                    options=["", "top", "bottom", "dress", "outerwear", "activewear", "shoes", "accessory"],
+                )
+
+            col_c, col_d = st.columns([2, 2], gap="small")
+            with col_c:
+                w_store = st.selectbox(
+                    "Preferred store (optional)",
+                    options=[""] + stores_for_select,
+                    help=("Choose from your saved favorites. Add new stores in the "
+                          "Favorite stores tab to see them here."),
+                )
+            with col_d:
+                w_priority = st.selectbox("Priority", options=list(VALID_PRIORITIES), index=1)
+
+            w_tags = st.multiselect(
+                "Occasions",
+                options=["work", "dinner", "gym", "formal", "casual", "weekend", "evening", "date", "travel", "versatile"],
+                default=[],
+            )
+            w_notes = st.text_area("Notes (optional)", placeholder="Anything to remember when you eventually buy this.")
+            w_url   = st.text_input("Product URL (optional)", placeholder="https://…")
+
+            w_submit = st.form_submit_button("Add to wishlist", type="primary", use_container_width=True)
+            if w_submit:
+                rr = add_wishlist_item({
+                    "name":            w_name,
+                    "category":        w_category,
+                    "preferred_store": w_store,
+                    "tags":            w_tags,
+                    "priority":        w_priority,
+                    "notes":           w_notes,
+                    "source_url":      w_url,
+                })
+                if rr.get("success"):
+                    st.success(f"Saved {rr['item']['id']} · {rr['item']['name']}.")
+                    st.rerun()
+                else:
+                    st.error(rr.get("error", "Could not save."))
+
+    # ── Favorite stores tab ───────────────────────────────────
+    with _tab_stores:
+        stores = get_favorite_stores().get("stores", [])
+
+        if stores:
+            st.markdown(f"""
+            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
+                {len(stores)} favorite store{'' if len(stores) == 1 else 's'}
+            </div>
+            """, unsafe_allow_html=True)
+            for s in stores:
+                name = s.get("name", "—")
+                url = s.get("url")
+                notes = s.get("notes")
+                link_block = f' · <a href="{url}" target="_blank" style="color:#C17F5A;">{url}</a>' if url else ""
+                notes_block = f'<div style="font-size:0.78rem; color:#7C6F64; margin-top:0.2rem; font-style:italic;">{notes}</div>' if notes else ""
+
+                row_a, row_b = st.columns([5, 1], gap="small")
+                with row_a:
+                    st.markdown(f"""
+                    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
+                        <div style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{name}</div>
+                        <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.2rem;">{url or "no link saved"}{link_block if False else ""}</div>
+                        {notes_block}
+                    </div>
+                    """, unsafe_allow_html=True)
+                with row_b:
+                    if st.button("Remove", key=f"st_rm_{name}", use_container_width=True):
+                        rr = remove_favorite_store(name)
+                        if rr.get("success"):
+                            st.success(f"Removed {name}.")
+                            st.rerun()
+                        else:
+                            st.error(rr.get("error", "Could not remove."))
+        else:
+            st.markdown(
+                '<div style="font-size:0.82rem; color:#9C8A7A; margin-bottom:1rem;">'
+                "No favorite stores saved yet. Add a few below — Wearly will reference them "
+                "when it spots a wardrobe gap."
+                '</div>',
+                unsafe_allow_html=True,
+            )
+
+        st.markdown("""
+        <div style="margin-top:1.4rem; margin-bottom:0.4rem;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.2rem; color:#1C1917;">Add a store</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.form("store_add_form", clear_on_submit=True):
+            s_name  = st.text_input("Store name", placeholder="e.g. COS, Aritzia, Mejuri")
+            s_url   = st.text_input("Store URL (optional)", placeholder="https://…")
+            s_notes = st.text_input("Notes (optional)", placeholder="Why is this a favorite?")
+            s_submit = st.form_submit_button("Add store", type="primary", use_container_width=True)
+            if s_submit:
+                rr = add_favorite_store(s_name, s_url, s_notes)
+                if rr.get("success"):
+                    st.success(f"Saved {rr['store']['name']} as a favorite.")
+                    st.rerun()
+                else:
+                    st.error(rr.get("error", "Could not save."))
+
+    # ── Prototype disclosure ──
+    st.markdown("""
+    <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EDE5DC;">
+        <p style="font-size:0.74rem; color:#9C8A7A; line-height:1.6; margin:0;">
+            <strong style="color:#7C6F64; letter-spacing:0.04em;">Prototype.</strong>
+            Wearly doesn't perform live retailer searches yet — favorite stores act as
+            personalization hints in shopping suggestions, and the wishlist is a saved
+            local list. Real product catalogs and price lookups are future production work.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────
 # PROFILE — mock profile screen
 # ─────────────────────────────────────────────
 
@@ -1985,6 +2280,7 @@ _router = {
     "home":     _render_home,
     "today":    _render_today,
     "wardrobe": _render_wardrobe,
+    "shop":     _render_shop,
     "profile":  _render_profile,
     "demo":     _render_demo,
 }

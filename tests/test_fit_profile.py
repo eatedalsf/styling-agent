@@ -28,7 +28,14 @@ from fit_tool import (  # noqa: E402
 
 
 class _ProfileSnapshotMixin:
-    """Snapshot / restore user_profile.json across each test class."""
+    """
+    Snapshot / restore both user_profile.json AND wear_history.json across
+    each test class. We touch wear_history because TestAgentFitIntegration
+    runs the agent against the seed wardrobe, and stale wear-history state
+    (from a prior dev exploration via the Streamlit "Wear this outfit"
+    button) would steer Step 5 to different items — breaking assertions
+    that look for specific reasoning notes tied to particular pieces.
+    """
 
     @classmethod
     def setUpClass(cls):
@@ -36,6 +43,17 @@ class _ProfileSnapshotMixin:
         if os.path.exists(PROFILE_PATH):
             with open(PROFILE_PATH, "r", encoding="utf-8") as f:
                 cls._original = f.read()
+        # Snapshot wear history too.
+        try:
+            from history_tool import HISTORY_PATH
+            cls._history_path = HISTORY_PATH
+            cls._history_original = None
+            if os.path.exists(HISTORY_PATH):
+                with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+                    cls._history_original = f.read()
+        except ImportError:
+            cls._history_path = None
+            cls._history_original = None
 
     @classmethod
     def tearDownClass(cls):
@@ -45,6 +63,9 @@ class _ProfileSnapshotMixin:
         else:
             if os.path.exists(PROFILE_PATH):
                 os.remove(PROFILE_PATH)
+        if cls._history_path and cls._history_original is not None:
+            with open(cls._history_path, "w", encoding="utf-8") as f:
+                f.write(cls._history_original)
 
     def setUp(self):
         # Reset overlay to all-empty so tests are deterministic.
@@ -56,6 +77,11 @@ class _ProfileSnapshotMixin:
                 "highlight_features": [],
                 "balance_areas":      [],
             }, f)
+        # Reset wear history too — this is the test-hardening fix.
+        # See note in setUpClass for context.
+        if self._history_path:
+            with open(self._history_path, "w", encoding="utf-8") as f:
+                json.dump({"history": {}}, f)
 
 
 # ─────────────────────────────────────────────
