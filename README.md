@@ -2,6 +2,7 @@
 *Your style, reasoned.*
 
 [![tests](https://github.com/eatedalsf/styling-agent/actions/workflows/tests.yml/badge.svg)](https://github.com/eatedalsf/styling-agent/actions/workflows/tests.yml)
+[![docs](https://github.com/eatedalsf/styling-agent/actions/workflows/docs.yml/badge.svg)](https://github.com/eatedalsf/styling-agent/actions/workflows/docs.yml)
 
 **SEIS 666 — Digital Transformation 2.0 | Spring 2026**
 **Track B: Agentic AI System**
@@ -11,10 +12,11 @@ A mobile-first, clean-luxury personal styling agent that recommends complete out
 <!-- HERO BLOCK — drop a hero screenshot or GIF into docs/assets/hero.png and the image below
      will pick it up. The live-demo button is wired to the deployed Streamlit Cloud app. -->
 
-### 🔗 [**Open the live app →**](https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/)
+### 🔗 [**Open the live app →**](https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/) · 📖 [**Read the Intelligent Book →**](https://eatedalsf.github.io/styling-agent/)
 
-> **Live demo:** <https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/> — hosted on Streamlit Community Cloud.
-> No install, no signup — works in any browser, mobile or desktop.
+> **Live demo:** <https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/> — hosted on Streamlit Community Cloud. No install, no signup.
+>
+> **Intelligent Book:** <https://eatedalsf.github.io/styling-agent/> — companion documentation site built with MkDocs Material. The agent's design principles, evidence categories, skill rules, knowledge-graph schema, and architecture, all searchable in one place.
 >
 > ![Wearly home — hero screenshot](docs/assets/hero.png)
 

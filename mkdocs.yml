@@ -1,0 +1,153 @@
+# MkDocs Material configuration for the Wearly Intelligent Book.
+#
+# Builds the existing Markdown in book/, docs/, skills/, graph/, and
+# the repo-root product docs into a navigable, searchable site at:
+#   https://eatedalsf.github.io/styling-agent/
+#
+# Source files are NEVER moved. docs_dir is set to the repo root and
+# the nav lists each file by its actual on-disk path, so the Markdown
+# files stay alongside the code they document.
+
+site_name: "Wearly — Intelligent Book"
+site_description: "Evidence-informed, design-informed, user-preference-driven styling agent. Companion documentation for the Wearly prototype."
+site_url: "https://eatedalsf.github.io/styling-agent/"
+site_author: "Wearly project"
+
+repo_url: "https://github.com/eatedalsf/styling-agent"
+repo_name: "eatedalsf/styling-agent"
+edit_uri: "edit/main/"
+
+# MkDocs forbids `docs_dir` being the parent of the config file, so the
+# Markdown source files are NOT consumed in place. Instead, `scripts/stage_docs.py`
+# copies the canonical Markdown (book/, docs/, skills/, graph/, plus the
+# repo-root product docs) into `_docs_build/` at build time. The originals
+# never move — they stay alongside the code they document.
+docs_dir: "_docs_build"
+site_dir: "site"
+
+theme:
+  name: material
+  language: en
+  palette:
+    # Light scheme tuned to Wearly's warm-ivory + terracotta brand.
+    - scheme: default
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: deep orange
+      accent: orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  font:
+    text: "DM Sans"
+    code: "DM Mono"
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - navigation.indexes
+    - search.highlight
+    - search.suggest
+    - search.share
+    - content.code.copy
+    - content.tabs.link
+    - content.action.edit
+    - toc.follow
+
+plugins:
+  - search
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+      toc_depth: 3
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      # Render Mermaid blocks as live diagrams instead of code blocks.
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/eatedalsf/styling-agent
+  generator: false  # hide the small "Made with Material for MkDocs" footer
+
+# The nav lists every documentation file by its on-disk path. No moves.
+nav:
+  - Home: book/index.md
+
+  - The Book:
+    - Overview: book/index.md
+    - "01 · Product vision": book/01-vision.md
+    - "02 · User problem": book/02-user-problem.md
+    - "03 · Agent workflow": book/03-agent-workflow.md
+    - "04 · Styling knowledge base": book/04-styling-knowledge-base.md
+    - "05 · Wardrobe intelligence": book/05-wardrobe-intelligence.md
+    - "06 · Fit-profile logic": book/06-fit-profile-logic.md
+    - "07 · Calendar & weather context": book/07-calendar-weather-context.md
+    - "08 · Shopping-gap logic": book/08-shopping-gap-logic.md
+    - "09 · Before / after demo": book/09-before-after-demo.md
+    - "10 · Privacy & security": book/10-privacy-security.md
+    - "11 · Product roadmap": book/11-product-roadmap.md
+    - "12 · Evidence & references": book/12-evidence-and-references.md
+
+  - Evidence:
+    - "Evidence & references (canonical)": docs/evidence-and-references.md
+
+  - Skills:
+    - "Skill package overview": skills/wearly-styling-agent/SKILL.md
+    - "Occasion rules": skills/wearly-styling-agent/occasion-rules.md
+    - "Weather rules": skills/wearly-styling-agent/weather-rules.md
+    - "Fit & silhouette rules": skills/wearly-styling-agent/fit-silhouette-rules.md
+    - "Wardrobe filtering rules": skills/wearly-styling-agent/wardrobe-filtering-rules.md
+    - "Color coordination rules": skills/wearly-styling-agent/color-coordination-rules.md
+    - "Wear history rules": skills/wearly-styling-agent/wear-history-rules.md
+    - "Shopping gap rules": skills/wearly-styling-agent/shopping-gap-rules.md
+    - "Privacy guidelines": skills/wearly-styling-agent/privacy-guidelines.md
+
+  - Knowledge Graph:
+    - "Schema": graph/schema.md
+    - "Diagram": graph/render.md
+
+  - Architecture:
+    - "System architecture": docs/architecture.md
+    - "Workflow diagram": workflow_diagram.md
+    - "Demo script": docs/demo_script.md
+
+  - Project Vision:
+    - "Product brief": Wearly_Product_Brief.md
+    - "References & course context": Wearly_References_and_Course_Context.md

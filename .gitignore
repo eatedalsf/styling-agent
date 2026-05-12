@@ -34,6 +34,11 @@ htmlcov/
 # kept out of version control so the repo doesn't bloat with user uploads.
 wardrobe_images/
 
+# MkDocs build artifacts — the staging directory populated by
+# scripts/stage_docs.py and the built static site MkDocs emits.
+_docs_build/
+site/
+
 # Environment variables
 .env
 .env.*

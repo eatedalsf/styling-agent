@@ -1,0 +1,78 @@
+name: docs
+
+# Build the Wearly Intelligent Book (MkDocs Material) and deploy to
+# GitHub Pages.
+#
+# Build runs on every push (catches broken links / config errors
+# early). Deploy runs only on pushes to main or to the current feature
+# branch — keep it permissive while the project is in prototype mode;
+# tighten to `main` once the book is publicly linked from a stable
+# place.
+#
+# One-time repo setup (the maintainer does this once):
+#   Settings → Pages → Source: GitHub Actions
+# After that's set, every successful build on the deploy branch
+# publishes the site at https://eatedalsf.github.io/styling-agent/.
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; cancel in-flight runs from prior
+# pushes so we don't queue them up.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-docs.txt
+
+      - name: Install MkDocs Material
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-docs.txt
+
+      - name: Stage Markdown into _docs_build/
+        run: python scripts/stage_docs.py
+
+      - name: Build site
+        run: mkdocs build --clean
+
+      - name: Upload built site as Pages artifact
+        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/sweet-brown-f3ef68'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/sweet-brown-f3ef68'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

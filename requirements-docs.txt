@@ -1,0 +1,6 @@
+# Build-time dependencies for the MkDocs Intelligent Book site.
+# These are used ONLY by .github/workflows/docs.yml — never installed
+# on Streamlit Cloud, never imported by the running app.
+
+mkdocs-material>=9.5
+pymdown-extensions>=10.0
