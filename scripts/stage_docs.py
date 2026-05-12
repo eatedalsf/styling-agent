@@ -62,7 +62,18 @@ _PATHS_TO_EXCLUDE = {
 # the rest of the docs.
 _REMAPPED_FILES = {
     "docs/home.md": "index.md",
+    # JSON data files the micro-sims fetch at runtime via XHR. Copied
+    # into the stage so they're served from the same origin as the sim HTML.
+    "graph/graph.json":           "graph/graph.json",
+    "graph/learning-graph.json":  "graph/learning-graph.json",
 }
+
+# Directories where every file (not just .md) must be staged — typically
+# interactive micro-sims that bundle HTML + JS + assets next to their
+# index.md. Pattern matches dmccreary/intelligent-textbooks.
+_VERBATIM_DIRS = [
+    ("docs/sims", "docs/sims"),
+]
 
 
 def _wipe_stage() -> None:
@@ -121,6 +132,26 @@ def main() -> int:
         shutil.copy2(src, os.path.join(_STAGE, fname))
         total += 1
         print(f"  - {fname}")
+
+    # Verbatim directories: copy ALL files (e.g. main.html, .js, .json,
+    # images) so micro-sims work at runtime.
+    for src_rel, dst_rel in _VERBATIM_DIRS:
+        src = os.path.join(_ROOT, src_rel)
+        if not os.path.isdir(src):
+            print(f"  - skip {src_rel}/ verbatim (not present)")
+            continue
+        dst = os.path.join(_STAGE, dst_rel)
+        n = 0
+        for dirpath, _dirs, files in os.walk(src):
+            rel = os.path.relpath(dirpath, src)
+            target_dir = dst if rel == "." else os.path.join(dst, rel)
+            os.makedirs(target_dir, exist_ok=True)
+            for f in files:
+                shutil.copy2(os.path.join(dirpath, f),
+                             os.path.join(target_dir, f))
+                n += 1
+        total += n
+        print(f"  - {src_rel}/ -> {dst_rel}/  (verbatim, {n} file{'' if n == 1 else 's'})")
 
     # Files mapped to a different stage location (e.g. site-root index).
     for src_rel, dst_rel in _REMAPPED_FILES.items():

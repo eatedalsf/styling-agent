@@ -116,7 +116,7 @@ Each rule pack ends with a *Source basis* footer linking back to [`docs/evidence
 
 | Script | Purpose |
 |---|---|
-| [`scripts/validate_outfit.py`](scripts/validate_outfit.py) | Stand-alone validator: given a result dict, verify each rule pack's contract is upheld (occasion tag valid, required pieces present, color score in range, reasoning trail body-positive). Returns a structured PASS / FAIL report. Run as `python scripts/validate_outfit.py path/to/result.json`. |
+| [`scripts/validate_outfit.py`](https://github.com/eatedalsf/styling-agent/blob/main/skills/wearly-styling-agent/scripts/validate_outfit.py) | Stand-alone validator: given a result dict, verify each rule pack's contract is upheld (occasion tag valid, required pieces present, color score in range, reasoning trail body-positive). Returns a structured PASS / FAIL report. Run as `python skills/wearly-styling-agent/scripts/validate_outfit.py path/to/result.json`. |
 
 The script makes this an **Advanced**-tier skill per the meta-skills lecture: reference files PLUS executable code.
 

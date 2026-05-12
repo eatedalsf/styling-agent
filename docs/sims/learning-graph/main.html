@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wearly — Learning Graph</title>
+
+  <!--
+    Wearly Learning Graph viewer.
+    Pattern follows dmccreary/intelligent-textbooks `docs/sims/<sim>/main.html`.
+    Renders graph/learning-graph.json via vis-network.js (same library
+    yarmoluk's course learning graph uses).
+    Self-contained: vis-network.js is loaded from the official UMD bundle.
+    No build step; opens directly in a browser.
+  -->
+
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    :root {
+      --paper:       #F8F4ED;
+      --card:        #FDFAF7;
+      --ink:         #1C1917;
+      --body:        #4A3D36;
+      --secondary:   #7C6F64;
+      --eyebrow:     #A8937E;
+      --edge:        #C8B8A8;
+      --accent:      #C17F5A;
+      --accent-deep: #9F5A36;
+      --border:      #E8E0D8;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+    }
+    @media (min-width: 900px) {
+      .layout { grid-template-columns: 280px 1fr; grid-template-rows: auto 1fr; }
+      .header { grid-column: 1 / span 2; }
+    }
+
+    .header {
+      padding: 0.85rem 1.2rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .title { font-family: "DM Serif Display", "Times New Roman", serif; font-size: 1.3rem; color: var(--ink); }
+    .subtitle { font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em; }
+
+    .sidebar {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 0.9rem 1rem;
+      overflow-y: auto;
+      font-size: 0.86rem;
+    }
+    .sidebar h3 {
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--eyebrow);
+      font-weight: 700;
+      margin: 1.1rem 0 0.5rem;
+    }
+    .sidebar h3:first-child { margin-top: 0; }
+    .controls input,
+    .controls select {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--paper);
+      font-size: 0.85rem;
+      color: var(--ink);
+      font-family: inherit;
+    }
+    .controls label {
+      display: block;
+      font-size: 0.74rem;
+      color: var(--secondary);
+      margin-bottom: 0.25rem;
+      margin-top: 0.6rem;
+    }
+    .controls label:first-child { margin-top: 0; }
+    .controls button {
+      width: 100%;
+      padding: 0.5rem;
+      border: none;
+      background: var(--accent);
+      color: var(--card);
+      font-family: inherit;
+      font-size: 0.84rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .controls button:hover { background: var(--accent-deep); }
+    .legend {
+      display: flex; flex-direction: column; gap: 0.35rem;
+    }
+    .legend-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.82rem;
+      color: var(--body);
+    }
+    .legend-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%; border: 2px solid var(--edge);
+      flex-shrink: 0;
+    }
+    .selected-node {
+      padding: 0.65rem 0.75rem;
+      background: var(--paper);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+      margin-top: 0.4rem;
+      font-size: 0.84rem;
+    }
+    .selected-node-label {
+      font-weight: 600; color: var(--ink); margin-bottom: 0.25rem;
+    }
+    .selected-node-summary { color: var(--body); line-height: 1.5; }
+    .selected-node-bloom {
+      display: inline-block; margin-top: 0.4rem;
+      font-size: 0.66rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 1px 7px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      color: var(--secondary);
+    }
+    .selected-node-link {
+      display: inline-block; margin-top: 0.5rem;
+      font-size: 0.78rem;
+      color: var(--accent-deep);
+      text-decoration: underline;
+    }
+
+    #network {
+      width: 100%; height: 100%;
+      background: var(--paper);
+      min-height: 500px;
+    }
+    .empty-state {
+      padding: 1rem; color: var(--secondary); font-size: 0.84rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="header">
+      <div>
+        <div class="title">Wearly — Learning Graph</div>
+        <div class="subtitle">
+          <span id="stats">loading…</span> ·
+          a directed acyclic graph of concepts ·
+          click a node to inspect ·
+          double-click to focus its neighbors
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="controls">
+        <h3>Filter</h3>
+        <label for="searchBox">Search concepts</label>
+        <input type="text" id="searchBox" placeholder="e.g. wear history, color, fit">
+        <label for="categorySel">Category</label>
+        <select id="categorySel">
+          <option value="">All categories</option>
+        </select>
+        <label for="bloomSel">Bloom level</label>
+        <select id="bloomSel">
+          <option value="">All levels</option>
+          <option value="Remember">Remember</option>
+          <option value="Understand">Understand</option>
+          <option value="Apply">Apply</option>
+          <option value="Analyze">Analyze</option>
+        </select>
+        <label for="layoutSel">Layout</label>
+        <select id="layoutSel">
+          <option value="physics">Physics (force-directed)</option>
+          <option value="hierarchical">Hierarchical (top → bottom)</option>
+        </select>
+        <button id="resetBtn">Reset view</button>
+      </div>
+
+      <h3>Categories</h3>
+      <div id="legend" class="legend"></div>
+
+      <h3>Selected concept</h3>
+      <div id="selected" class="empty-state">Click a node to see its summary, Bloom level, and a link to the relevant book chapter.</div>
+    </div>
+
+    <div id="network"></div>
+  </div>
+
+  <script>
+  /* eslint-disable */
+  // ─────────────────────────────────────────────────────────────
+  // Load graph data. When served from MkDocs, the path is
+  //   /graph/learning-graph.json  (root-relative to the site)
+  // When served standalone (file:// or via mkdocs serve from this
+  // directory), try a relative path first then fall back to root.
+  // ─────────────────────────────────────────────────────────────
+  const candidatePaths = [
+    "../../../graph/learning-graph.json",        // standalone file://
+    "/styling-agent/graph/learning-graph.json",  // GitHub Pages base
+    "/graph/learning-graph.json",                // root-relative
+    "graph/learning-graph.json",                 // bare fallback
+  ];
+
+  async function loadGraph() {
+    for (const path of candidatePaths) {
+      try {
+        const r = await fetch(path, {cache: "no-cache"});
+        if (r.ok) return await r.json();
+      } catch (e) { /* try next */ }
+    }
+    throw new Error("Could not load learning-graph.json from any known path.");
+  }
+
+  function bloomBadge(bloom) {
+    return `<span class="selected-node-bloom">${bloom || "—"}</span>`;
+  }
+
+  function renderLegend(categories) {
+    const legendEl = document.getElementById("legend");
+    legendEl.innerHTML = categories.map(c => `
+      <div class="legend-row">
+        <span class="legend-dot" style="background:${c.color}; border-color:${c.border}"></span>
+        <span><strong>${c.label}</strong> — <span style="color:var(--secondary)">${c.description}</span></span>
+      </div>
+    `).join("");
+
+    const sel = document.getElementById("categorySel");
+    for (const c of categories) {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.label;
+      sel.appendChild(opt);
+    }
+  }
+
+  function buildNodesAndEdges(data) {
+    const catMap = Object.fromEntries(data.categories.map(c => [c.id, c]));
+    const nodes = data.concepts.map(c => {
+      const cat = catMap[c.category] || {color: "#F5EDE3", border: "#A8937E"};
+      return {
+        id: c.id,
+        label: c.label,
+        title: `${c.label}\n\nBloom level: ${c.bloom || "—"}\nCategory: ${cat.label || c.category}\n\n${c.summary || ""}`,
+        color: {background: cat.color, border: cat.border},
+        font: {color: "#1C1917", size: 13, face: "DM Sans, sans-serif"},
+        shape: "dot",
+        size: 18,
+        // payload kept for the side panel
+        _concept: c,
+        _category: cat,
+      };
+    });
+    const edges = data.edges.map(([from, to, label]) => ({
+      from, to, label,
+      arrows: {to: {enabled: true, scaleFactor: 0.45}},
+      color: {color: "#C8B8A8", highlight: "#C17F5A"},
+      font: {size: 10, color: "#7C6F64", strokeWidth: 0, align: "middle"},
+      smooth: {type: "continuous"},
+    }));
+    return {nodes, edges};
+  }
+
+  function showSelected(node, baseUrl) {
+    const el = document.getElementById("selected");
+    if (!node) {
+      el.innerHTML = `<div class="empty-state">Click a node to see its summary, Bloom level, and a link to the relevant book chapter.</div>`;
+      return;
+    }
+    const c = node._concept;
+    const linkHref = baseUrl + "/" + c.url.replace(/\.md$/i, "/");
+    el.innerHTML = `
+      <div class="selected-node">
+        <div class="selected-node-label">${c.label}</div>
+        <div class="selected-node-summary">${c.summary || ""}</div>
+        ${bloomBadge(c.bloom)}
+        <a class="selected-node-link" href="${linkHref}" target="_top">Open in the book →</a>
+      </div>
+    `;
+  }
+
+  // Try to detect the book base URL so the "Open in book" link works
+  // whether the viewer is embedded in the MkDocs site, accessed via
+  // direct GitHub Pages URL, or running locally.
+  function detectBaseUrl() {
+    try {
+      const top = window.top.location.href;
+      if (top.includes("/styling-agent/")) return top.split("/styling-agent/")[0] + "/styling-agent";
+    } catch (e) {
+      // window.top access blocked (iframe sandbox).
+    }
+    const here = window.location.pathname;
+    if (here.includes("/styling-agent/")) {
+      return location.origin + here.split("/styling-agent/")[0] + "/styling-agent";
+    }
+    return "";
+  }
+
+  (async function main() {
+    let data;
+    try {
+      data = await loadGraph();
+    } catch (e) {
+      document.getElementById("network").innerHTML =
+        `<div class="empty-state">Could not load the learning graph data (${e.message}).</div>`;
+      return;
+    }
+    const meta = data.metadata || {};
+    document.getElementById("stats").textContent =
+      `${data.concepts.length} concepts · ${data.edges.length} prerequisites · ${data.categories.length} categories`;
+
+    renderLegend(data.categories);
+
+    const {nodes, edges} = buildNodesAndEdges(data);
+    const baseUrl = detectBaseUrl();
+
+    const network = new vis.Network(
+      document.getElementById("network"),
+      {nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges)},
+      {
+        nodes: {borderWidth: 2},
+        edges: {smooth: {type: "continuous"}},
+        physics: {
+          barnesHut: {
+            gravitationalConstant: -3500, centralGravity: 0.18,
+            springLength: 130, springConstant: 0.04, damping: 0.5,
+          },
+          minVelocity: 0.5,
+        },
+        interaction: {hover: true, tooltipDelay: 100, navigationButtons: false},
+      }
+    );
+
+    // Wire interactions
+    network.on("selectNode", function (params) {
+      const id = params.nodes[0];
+      const node = nodes.find(n => n.id === id);
+      showSelected(node, baseUrl);
+    });
+    network.on("deselectNode", function () { showSelected(null, baseUrl); });
+    network.on("doubleClick", function (params) {
+      if (params.nodes && params.nodes.length) {
+        network.focus(params.nodes[0], {animation: true, scale: 1.2});
+      }
+    });
+
+    // Wire filter controls
+    function applyFilters() {
+      const q = (document.getElementById("searchBox").value || "").toLowerCase();
+      const cat = document.getElementById("categorySel").value;
+      const bloom = document.getElementById("bloomSel").value;
+      const visibleNodeIds = new Set();
+      const ds = network.body.data.nodes;
+      ds.forEach(n => {
+        const c = n._concept;
+        const labelMatch = !q || (n.label || "").toLowerCase().includes(q) ||
+                          (c.summary || "").toLowerCase().includes(q);
+        const catMatch = !cat || c.category === cat;
+        const bloomMatch = !bloom || (c.bloom || "") === bloom;
+        const visible = labelMatch && catMatch && bloomMatch;
+        ds.update({id: n.id, hidden: !visible});
+        if (visible) visibleNodeIds.add(n.id);
+      });
+      const eds = network.body.data.edges;
+      eds.forEach(e => {
+        eds.update({id: e.id,
+                    hidden: !(visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to))});
+      });
+    }
+    document.getElementById("searchBox").addEventListener("input", applyFilters);
+    document.getElementById("categorySel").addEventListener("change", applyFilters);
+    document.getElementById("bloomSel").addEventListener("change", applyFilters);
+
+    document.getElementById("layoutSel").addEventListener("change", function (e) {
+      const isHier = e.target.value === "hierarchical";
+      network.setOptions({
+        layout: {hierarchical: isHier ? {direction: "UD", sortMethod: "directed",
+                                         nodeSpacing: 150, levelSeparation: 110} : false},
+        physics: {enabled: !isHier},
+      });
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", function () {
+      document.getElementById("searchBox").value = "";
+      document.getElementById("categorySel").value = "";
+      document.getElementById("bloomSel").value = "";
+      document.getElementById("layoutSel").value = "physics";
+      applyFilters();
+      network.setOptions({layout: {hierarchical: false}, physics: {enabled: true}});
+      network.fit({animation: true});
+    });
+  })();
+  </script>
+</body>
+</html>

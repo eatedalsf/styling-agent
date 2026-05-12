@@ -1,0 +1,104 @@
+{
+  "_comment": "Wearly Learning Graph — a directed acyclic graph of concepts a reader must understand to fully grasp the project. Distinct from graph/graph.json (which models wardrobe items + outfits at RUNTIME). This learning graph models the READER's path through the Intelligent Book. Inspired by https://yarmoluk.github.io/Digital-Transformation-with-AI-Spring-2026/learning-graph/ and rendered with vis-network.js. Categories follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).",
+  "metadata": {
+    "version": "0.1.0",
+    "node_count": 28,
+    "edge_count": 38,
+    "category_count": 6,
+    "max_chain_length": 6,
+    "rendered_by": "vis-network.js",
+    "source_repo": "https://github.com/eatedalsf/styling-agent"
+  },
+  "categories": [
+    {"id": "foundation",  "label": "Foundation",  "color": "#FAF3EE", "border": "#9F5A36", "description": "The product problem and the agent stance — the entry concepts every reader needs."},
+    {"id": "workflow",    "label": "Workflow",    "color": "#F5EDE3", "border": "#C17F5A", "description": "How the agent runs through its seven steps."},
+    {"id": "knowledge",   "label": "Knowledge",   "color": "#FDFAF7", "border": "#A8937E", "description": "The rule systems and data models the agent reasons over."},
+    {"id": "personalization", "label": "Personalization", "color": "#EFE3CC", "border": "#7C6F64", "description": "Fit profile, wear history, feedback loops — how the agent learns about the user."},
+    {"id": "framing",     "label": "Framing",     "color": "#FDF3EE", "border": "#9F5A36", "description": "Body-positive language contract, evidence framing, privacy, ethics."},
+    {"id": "system",      "label": "System",      "color": "#F5EDE3", "border": "#1C1917", "description": "Architecture, knowledge graph, skill package, the book itself."}
+  ],
+  "concepts": [
+    {"id": "personal-styling-problem",  "label": "The personal styling problem",  "category": "foundation", "bloom": "Understand", "url": "book/02-user-problem.md", "summary": "The fifteen-minute closet decision: calendar, weather, closet, fit all converge under time pressure."},
+    {"id": "agent-not-chatbot",         "label": "Agent vs. chatbot",             "category": "foundation", "bloom": "Understand", "url": "book/01-vision.md",      "summary": "Wearly reads context FIRST and recommends with a visible reasoning trail — not a free-text response from a prompt."},
+    {"id": "honesty-contract",          "label": "The honesty contract",          "category": "framing",    "bloom": "Understand", "url": "book/12-evidence-and-references.md", "summary": "Styling is not an exact science. Wearly says 'tends to work well', never 'is correct'."},
+    {"id": "body-positive-language",    "label": "Body-positive language contract", "category": "framing",  "bloom": "Apply",      "url": "book/06-fit-profile-logic.md",        "summary": "No corrective vocabulary. Forbidden tokens enforced at runtime AND in documentation."},
+    {"id": "evidence-categories",       "label": "Evidence categories",           "category": "framing",    "bloom": "Analyze",    "url": "docs/evidence-and-references.md",     "summary": "Nine source categories every rule traces back to — color harmony, recommender systems, XAI, etc."},
+
+    {"id": "seven-step-workflow",       "label": "The seven-step workflow",       "category": "workflow",   "bloom": "Apply",      "url": "book/03-agent-workflow.md",           "summary": "Determine occasion → load profile → check weather → filter wardrobe → build outfit → check gaps → score color."},
+    {"id": "occasion-classification",   "label": "Occasion classification",       "category": "workflow",   "bloom": "Apply",      "url": "skills/wearly-styling-agent/occasion-rules.md", "summary": "Map free-text or calendar events to the five canonical tags (work/gym/dinner/formal/casual)."},
+    {"id": "calendar-context",          "label": "Calendar context",              "category": "workflow",   "bloom": "Apply",      "url": "book/07-calendar-weather-context.md", "summary": "Reads upcoming events; falls back to casual if none."},
+    {"id": "weather-context",           "label": "Weather context",               "category": "workflow",   "bloom": "Apply",      "url": "book/07-calendar-weather-context.md", "summary": "Live Open-Meteo with seasonal fallback. Temperature drives layering + season."},
+    {"id": "wardrobe-filtering",        "label": "Wardrobe filtering",            "category": "workflow",   "bloom": "Apply",      "url": "skills/wearly-styling-agent/wardrobe-filtering-rules.md", "summary": "Filter the candidate pool by occasion tags + season + availability + rejection exclusions."},
+    {"id": "outfit-construction",       "label": "Outfit construction",           "category": "workflow",   "bloom": "Analyze",    "url": "book/05-wardrobe-intelligence.md",    "summary": "Dress vs. separates branching; gym activewear branching; outerwear injection below 60°F."},
+    {"id": "gap-detection",             "label": "Wardrobe gap detection",        "category": "workflow",   "bloom": "Apply",      "url": "book/08-shopping-gap-logic.md",       "summary": "Compare built outfit against the occasion's required-piece set; surface descriptive (non-promotional) shopping suggestions."},
+
+    {"id": "wardrobe-model",            "label": "The wardrobe data model",       "category": "knowledge",  "bloom": "Understand", "url": "book/05-wardrobe-intelligence.md",    "summary": "Clothing / shoes / accessories with type, color, formality, season tags."},
+    {"id": "color-harmony",             "label": "Color harmony rules",           "category": "knowledge",  "bloom": "Apply",      "url": "skills/wearly-styling-agent/color-coordination-rules.md", "summary": "Skin-tone palettes (warm olive, cool fair, deep warm) + 0–100 scoring formula (+8 / +4 / −10)."},
+    {"id": "skin-tone-palette",         "label": "Skin-tone palette",             "category": "knowledge",  "bloom": "Understand", "url": "skills/wearly-styling-agent/color-coordination-rules.md", "summary": "Three palettes shipped today; design-informed, never claimed as deterministic."},
+    {"id": "required-pieces",           "label": "Required pieces by occasion",   "category": "knowledge",  "bloom": "Remember",   "url": "skills/wearly-styling-agent/occasion-rules.md", "summary": "Work needs top+bottom; gym needs activewear; formal needs a dress; etc."},
+
+    {"id": "fit-profile",               "label": "Fit profile (user-declared)",   "category": "personalization", "bloom": "Apply",  "url": "book/06-fit-profile-logic.md",        "summary": "Optional fields: body_shape, modesty_preference, comfort_needs, style_goals, highlight_features, balance_areas."},
+    {"id": "body-shape-framing",        "label": "Body-shape framing",            "category": "personalization", "bloom": "Analyze","url": "docs/evidence-and-references.md",     "summary": "Body-shape labels are industry heuristic, not scientific taxonomy. Always user-declared, never inferred."},
+    {"id": "wear-history",              "label": "Wear history",                  "category": "personalization", "bloom": "Apply",  "url": "skills/wearly-styling-agent/wear-history-rules.md", "summary": "Worn-count + last-worn-date per item, written when user confirms an outfit."},
+    {"id": "freshness-score",           "label": "Freshness score (0.4 floor)",   "category": "personalization", "bloom": "Analyze","url": "skills/wearly-styling-agent/wear-history-rules.md", "summary": "Frequency penalty + recency penalty. Floor 0.4: a much-loved piece is never exiled."},
+    {"id": "reject-regenerate",         "label": "Reject & regenerate",           "category": "personalization", "bloom": "Analyze","url": "book/03-agent-workflow.md",           "summary": "The agent-not-chatbot moment. User pushes back; agent re-runs with constraints; trail surfaces the rejection reasons."},
+    {"id": "favorite-stores",           "label": "Favorite stores + wishlist",    "category": "personalization", "bloom": "Apply",  "url": "book/08-shopping-gap-logic.md",       "summary": "Local-only saved retailer hints + saved wishlist items with priority + linked_gap."},
+
+    {"id": "result-dict-contract",      "label": "The result-dict contract",      "category": "system",     "bloom": "Understand", "url": "docs/architecture.md",                "summary": "Single boundary between agent and UI — steps, recommendation, reasoning, gaps, color_score, weather, event, profile."},
+    {"id": "knowledge-graph-schema",    "label": "Knowledge graph schema",        "category": "system",     "bloom": "Analyze",    "url": "graph/schema.md",                     "summary": "Nine entity types + 14 relations modeling the agent's reasoning. NOT the learning graph you're viewing now."},
+    {"id": "live-run-graph",            "label": "Live-run reasoning graph",      "category": "system",     "bloom": "Analyze",    "url": "book/12-evidence-and-references.md",  "summary": "Dynamic graph built per outfit. Same vis-network library, different data."},
+    {"id": "skill-package",             "label": "Skill package",                 "category": "system",     "bloom": "Apply",      "url": "skills/wearly-styling-agent/SKILL.md","summary": "Conforms to agentskills.io: YAML frontmatter, progressive disclosure, reference files, executable scripts."},
+    {"id": "privacy-stance",            "label": "Privacy stance",                "category": "framing",    "bloom": "Understand", "url": "book/10-privacy-security.md",         "summary": "Minimum-necessary access, no third parties, no implicit data collection. Production roadmap documented."},
+    {"id": "before-after-delta",        "label": "Before / after delta",          "category": "system",     "bloom": "Understand", "url": "book/09-before-after-demo.md",        "summary": "15 minutes of manual planning → 3 seconds of agent reasoning, with the work made visible."}
+  ],
+  "edges": [
+    ["personal-styling-problem", "agent-not-chatbot",      "motivates"],
+    ["agent-not-chatbot",        "seven-step-workflow",    "is implemented as"],
+    ["agent-not-chatbot",        "reject-regenerate",      "is demonstrated by"],
+
+    ["seven-step-workflow",      "occasion-classification","step 1 uses"],
+    ["seven-step-workflow",      "calendar-context",       "step 1 reads"],
+    ["seven-step-workflow",      "weather-context",        "step 3 reads"],
+    ["seven-step-workflow",      "wardrobe-filtering",     "step 4 uses"],
+    ["seven-step-workflow",      "outfit-construction",    "step 5 uses"],
+    ["seven-step-workflow",      "gap-detection",          "step 6 uses"],
+    ["seven-step-workflow",      "color-harmony",          "step 7 uses"],
+
+    ["wardrobe-model",           "wardrobe-filtering",     "is filtered by"],
+    ["wardrobe-model",           "outfit-construction",    "is consumed by"],
+    ["required-pieces",          "gap-detection",          "drives"],
+    ["color-harmony",            "skin-tone-palette",      "reads from"],
+    ["skin-tone-palette",        "fit-profile",            "is part of"],
+
+    ["fit-profile",              "outfit-construction",    "biases"],
+    ["body-shape-framing",       "fit-profile",            "frames"],
+    ["body-positive-language",   "fit-profile",            "constrains"],
+    ["body-positive-language",   "body-shape-framing",     "enforces"],
+
+    ["wear-history",             "freshness-score",        "feeds"],
+    ["freshness-score",          "outfit-construction",    "tie-breaks"],
+    ["reject-regenerate",        "wardrobe-filtering",     "modifies"],
+
+    ["gap-detection",            "favorite-stores",        "consults"],
+    ["favorite-stores",          "gap-detection",          "personalizes"],
+
+    ["seven-step-workflow",      "result-dict-contract",   "produces"],
+    ["result-dict-contract",     "live-run-graph",         "is visualized by"],
+    ["result-dict-contract",     "before-after-delta",     "powers"],
+    ["knowledge-graph-schema",   "live-run-graph",         "instantiates"],
+    ["knowledge-graph-schema",   "result-dict-contract",   "abstracts"],
+
+    ["honesty-contract",         "body-positive-language", "implies"],
+    ["honesty-contract",         "evidence-categories",    "requires"],
+    ["honesty-contract",         "color-harmony",          "applies to"],
+    ["honesty-contract",         "skin-tone-palette",      "applies to"],
+    ["evidence-categories",      "color-harmony",          "informs"],
+    ["evidence-categories",      "fit-profile",            "informs"],
+    ["evidence-categories",      "wear-history",           "informs"],
+
+    ["privacy-stance",           "favorite-stores",        "guards"],
+    ["privacy-stance",           "wear-history",           "guards"],
+
+    ["skill-package",            "seven-step-workflow",    "packages"]
+  ]
+}
