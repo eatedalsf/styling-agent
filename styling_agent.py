@@ -115,6 +115,7 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
         "color_score": None,
         "weather": None,
         "event": None,
+        "profile": None,
         "error": None
     }
 
@@ -167,6 +168,7 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
         return result
 
     profile = profile_result["profile"]
+    result["profile"] = profile
     step2["output"] = (
         f"Owner: {profile['name']} | Body shape: {profile['body_shape']} | "
         f"Skin tone: {profile['skin_tone']} | Style: {', '.join(profile['style_preferences'])}"
@@ -273,14 +275,27 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
         outfit.append(acc)
         reasoning.append(f"Added accessory: '{acc['name']}'.")
 
-    # Add outerwear if weather requires it
+    # Add outerwear if weather requires it.
+    # Use the CURRENT occasion (not a hardcoded "work" tag) so a gym outfit
+    # doesn't get auto-paired with a formal coat.
+    outerwear_gap = False
     if isinstance(temp, (int, float)) and temp < 60:
-        wardrobe_all_result = filter_items_by_occasion("work", season)
-        outer_pool = [i for i in wardrobe_all_result.get("clothing", []) if i["type"] == "outerwear"]
+        occ_outer_result = filter_items_by_occasion(occasion_tag, season)
+        outer_pool = [i for i in occ_outer_result.get("clothing", []) if i["type"] == "outerwear"]
+
         if outer_pool:
             outfit.append(outer_pool[0])
             reasoning.append(
                 f"Added '{outer_pool[0]['name']}' as outerwear — temperature is {temp}°F and {weather['layer_advice']}"
+            )
+        else:
+            # No outerwear matches this occasion. Don't force a wrong-style coat
+            # onto the outfit; flag it as a wardrobe gap instead.
+            outerwear_gap = True
+            reasoning.append(
+                f"Note: temperature is {temp}°F, but no {occasion_tag}-appropriate "
+                f"outerwear was found in the wardrobe. Skipping outerwear rather "
+                f"than forcing a mismatched coat."
             )
 
     step5["output"] = f"Built outfit with {len(outfit)} pieces: {', '.join(i['name'] for i in outfit)}."
@@ -304,6 +319,24 @@ def run_agent(mode: str = "calendar", everyday_request: str = None) -> dict:
     else:
         step6["output"] = "Outfit is complete — all required pieces present."
     steps.append(step6)
+
+    # Record outerwear gap (detected in Step 5) AFTER Step 6 so we don't
+    # overwrite check_gaps results, and so shopping_suggestions keeps both.
+    if outerwear_gap:
+        if "outerwear" not in result["gaps"]:
+            result["gaps"].append("outerwear")
+        if occasion_tag == "gym":
+            outer_suggestion = (
+                "A lightweight athletic windbreaker or running jacket would cover "
+                "cool-weather gym transit without breaking the activewear look."
+            )
+        else:
+            outer_suggestion = (
+                f"A {occasion_tag}-appropriate coat or jacket would round out your "
+                f"wardrobe for cool-weather days."
+            )
+        if outer_suggestion not in result["shopping_suggestions"]:
+            result["shopping_suggestions"].append(outer_suggestion)
 
     # ── STEP 7: Color Check ────────────────────────────────────────────────────
     step7 = {"step": 7, "name": "Color Coordination Check", "status": "ok", "output": ""}

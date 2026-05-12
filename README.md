@@ -19,7 +19,11 @@ The agent follows a structured 7-step workflow, makes decisions at each step, ha
 
 ## How to Run It
 
-**Requirements:** Python 3.8+ (no external packages needed — uses only the standard library)
+**Requirements:** Python 3.8+. The core agent uses only the standard library. The optional Streamlit web UI needs one extra package — install it with:
+
+```bash
+pip install -r requirements.txt
+```
 
 ```bash
 # Clone or copy the project folder, then:
@@ -37,35 +41,32 @@ python main.py --everyday "weekend brunch"
 
 # Option 3: Before/After comparison demo (best for presenting)
 python main.py --compare
+
+# Option 4: Streamlit web UI
+streamlit run app.py
 ```
 
 ---
 
 ## Project Structure
 
+The repository currently uses a flat layout — all source, data, and docs sit at the project root:
+
 ```
 styling-agent/
-│
-├── main.py                     ← Run this. CLI interface + before/after demo
-│
-├── agent/
-│   └── styling_agent.py        ← Core agent logic. Orchestrates all tools.
-│
-├── tools/
-│   ├── calendar_tool.py        ← Tool 1: Reads upcoming calendar events
-│   ├── weather_tool.py         ← Tool 2: Fetches real weather (Open-Meteo API)
-│   ├── wardrobe_tool.py        ← Tool 3: Filters wardrobe by occasion + season
-│   └── color_tool.py           ← Tool 4: Scores outfit colors vs. skin tone
-│
-├── data/
-│   ├── wardrobe.json           ← Wardrobe inventory (clothing, shoes, accessories)
-│   ├── calendar_events.json    ← Mock calendar events
-│   └── color_rules.json        ← Skin-tone color coordination rules
-│
-├── docs/
-│   └── workflow_diagram.md     ← Agent decision flow documentation
-│
-└── README.md                   ← This file
+├── main.py                  ← CLI runner (calendar / everyday / compare modes)
+├── app.py                   ← Streamlit web UI
+├── styling_agent.py         ← Core agent logic. Orchestrates all tools.
+├── calendar_tool.py         ← Tool 1: Reads upcoming calendar events
+├── weather_tool.py          ← Tool 2: Fetches real weather (Open-Meteo API)
+├── wardrobe_tool.py         ← Tool 3: Filters wardrobe by occasion + season
+├── color_tool.py            ← Tool 4: Scores outfit colors vs. skin tone
+├── wardrobe.json            ← Wardrobe inventory (clothing, shoes, accessories)
+├── calendar_events.json     ← Mock calendar events
+├── color_rules.json         ← Skin-tone color coordination rules
+├── workflow_diagram.md      ← Agent decision flow documentation
+├── requirements.txt         ← Python dependencies (Streamlit)
+└── README.md                ← This file
 ```
 
 ---

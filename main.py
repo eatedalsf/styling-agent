@@ -13,8 +13,24 @@ import sys
 import os
 import argparse
 
+# Force UTF-8 on stdout/stderr so the box-drawing characters and emoji used
+# below don't crash on Windows consoles using legacy codepages (cp1256, cp1252).
+# reconfigure() exists on Python 3.7+ TextIOWrapper streams; if the stream
+# can't be reconfigured (e.g. redirected to a non-text wrapper), fail silent.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from agent.styling_agent import run_agent
+
+# Support both the current flat layout (styling_agent.py at repo root)
+# and the older structured layout (agent/styling_agent.py).
+try:
+    from agent.styling_agent import run_agent
+except ModuleNotFoundError:
+    from styling_agent import run_agent
 
 
 # ─────────────────────────────────────────────

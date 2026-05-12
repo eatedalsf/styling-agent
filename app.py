@@ -531,7 +531,7 @@ if result:
                 {score_val}<span style="font-size:1.2rem; color:#9C8A7A">/100</span>
             </div>
             <div style="font-size:0.78rem;color:#9C8A7A;margin:0.3rem 0 0.4rem;">
-                Skin tone: {result.get('event',{}).get('type','')} — warm olive
+                Skin tone: {result.get('profile',{}).get('skin_tone','—')}
             </div>
             <div class="score-bar-bg">
                 <div class="score-bar-fill" style="width:{bar_pct}%"></div>
