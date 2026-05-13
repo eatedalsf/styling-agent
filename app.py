@@ -2052,6 +2052,15 @@ def _render_reasoning_story(lines: list) -> None:
     citations like `[occasion-rules#R3]` are extracted from the prose
     and surfaced as small pills below the sentence — so the citation
     is still visible but no longer interrupts the reading rhythm.
+
+    Goal 9 improvements:
+      - New "Taste" section recognises the wishlist-derived taste
+        narrative ("Your wishlist suggests …").
+      - New "Rotation" section recognises cross-event rotation notes
+        ("Rotation: avoiding …").
+      - A short story-level summary card at the very top — a single
+        body-positive sentence answering "why this outfit?" — built
+        deterministically from the picked pieces in the trail.
     """
     raw_lines = [(ln or "").strip() for ln in (lines or []) if (ln or "").strip()]
     if not raw_lines:
@@ -2062,11 +2071,68 @@ def _render_reasoning_story(lines: list) -> None:
         )
         return
 
+    # ── Top-of-panel TL;DR — "Why this outfit?" ──
+    # Build a single sentence by mining the trail for picks (Selected
+    # / Added) and stating the dominant reason class. This gives the
+    # user a body-positive headline before they scroll the details.
+    picks: list = []
+    has_color_note = False
+    has_fit_note   = False
+    has_wishlist   = False
+    has_rotation   = False
+    for ln in raw_lines:
+        low = ln.lower().lstrip()
+        if low.startswith(("selected", "added")):
+            # pull the quoted item name
+            import re as _re
+            m = _re.search(r"['\"]([^'\"]+)['\"]", ln)
+            if m and m.group(1) not in picks:
+                picks.append(m.group(1))
+        if low.startswith("complements your"):
+            has_color_note = True
+        if low.startswith(("aligns with", "matches your", "supports your",
+                           "respects your")):
+            has_fit_note = True
+        if low.startswith("your wishlist"):
+            has_wishlist = True
+        if low.startswith("rotation:"):
+            has_rotation = True
+    if picks:
+        head = ", ".join(picks[:3])
+        why_bits: list = []
+        if has_fit_note:    why_bits.append("aligned with your fit profile")
+        if has_color_note:  why_bits.append("color-harmony for your skin tone")
+        if has_wishlist:    why_bits.append("in the direction your wishlist points")
+        if has_rotation:    why_bits.append("rotated from yesterday's outfit")
+        why_clause = (
+            ", ".join(why_bits[:-1]) + (
+                ", and " + why_bits[-1] if len(why_bits) > 1 else
+                why_bits[-1] if why_bits else ""
+            )
+        ) if why_bits else "based on your wardrobe, occasion, and weather"
+        st.markdown(
+            "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+            "border-radius:8px; padding:0.9rem 1.1rem; margin-bottom:0.8rem;'>"
+            "<div style='font-size:0.66rem; color:#8E8E93; "
+            "letter-spacing:0.14em; text-transform:uppercase; "
+            "font-weight:600; margin-bottom:0.25rem;'>Why this outfit</div>"
+            "<div style='font-size:0.92rem; color:#1C1917; line-height:1.55;'>"
+            f"Built around <strong>{head}</strong>"
+            + (" and others" if len(picks) > 3 else "")
+            + f", {why_clause}.</div>"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
     # Group classification — used to pick the section header + icon.
     def _classify(line: str) -> tuple:
         low = line.lower().lstrip()
         if low.startswith("today's context"):
             return ("Context",   "Your context for today")
+        if low.startswith("your wishlist"):
+            return ("Taste",     "What your wishlist suggests")
+        if low.startswith("rotation:"):
+            return ("Rotation",  "Avoiding repeats from nearby events")
         if low.startswith("skipping"):
             return ("Excluded",  "Items you ruled out")
         if low.startswith(("selected", "added", "chose")):
@@ -2081,11 +2147,14 @@ def _render_reasoning_story(lines: list) -> None:
             return ("Palette",   "Palette notes")
         return ("Other", "Other reasoning")
 
-    # Order sections deliberately — context first, picks next, then
-    # color, notes, gaps. "Other" trails at the end.
+    # Order sections deliberately — context + taste first (they FRAME
+    # the rest), then picks, excluded, color, palette, notes, gaps,
+    # rotation, and the catch-all "Other" trails at the end.
     section_order = [
-        "Context", "Pieces", "Excluded",
-        "Color", "Palette", "Notes", "Gaps", "Other",
+        "Context", "Taste",
+        "Pieces", "Excluded",
+        "Color", "Palette",
+        "Notes", "Gaps", "Rotation", "Other",
     ]
     grouped: dict = {k: [] for k in section_order}
     for line in raw_lines:
@@ -2093,15 +2162,18 @@ def _render_reasoning_story(lines: list) -> None:
         grouped[sec].append(line)
 
     # Section subtitle lookup (used in header).
-    subtitle_for = {sec: _classify("dummy " + sec)[1] for sec in section_order}
-    subtitle_for["Context"]  = "Your context for today"
-    subtitle_for["Pieces"]   = "What Wearly picked, and why"
-    subtitle_for["Excluded"] = "Items you ruled out"
-    subtitle_for["Color"]    = "Color-harmony check"
-    subtitle_for["Palette"]  = "Palette notes"
-    subtitle_for["Notes"]    = "Heads-up notes"
-    subtitle_for["Gaps"]     = "What's missing, and what to add"
-    subtitle_for["Other"]    = "Other reasoning"
+    subtitle_for = {
+        "Context":  "Your context for today",
+        "Taste":    "What your wishlist suggests",
+        "Pieces":   "What Wearly picked, and why",
+        "Excluded": "Items you ruled out",
+        "Color":    "Color-harmony check",
+        "Palette":  "Palette notes",
+        "Notes":    "Heads-up notes",
+        "Gaps":     "What's missing, and what to add",
+        "Rotation": "Avoiding repeats from nearby events",
+        "Other":    "Other reasoning",
+    }
 
     for section in section_order:
         bucket = grouped.get(section) or []
@@ -2187,7 +2259,35 @@ def _item_thumbnail_html(item: dict, size_px: int = 44) -> str:
             f'<img src="{src_image}" alt="" style="{base_style}" '
             f'onerror="this.style.display=\'none\'">'
         )
+    # Goal 8: placeholder takes the item's COLOR as its background so a
+    # photoless camel coat still reads as a camel coat at a glance,
+    # not just a grey card with an initial. Contrast-aware text color
+    # keeps the initial legible on both light and dark swatches. If we
+    # don't know the color, fall back to the original neutral card.
     initial = (item.get("type") or item.get("name") or "?")[:1].upper()
+    color_name = (item.get("color") or "").lower().strip()
+    try:
+        hex_str = color_to_swatch(color_name) if color_name else None
+    except Exception:
+        hex_str = None
+    if hex_str and hex_str.startswith("#") and len(hex_str) == 7:
+        try:
+            r = int(hex_str[1:3], 16); g = int(hex_str[3:5], 16); b = int(hex_str[5:7], 16)
+            # Perceived luminance per ITU-R BT.601 — keeps text legible
+            # on both very dark and very light swatches.
+            lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255.0
+        except Exception:
+            lum = 0.5
+        text = "#111111" if lum > 0.55 else "#FFFFFF"
+        colored_style = base_style.replace("background:#FAFAFA;", f"background:{hex_str};")
+        return (
+            f'<div style="{colored_style} '
+            f'display:flex; align-items:center; justify-content:center; '
+            f'color:{text}; font-family:DM Sans,sans-serif; font-size:0.78rem; '
+            f'font-weight:600; letter-spacing:0.04em; '
+            f'box-shadow:inset 0 0 0 1px rgba(0,0,0,0.04);">'
+            f'{initial}</div>'
+        )
     return (
         f'<div style="{base_style} display:flex; align-items:center; '
         f'justify-content:center; color:#8E8E93; '
