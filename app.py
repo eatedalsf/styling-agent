@@ -133,39 +133,102 @@ html, body, [class*="css"] {
 .app-bar-right {
     display: flex; align-items: center; gap: 0.6rem;
 }
-/* Profile chip — now a real <a> link that routes to the Profile section
-   via Streamlit's query-param API. Keyboard-focusable, hover state,
-   honest tooltip that explains Wearly has no accounts. */
-.profile-chip {
-    display: inline-flex; align-items: center; gap: 0.55rem;
-    padding: 0.32rem 0.85rem 0.32rem 0.4rem;
-    background: #FFFFFF;
-    border: 1px solid #E5E5E5;
-    border-radius: 99px;
-    text-decoration: none !important;
-    color: inherit !important;
-    cursor: pointer;
-    transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
-    user-select: none;
+/* ───── Profile popover (top-right chip dropdown) ─────
+   The trigger is a real Streamlit popover whose button is styled to
+   look like the old chip: pill shape, thin grey border, small avatar
+   initial on the left, "Hi, <name>" text in the middle, chevron at
+   the end. Hover + focus states keep the affordance obvious.
+   We scope every rule via `.profile-popover-slot` so we don't
+   accidentally restyle any other popovers in the app. */
+.profile-popover-slot { display: flex; justify-content: flex-end; }
+
+.profile-popover-slot [data-testid="stPopover"] > div > button,
+.profile-popover-slot button[kind="secondary"] {
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid #E5E5E5 !important;
+    border-radius: 99px !important;
+    padding: 0.32rem 0.85rem 0.32rem 0.5rem !important;
+    min-height: 40px !important;
+    font-family: 'DM Sans', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
+    letter-spacing: 0 !important;
+    box-shadow: none !important;
+    transition: background 0.15s ease, border-color 0.15s ease !important;
+    text-align: left !important;
+    white-space: nowrap !important;
 }
-.profile-chip:hover {
-    background: #FAFAFA;
-    border-color: #111111;
+.profile-popover-slot [data-testid="stPopover"] > div > button:hover,
+.profile-popover-slot button[kind="secondary"]:hover {
+    background: #FAFAFA !important;
+    border-color: #111111 !important;
+    color: #111111 !important;
 }
-.profile-chip:active {
-    transform: translateY(1px);
+
+/* The popover panel itself — clean white card with thin border. */
+[data-testid="stPopoverBody"] {
+    background: #FFFFFF !important;
+    border: 1px solid #EEEEEE !important;
+    border-radius: 10px !important;
+    box-shadow: 0 6px 24px rgba(0,0,0,0.08) !important;
+    min-width: 240px !important;
+    padding: 0.6rem !important;
 }
-.profile-chip:focus-visible {
-    outline: 2px solid #111111;
-    outline-offset: 2px;
+
+/* Menu items inside the popover are full-width plain buttons. */
+[data-testid="stPopoverBody"] .stButton > button {
+    width: 100% !important;
+    text-align: left !important;
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: none !important;
+    border-radius: 6px !important;
+    padding: 0.55rem 0.7rem !important;
+    font-size: 0.86rem !important;
+    font-weight: 500 !important;
+    min-height: 38px !important;
+    justify-content: flex-start !important;
 }
-.profile-chip-arrow {
+[data-testid="stPopoverBody"] .stButton > button:hover {
+    background: #FAFAFA !important;
+    color: #111111 !important;
+}
+
+/* The "Hi, <name>" header block inside the popover. */
+.profile-menu-header {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.5rem 0.6rem 0.7rem;
+}
+.profile-menu-avatar {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #111111;
+    color: #FFFFFF;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    display: inline-flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+}
+.profile-menu-hi {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.05rem;
+    color: #111111;
+    line-height: 1.15;
+}
+.profile-menu-sub {
+    font-size: 0.72rem;
+    color: #6E6E73;
+    margin-top: 2px;
+    letter-spacing: 0.01em;
+}
+.profile-menu-footnote {
     font-size: 0.7rem;
     color: #8E8E93;
-    margin-left: 0.15rem;
-    line-height: 1;
+    line-height: 1.45;
+    padding: 0.2rem 0.6rem 0.4rem;
 }
-.profile-chip:hover .profile-chip-arrow { color: #111111; }
 .profile-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
@@ -678,30 +741,108 @@ def _goto(section_key: str):
     st.rerun()
 
 
+def _sign_out():
+    """
+    Clear the user-profile overlay and the session-specific state so the
+    next page load shows the seed identity. Wearly has no real accounts
+    (privacy contract), so 'sign out' here means: drop the personalization
+    overlay, reset the active session, and return to Home. Wardrobe and
+    wear history files are preserved — those are user data, not session
+    state, and a real product would have them survive a sign-out.
+    """
+    # Empty the user-profile overlay file. If write fails (e.g. read-only
+    # filesystem on certain hosts), we still clear session state.
+    try:
+        from fit_tool import PROFILE_PATH
+        import json as _json
+        with open(PROFILE_PATH, "w", encoding="utf-8") as _f:
+            _json.dump({"profile": {}}, _f)
+    except Exception:
+        pass
+
+    # Clear session-specific state, keep wardrobe and history untouched.
+    for _k in (
+        "result", "last_run", "rejected_ids", "rejection_reasons",
+        "todays_context", "wq_result", "worn_outfit_key",
+    ):
+        st.session_state.pop(_k, None)
+    st.session_state["section"] = "home"
+    st.toast("Signed out. Your wardrobe stays local — wear history preserved.")
+    st.rerun()
+
+
 # ─────────────────────────────────────────────
-# TOP APP BAR — wordmark left, profile chip right
+# TOP APP BAR — wordmark left, popover menu right
 # ─────────────────────────────────────────────
 
 _name, _initial = _profile_display()
 
-st.markdown(f"""
-<div class="app-bar">
+# The app bar is laid out as two Streamlit columns so the right column
+# can host a real st.popover (a clickable dropdown menu). The brand
+# wordmark on the left is still rendered as HTML inside its column for
+# the typographic look.
+_bar_left, _bar_right = st.columns([4, 1], gap="small")
+
+with _bar_left:
+    st.markdown(f"""
     <div class="brand">
         <span class="brand-mark">W</span>
         <span class="brand-wordmark">Wearly</span>
         <span class="brand-tag">Prototype</span>
     </div>
-    <div class="app-bar-right">
-        <a class="profile-chip" href="?section=profile" target="_self"
-           title="Open your profile — Wearly has no accounts; your data stays local"
-           aria-label="Open profile for {_name}">
-            <span class="profile-avatar">{_initial}</span>
-            <span class="profile-name">{_name}</span>
-            <span class="profile-chip-arrow" aria-hidden="true">›</span>
-        </a>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+
+with _bar_right:
+    # The popover's trigger label appears on the button. We mark the
+    # surrounding column so we can style only this specific popover via
+    # CSS without affecting any other popovers elsewhere in the app.
+    st.markdown('<div class="profile-popover-slot">', unsafe_allow_html=True)
+    with st.popover(
+        f"  {_initial}    Hi, {_name}    ▾",
+        use_container_width=True,
+        help="Wearly has no accounts — your data stays local on this device.",
+    ):
+        st.markdown(f"""
+        <div class="profile-menu-header">
+            <div class="profile-menu-avatar">{_initial}</div>
+            <div class="profile-menu-greeting">
+                <div class="profile-menu-hi">Hi, {_name}.</div>
+                <div class="profile-menu-sub">Signed in locally · no cloud account</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        st.divider()
+
+        if st.button("Open profile", key="menu_profile_btn", use_container_width=True):
+            _goto("profile")
+        if st.button("My wardrobe", key="menu_wardrobe_btn", use_container_width=True):
+            _goto("wardrobe")
+        if st.button("Backup & restore", key="menu_backup_btn", use_container_width=True):
+            # The Backup expander lives at the top of the Wardrobe screen.
+            _goto("wardrobe")
+        if st.button("Before / after demo", key="menu_demo_btn", use_container_width=True):
+            _goto("demo")
+
+        st.divider()
+
+        st.markdown(
+            "<div class='profile-menu-footnote'>"
+            "Wearly stores your wardrobe and wear history locally. "
+            "Signing out clears your fit profile but keeps your closet."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button("Sign out", key="menu_signout_btn", use_container_width=True):
+            _sign_out()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# Visual divider under the app bar — matches the old single-row look.
+st.markdown(
+    "<div style='border-bottom:1px solid #EEEEEE; margin:0.2rem 0 1rem;'></div>",
+    unsafe_allow_html=True,
+)
 
 
 # ─────────────────────────────────────────────
