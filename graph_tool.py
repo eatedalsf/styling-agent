@@ -114,15 +114,15 @@ def _new_network(height_px: int = 520):
         "enabled": true,
         "solver": "forceAtlas2Based",
         "forceAtlas2Based": {
-          "gravitationalConstant": -90,
-          "centralGravity": 0.012,
-          "springLength": 190,
-          "springConstant": 0.05,
-          "damping": 0.6,
-          "avoidOverlap": 0.7
+          "gravitationalConstant": -110,
+          "centralGravity": 0.02,
+          "springLength": 170,
+          "springConstant": 0.06,
+          "damping": 0.7,
+          "avoidOverlap": 0.85
         },
-        "stabilization": {"enabled": true, "iterations": 250, "fit": true},
-        "minVelocity": 0.6
+        "stabilization": {"enabled": true, "iterations": 320, "fit": true},
+        "minVelocity": 0.5
       },
       "interaction": {
         "hover": true, "tooltipDelay": 120, "navigationButtons": false,
@@ -294,6 +294,13 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
     net.add_edge("weather", "outfit", label="informs")
 
     # ── Wardrobe items (capped for readability) ──
+    # We do NOT draw a user→item "owns" edge here even though the
+    # schema has one. With 5–8 items in a typical outfit, those
+    # extra edges crowd around the User node and make the graph
+    # read as a starburst. The "recommends" edge from Outfit to the
+    # item is enough to communicate provenance, and Outfit already
+    # links back to User via the event chain. Trade-off documented
+    # in graph/render.md.
     for item in outfit[:_MAX_ITEM_NODES_PER_RUN]:
         iid_src = item.get("id") or item.get("name") or "item"
         iid = f"item:{iid_src}"
@@ -303,9 +310,12 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
             f"Type: {item.get('type','—')}",
             f"Formality: {item.get('formality','—')}",
         ]
+        # User-added items get a "(your addition)" hint in the tooltip
+        # so the graph also expresses who supplied which piece.
+        if str(item.get("id", "")).startswith("U"):
+            meta_lines.append("Source: your wardrobe additions")
         _add_node(net, iid, name, "WardrobeItem",
                   title=f"{name}\n" + "\n".join(meta_lines))
-        net.add_edge("user", iid, label="owns")
         net.add_edge("outfit", iid, label="recommends")
 
     # ── Wardrobe Gaps (if any) ──
