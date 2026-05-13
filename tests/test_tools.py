@@ -52,6 +52,90 @@ class TestWeatherTool(unittest.TestCase):
         for key in ("city", "temp_f", "condition", "layer_advice"):
             self.assertIn(key, w)
 
+    def test_past_date_uses_seasonal_fallback(self):
+        """Past dates can't have a forecast — fallback honestly."""
+        from weather_tool import get_weather_for_date
+        from datetime import date as _d, timedelta as _td
+        past = (_d.today() - _td(days=30)).isoformat()
+        r = get_weather_for_date(past, _today=_d.today())
+        self.assertTrue(r.get("success"))
+        self.assertEqual(r.get("source"), "seasonal-fallback")
+        self.assertEqual(r["weather"].get("fallback_reason"), "past-date")
+        self.assertFalse(r.get("in_range"))
+
+    def test_date_beyond_window_uses_seasonal_fallback(self):
+        """Dates more than 15 days out are beyond Open-Meteo's free
+        forecast window — honest seasonal fallback."""
+        from weather_tool import get_weather_for_date
+        from datetime import date as _d, timedelta as _td
+        far = (_d.today() + _td(days=90)).isoformat()
+        r = get_weather_for_date(far, _today=_d.today())
+        self.assertTrue(r.get("success"))
+        self.assertEqual(r.get("source"), "seasonal-fallback")
+        self.assertEqual(r["weather"].get("fallback_reason"),
+                         "beyond-forecast-window")
+        # Layer advice mentions the fallback honestly.
+        self.assertIn("Seasonal estimate", r["weather"]["layer_advice"])
+
+    def test_unparseable_date_falls_back_to_now(self):
+        """Garbage input shouldn't crash — fall back to current weather."""
+        from weather_tool import get_weather_for_date
+        r = get_weather_for_date("not-a-date")
+        self.assertTrue(r.get("success"))
+        # Either live or api-error-fallback — both are acceptable.
+        self.assertIn(r.get("source"), ("live", "seasonal-fallback"))
+
+    def test_seasonal_fallback_varies_by_month(self):
+        """A January date should be cold; a July date should be warm."""
+        from weather_tool import get_weather_for_date
+        from datetime import date as _d
+        # Both far enough out to be guaranteed seasonal fallback.
+        jan = "2099-01-15"; jul = "2099-07-15"
+        r_jan = get_weather_for_date(jan, _today=_d.today())
+        r_jul = get_weather_for_date(jul, _today=_d.today())
+        self.assertLess(r_jan["weather"]["temp_f"], r_jul["weather"]["temp_f"])
+        # Conditions reflect the season too.
+        self.assertIn(r_jan["weather"]["condition"],
+                      ("Mixed Conditions", "Partly Cloudy"))
+
+    def test_multiple_future_events_dont_all_share_today_weather(self):
+        """Regression for the reported bug: each future event must get
+        its OWN weather object. We use two far-out dates so both
+        deterministically go through the seasonal fallback in
+        different months — they should differ in temperature."""
+        from weather_tool import get_weather_for_date
+        from datetime import date as _d
+        winter = get_weather_for_date("2099-01-15", _today=_d.today())
+        summer = get_weather_for_date("2099-07-15", _today=_d.today())
+        # Two different target_date values, two different weather dicts.
+        self.assertEqual(winter["target_date"], "2099-01-15")
+        self.assertEqual(summer["target_date"], "2099-07-15")
+        self.assertNotEqual(winter["weather"]["temp_f"],
+                            summer["weather"]["temp_f"])
+
+    def test_seasonal_fallback_has_honest_label_in_layer_advice(self):
+        """The reasoning trail and UI must be able to see that this
+        is NOT a live forecast. Source field + fallback_reason both
+        carry that signal."""
+        from weather_tool import get_weather_for_date
+        from datetime import date as _d
+        r = get_weather_for_date("2099-08-15", _today=_d.today())
+        self.assertEqual(r["source"], "seasonal-fallback")
+        self.assertEqual(r["weather"]["fallback_reason"],
+                         "beyond-forecast-window")
+        # The layer_advice string itself flags the fallback so users
+        # who only see that line still know it's not live.
+        self.assertIn("Seasonal estimate", r["weather"]["layer_advice"])
+
+    def test_agent_run_stamps_weather_source(self):
+        """End-to-end: run_agent must put a `_source` on the weather
+        object so the Planner UI can label live vs forecast vs seasonal."""
+        from styling_agent import run_agent
+        r = run_agent(mode="everyday", everyday_request="casual")
+        w = r.get("weather") or {}
+        self.assertIn("_source", w)
+        self.assertIn(w["_source"], ("live", "forecast", "seasonal-fallback"))
+
 
 class TestWardrobeTool(unittest.TestCase):
     def test_get_wardrobe_loads(self):

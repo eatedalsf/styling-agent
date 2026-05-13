@@ -3559,7 +3559,21 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
 
     weather_text = ""
     if isinstance(weather, dict) and weather.get("temp_f") not in (None, "—"):
-        weather_text = f"{weather.get('temp_f')}°F · {weather.get('condition','')}"
+        # Source-honest label so the user can tell a real forecast
+        # apart from a seasonal estimate.
+        _src = (weather.get("_source") or "").lower()
+        if _src == "forecast":
+            src_prefix = "Forecast"
+        elif _src == "seasonal-fallback":
+            src_prefix = "Seasonal estimate"
+        elif _src == "live":
+            src_prefix = "Live"
+        else:
+            src_prefix = ""
+        prefix = f"{src_prefix} · " if src_prefix else ""
+        weather_text = (
+            f"{prefix}{weather.get('temp_f')}°F · {weather.get('condition','')}"
+        )
         if weather.get("layer_advice"):
             weather_text += f" · {weather['layer_advice']}"
 

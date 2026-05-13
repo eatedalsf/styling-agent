@@ -291,19 +291,86 @@ def run_agent(
     steps.append(step2)
 
     # ── STEP 3: Check Weather ─────────────────────────────────────────────────
+    # Honest per-event weather: when the occasion has a real date (a
+    # Planner card for a future event, a calendar event a few days
+    # out), ask Open-Meteo for THAT day's forecast — not "now".
+    #
+    # The three honest sources:
+    #   "live"              → current readings, same-day event.
+    #   "forecast"          → daily forecast, 1..15 days out.
+    #   "seasonal-fallback" → coarse seasonal estimate when the date
+    #                          is past, beyond 15 days, or the API is
+    #                          unreachable. The fallback_reason tells
+    #                          the user (and the reasoning trail)
+    #                          which case we hit.
     step3 = {"step": 3, "name": "Check Weather", "status": "ok", "output": ""}
-    weather_result = get_weather()
-    weather = weather_result["weather"]
-    result["weather"] = weather
+    _event_date_for_weather = (occasion.get("date") or "").strip()
+    # "Today" sentinel from routine fallback isn't a real date — drop it.
+    if _event_date_for_weather and _event_date_for_weather.lower() in ("today", ""):
+        _event_date_for_weather = ""
 
-    if weather_result.get("error"):
-        step3["status"] = "fallback"
-        step3["output"] = f"Weather note: {weather_result['error']} | Using estimate: {weather['temp_f']}°F, {weather['condition']}."
+    if _event_date_for_weather:
+        try:
+            from weather_tool import get_weather_for_date as _gwfd
+            weather_result = _gwfd(_event_date_for_weather)
+        except Exception:
+            weather_result = get_weather()
     else:
+        weather_result = get_weather()
+
+    weather = weather_result["weather"]
+    weather_source = (weather_result.get("source") or "").lower()
+    weather_target = weather_result.get("target_date") or ""
+    # Stash source + target_date on the weather object so the UI can
+    # show "live" vs "forecast" vs "seasonal estimate" labels without
+    # re-deriving from the agent's reasoning trail.
+    weather["_source"]      = weather_source
+    weather["_target_date"] = weather_target
+    result["weather"]       = weather
+
+    # Honest reasoning-trail framing per source.
+    if weather_source == "forecast":
         step3["output"] = (
-            f"{weather['city']}: {weather['temp_f']}°F (feels like {weather['feels_like_f']}°F), "
+            f"Forecast for {weather_target} in {weather['city']}: "
+            f"{weather['temp_f']}°F"
+            + (f" (high {weather['temp_high_f']}°F / "
+               f"low {weather['temp_low_f']}°F)"
+               if weather.get('temp_high_f') is not None else "")
+            + f", {weather['condition']}, "
+            f"wind {weather['wind_mph']} mph, "
+            f"{weather['precip_chance_pct']}% chance of rain. "
+            f"{weather['layer_advice']}"
+        )
+    elif weather_source == "seasonal-fallback":
+        step3["status"] = "fallback"
+        why = weather.get("fallback_reason") or ""
+        why_phrase = {
+            "past-date":              "this event is in the past",
+            "beyond-forecast-window":
+                "this event is more than 15 days out (beyond the "
+                "free Open-Meteo forecast window)",
+            "api-error":              "the weather service was unreachable",
+            "missing-data":           "the forecast returned no readings for that day",
+        }.get(why, "no live forecast was available for this day")
+        step3["output"] = (
+            f"Seasonal estimate for {weather_target or 'this day'} "
+            f"({why_phrase}): {weather['temp_f']}°F, "
+            f"{weather['condition']}. {weather['layer_advice']}"
+        )
+    elif weather_result.get("error"):
+        step3["status"] = "fallback"
+        step3["output"] = (
+            f"Weather note: {weather_result['error']} | "
+            f"Using estimate: {weather['temp_f']}°F, {weather['condition']}."
+        )
+    else:
+        # "live" — current readings.
+        step3["output"] = (
+            f"{weather['city']} (live): {weather['temp_f']}°F "
+            f"(feels like {weather['feels_like_f']}°F), "
             f"{weather['condition']}, wind {weather['wind_mph']} mph, "
-            f"{weather['precip_chance_pct']}% chance of rain. {weather['layer_advice']}"
+            f"{weather['precip_chance_pct']}% chance of rain. "
+            f"{weather['layer_advice']}"
         )
     steps.append(step3)
 
