@@ -67,8 +67,22 @@ html, body, [class*="css"] {
 [data-testid="stAppViewContainer"] {
     background: #FFFFFF !important;
 }
-[data-testid="stHeader"] { background: #FFFFFF !important; }
-.block-container { padding-top: 0.6rem !important; padding-bottom: 4rem !important; max-width: 720px !important; }
+/* Hide Streamlit's default top toolbar entirely so our own app bar
+   (with brand + profile chip) becomes the page's true top. Without
+   this, the toolbar overlays our app bar and clips the brand wordmark. */
+[data-testid="stHeader"] { display: none !important; }
+[data-testid="stToolbar"] { display: none !important; }
+
+/* Generous top padding so the app bar sits cleanly below the browser
+   chrome / the sidebar collapse handle. */
+.block-container {
+    padding-top: 2.2rem !important;
+    padding-bottom: 4rem !important;
+    max-width: 720px !important;
+}
+@media (max-width: 640px) {
+    .block-container { padding-top: 1.4rem !important; }
+}
 
 /* ───── Product top app bar ───── */
 .app-bar {
@@ -1177,7 +1191,7 @@ def _render_home():
 
     st.markdown(f"""
     <div style="position:relative; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.55rem 1.6rem 1.4rem; margin-bottom:1.1rem; overflow:hidden; box-shadow:0 1px 0 rgba(28,25,23,0.02);">
-        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, #111111 0%, #2E2E2E 60%, #E8B998 100%);"></div>
+        <div style="position:absolute; top:0; left:0; right:0; height:2px; background:#111111;"></div>
         <div style="font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:1rem;">
             Today · {today_label}
         </div>
