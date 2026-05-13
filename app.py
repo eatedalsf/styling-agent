@@ -1124,6 +1124,16 @@ with _bar_right:
 
         st.divider()
 
+        # Navigation entries that used to live in the main nav row but
+        # were moved here to keep the top of the screen reserved for the
+        # four daily-use destinations (Home, Today, Wardrobe, Shop).
+        if st.button("Profile", key="menu_profile_btn", use_container_width=True):
+            _goto("profile")
+        if st.button("Before / after demo", key="menu_demo_btn", use_container_width=True):
+            _goto("demo")
+
+        st.divider()
+
         if st.button("Backup & restore", key="menu_backup_btn", use_container_width=True):
             # Routes to the Wardrobe screen where the Backup expander
             # lives at the top — Backup is a Wardrobe sub-feature, so
@@ -1156,8 +1166,9 @@ _SECTIONS = [
     ("today",    "Today"),
     ("wardrobe", "Wardrobe"),
     ("shop",     "Shop"),
-    ("profile",  "Profile"),
-    ("demo",     "Before / After"),
+    # Profile and Before / After were moved out of the top nav into
+    # the user dropdown menu — see the popover block above. The top
+    # nav is reserved for the four daily-use destinations.
 ]
 _active = st.session_state["section"]
 
