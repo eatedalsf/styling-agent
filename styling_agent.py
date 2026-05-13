@@ -407,32 +407,102 @@ def run_agent(
 
     formality = occasion.get("formality", "casual")
 
-    # Check for dress-worthy occasions first
-    if occasion_tag in DRESS_OCCASIONS and formality in ["formal", "smart_casual"]:
-        dresses = [i for i in clothing_pool if i["type"] == "dress"]
-        if dresses:
-            # Prefer higher formality dresses for formal occasions, then freshness.
-            if formality == "formal":
-                dresses.sort(key=lambda d: (0 if d["formality"] == "formal" else 1,
-                                            -get_freshness(d.get("id", ""), _history)))
-            outfit.append(dresses[0])
-            reasoning.append(
-                f"Selected '{dresses[0]['name']}' as a one-piece solution "
-                f"for this {formality} occasion. {cite('occasion#R3')}"
+    # ── Dress-vs-separates selection ─────────────────────────────────
+    # Previous logic: dress branch only fired when occasion_tag was in
+    # DRESS_OCCASIONS AND formality was "formal" / "smart_casual". That
+    # meant a user with two casual dresses asking for a "dinner" outfit
+    # got top+bottom every time, ignoring the dresses entirely. The new
+    # rule keeps the same "formal occasions prefer a formal dress" bias
+    # but lets the dress branch fire whenever:
+    #   - occasion is naturally dress-worthy (formal / dinner / weekend
+    #     brunch / casual), AND
+    #   - at least one dress is in the candidate pool,
+    #   - AND it's a stronger main-piece than the available top+bottom
+    #     for this occasion (formality match, fit match, freshness).
+    #
+    # No more gating on a single string equality. The dress wins on its
+    # merits or the separates win on theirs.
+    dresses    = [i for i in clothing_pool if i.get("type") == "dress"]
+    tops       = [i for i in clothing_pool if i.get("type") == "top"]
+    bottoms    = [i for i in clothing_pool if i.get("type") == "bottom"]
+    activewear = [i for i in clothing_pool if i.get("type") == "activewear"]
+
+    def _score_main_piece(item: dict) -> float:
+        """
+        Score a candidate top OR dress. Higher = better fit for this
+        moment. Currently:
+          + formality match (most weighted)
+          + freshness (wear-history tie-breaker, see history_tool)
+          + user-added bonus (very small) so user items beat equally-
+            ranked seed items — Wearly should meaningfully use the
+            wardrobe the user actually built.
+
+        See book/04-styling-knowledge-base.md "Why rules, not ML."
+        """
+        s = 0.0
+        if item.get("formality") == formality:
+            s += 1.0
+        elif occasion_tag == "formal" and item.get("formality") in ("formal", "business"):
+            s += 0.6
+        elif occasion_tag == "dinner" and item.get("formality") in ("formal", "business", "smart_casual"):
+            s += 0.5
+        elif occasion_tag == "casual" and item.get("formality") in ("casual", "smart_casual"):
+            s += 0.5
+        # Freshness — 0.0..1.0 — already a 0-1 weight.
+        s += 0.4 * get_freshness(item.get("id", ""), _history)
+        # User-added preference. Items from the user overlay carry IDs
+        # starting with 'U' (UC###, US###, UA###). A small bias here
+        # ensures the agent uses what the user added when it's otherwise
+        # equivalent. Never strong enough to override formality.
+        if str(item.get("id", "")).startswith("U"):
+            s += 0.15
+        return s
+
+    pick_dress = False
+    if dresses and occasion_tag in DRESS_OCCASIONS + ["casual"]:
+        # For formal: dress is almost always the right call.
+        if occasion_tag == "formal":
+            pick_dress = True
+        else:
+            # Compare best dress vs best top+bottom pair.
+            best_dress = max(dresses, key=_score_main_piece)
+            best_top   = max(tops,    key=_score_main_piece) if tops    else None
+            best_btm   = max(bottoms, key=_score_main_piece) if bottoms else None
+            dress_score = _score_main_piece(best_dress)
+            pair_score  = (
+                _score_main_piece(best_top) + _score_main_piece(best_btm)
+                if (best_top and best_btm) else -1
             )
-            for _fnote in fit_alignment_notes(dresses[0], _fit_profile_full):
-                reasoning.append(_fnote)
-            _note = _freshness_note(dresses[0])
-            if _note: reasoning.append(_note)
+            # Pair score sums two pieces; halve for fair comparison.
+            pick_dress = dress_score >= (pair_score / 2 if pair_score >= 0 else -1)
+
+    if pick_dress:
+        # Prefer formal-rated dresses for formal occasions, otherwise
+        # sort by the same score the comparison used so it's consistent.
+        if occasion_tag == "formal":
+            dresses.sort(key=lambda d: (0 if d.get("formality") == "formal" else 1,
+                                        -_score_main_piece(d)))
+        else:
+            dresses.sort(key=lambda d: -_score_main_piece(d))
+        outfit.append(dresses[0])
+        _is_user_item = str(dresses[0].get("id", "")).startswith("U")
+        reasoning.append(
+            f"Selected '{dresses[0]['name']}' as a one-piece solution "
+            f"for this {formality} occasion"
+            + (" — from your own wardrobe additions" if _is_user_item else "")
+            + f". {cite('occasion#R3')}"
+        )
+        for _fnote in fit_alignment_notes(dresses[0], _fit_profile_full):
+            reasoning.append(_fnote)
+        _note = _freshness_note(dresses[0])
+        if _note: reasoning.append(_note)
 
     # If no dress selected, build top + bottom
-    if not any(i["type"] == "dress" for i in outfit):
-        tops = [i for i in clothing_pool if i["type"] == "top"]
-        bottoms = [i for i in clothing_pool if i["type"] == "bottom"]
-        activewear = [i for i in clothing_pool if i["type"] == "activewear"]
-
+    if not any(i.get("type") == "dress" for i in outfit):
         if occasion_tag == "gym":
             if activewear:
+                # Score activewear too, so user-added activewear gets picked.
+                activewear.sort(key=lambda i: -_score_main_piece(i))
                 chosen_active = activewear[:2]
                 outfit.extend(chosen_active)
                 reasoning.append(
@@ -447,39 +517,59 @@ def run_agent(
                 reasoning.append("No activewear found in wardrobe for this gym occasion.")
         else:
             if tops:
-                outfit.append(tops[0])
+                tops_sorted = sorted(tops, key=lambda i: -_score_main_piece(i))
+                outfit.append(tops_sorted[0])
+                _is_user = str(tops_sorted[0].get("id", "")).startswith("U")
                 reasoning.append(
-                    f"Selected top: '{tops[0]['name']}' for its "
-                    f"{tops[0]['formality']} formality. {cite('wardrobe#R3')}"
+                    f"Selected top: '{tops_sorted[0]['name']}' for its "
+                    f"{tops_sorted[0].get('formality','')} formality"
+                    + (" — from your own wardrobe additions" if _is_user else "")
+                    + f". {cite('wardrobe#R3')}"
                 )
-                for _fnote in fit_alignment_notes(tops[0], _fit_profile_full):
+                for _fnote in fit_alignment_notes(tops_sorted[0], _fit_profile_full):
                     reasoning.append(_fnote)
-                _note = _freshness_note(tops[0])
+                _note = _freshness_note(tops_sorted[0])
                 if _note: reasoning.append(_note)
             if bottoms:
-                outfit.append(bottoms[0])
+                bottoms_sorted = sorted(bottoms, key=lambda i: -_score_main_piece(i))
+                outfit.append(bottoms_sorted[0])
+                _is_user = str(bottoms_sorted[0].get("id", "")).startswith("U")
                 reasoning.append(
-                    f"Selected bottom: '{bottoms[0]['name']}' to pair with the top. "
-                    f"{cite('occasion#R2')}"
+                    f"Selected bottom: '{bottoms_sorted[0]['name']}' to pair with the top"
+                    + (" — from your own wardrobe additions" if _is_user else "")
+                    + f". {cite('occasion#R2')}"
                 )
-                for _fnote in fit_alignment_notes(bottoms[0], _fit_profile_full):
+                for _fnote in fit_alignment_notes(bottoms_sorted[0], _fit_profile_full):
                     reasoning.append(_fnote)
-                _note = _freshness_note(bottoms[0])
+                _note = _freshness_note(bottoms_sorted[0])
                 if _note: reasoning.append(_note)
 
-    # Add shoes
+    # Add shoes — score so user-added shoes can win.
     if shoes_pool:
-        outfit.append(shoes_pool[0])
-        reasoning.append(f"Added shoes: '{shoes_pool[0]['name']}' appropriate for the occasion.")
-        _note = _freshness_note(shoes_pool[0])
+        shoes_sorted = sorted(shoes_pool, key=lambda i: -_score_main_piece(i))
+        outfit.append(shoes_sorted[0])
+        _is_user = str(shoes_sorted[0].get("id", "")).startswith("U")
+        reasoning.append(
+            f"Added shoes: '{shoes_sorted[0]['name']}' appropriate for the occasion"
+            + (" — from your wardrobe additions" if _is_user else "")
+            + "."
+        )
+        _note = _freshness_note(shoes_sorted[0])
         if _note: reasoning.append(_note)
 
-    # Add accessories (up to 2)
-    for acc in accessories_pool[:2]:
-        outfit.append(acc)
-        reasoning.append(f"Added accessory: '{acc['name']}'.")
-        _note = _freshness_note(acc)
-        if _note: reasoning.append(_note)
+    # Add accessories (up to 2) — score for the same reason.
+    if accessories_pool:
+        accessories_sorted = sorted(accessories_pool, key=lambda i: -_score_main_piece(i))
+        for acc in accessories_sorted[:2]:
+            outfit.append(acc)
+            _is_user = str(acc.get("id", "")).startswith("U")
+            reasoning.append(
+                f"Added accessory: '{acc['name']}'"
+                + (" (from your wardrobe additions)" if _is_user else "")
+                + "."
+            )
+            _note = _freshness_note(acc)
+            if _note: reasoning.append(_note)
 
     # Add outerwear if weather requires it.
     # Use the CURRENT occasion (not a hardcoded "work" tag) so a gym outfit

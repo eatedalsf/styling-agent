@@ -30,26 +30,68 @@ from history_tool import (  # noqa: E402
 
 
 class _HistorySnapshotMixin:
-    """Snapshot / restore wear_history.json around tests."""
+    """
+    Snapshot wear_history.json AND user_wardrobe.json around tests in
+    this class.
+
+    The user-wardrobe snapshot is here even though most tests in this
+    file don't touch it — a previous run of test_backup that left
+    artifacts in user_wardrobe.json could cause these tests to pick
+    a leaked user item ahead of the expected seed item (Goal 3's
+    user-added-bonus scoring is intentionally biased toward user
+    items). Snapshotting locally guards us against that pollution.
+    """
 
     @classmethod
     def setUpClass(cls):
-        cls._original = None
+        # wear_history.json
+        cls._history_original = None
         if os.path.exists(HISTORY_PATH):
             with open(HISTORY_PATH, "r", encoding="utf-8") as f:
-                cls._original = f.read()
+                cls._history_original = f.read()
+        # user_wardrobe.json — capture so any leakage from prior runs
+        # can't taint these tests; restore at the end so we don't
+        # destroy the user's actual added items either.
+        try:
+            from wardrobe_tool import USER_DATA_PATH
+            cls._user_wardrobe_path = USER_DATA_PATH
+        except Exception:
+            cls._user_wardrobe_path = None
+        cls._user_wardrobe_original = None
+        if cls._user_wardrobe_path and os.path.exists(cls._user_wardrobe_path):
+            with open(cls._user_wardrobe_path, "r", encoding="utf-8") as f:
+                cls._user_wardrobe_original = f.read()
 
     @classmethod
     def tearDownClass(cls):
-        if cls._original is not None:
+        if cls._history_original is not None:
             with open(HISTORY_PATH, "w", encoding="utf-8") as f:
-                f.write(cls._original)
+                f.write(cls._history_original)
         else:
             if os.path.exists(HISTORY_PATH):
                 os.remove(HISTORY_PATH)
+        # Restore user_wardrobe.json to whatever it was at class setUp.
+        if cls._user_wardrobe_path:
+            if cls._user_wardrobe_original is not None:
+                with open(cls._user_wardrobe_path, "w", encoding="utf-8") as f:
+                    f.write(cls._user_wardrobe_original)
+            else:
+                if os.path.exists(cls._user_wardrobe_path):
+                    os.remove(cls._user_wardrobe_path)
 
     def setUp(self):
         reset_history()
+        # Per-test isolation: blank the user-wardrobe overlay so the
+        # agent's scoring tie-breaks land on the seed wardrobe (which
+        # is what these tests assert about). The class-level snapshot
+        # restores the user's real overlay at tearDownClass.
+        if self._user_wardrobe_path:
+            with open(self._user_wardrobe_path, "w", encoding="utf-8") as f:
+                import json as _json
+                _json.dump({
+                    "_comment": "blanked by test setUp; restored at tearDownClass.",
+                    "clothing": [], "shoes": [], "accessories": []
+                }, f)
 
 
 # ─────────────────────────────────────────────

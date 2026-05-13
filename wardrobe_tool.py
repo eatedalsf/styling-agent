@@ -239,23 +239,55 @@ _CANONICAL_OCCASIONS = {"work", "gym", "dinner", "formal", "casual",
 
 def _ensure_useful_occasion_tags(item: dict) -> bool:
     """
-    Quiet migration: if an item's `tags` contains no canonical occasion
-    tag at all, derive sensible defaults from its category + formality
-    and add them. Returns True iff the item was modified. Existing
-    legitimate tags are preserved — we only ever append.
+    Quiet migration: derive sensible occasion tags for an item that
+    has too few, so it doesn't silently drop out of the candidate pool.
 
-    Fixes the case where a user added an item with no occasion tag and
-    it silently dropped out of every candidate pool.
+    Two passes:
+
+      1. If the item has NO canonical occasion tag, infer a default
+         set from its category + formality. (Original behavior.)
+
+      2. If the item has only "casual" and is the kind of piece that
+         legitimately works for multiple casual contexts (dress,
+         skirt, blouse, knit), add "weekend" and — for dresses — "dinner".
+         Without this expansion, a "casual dress" tagged ONLY with
+         "casual" would never appear in a "dinner" or "weekend brunch"
+         pool, even though that's exactly when a casual dress is most
+         useful. The user reported exactly this case: two casual
+         dresses they'd added (UC001, UC002) were not being selected
+         for dinner/weekend requests.
+
+    Existing legitimate tags are preserved — this only ever appends.
+    Returns True iff the item was modified.
     """
-    tags = [t.lower() for t in (item.get("tags") or [])]
-    if any(t in _CANONICAL_OCCASIONS for t in tags):
+    raw_tags = [t.lower() for t in (item.get("tags") or [])]
+    tags = list(raw_tags)
+    has_canonical = any(t in _CANONICAL_OCCASIONS for t in tags)
+
+    if not has_canonical:
+        # Pass 1: no occasion tag at all — derive defaults.
+        derived = _default_occasion_tags(
+            item.get("type", ""),
+            item.get("formality", ""),
+        )
+        tags = list(dict.fromkeys(tags + derived))
+    else:
+        # Pass 2: has occasion tag(s) but maybe not enough. Expand
+        # legitimately versatile items so the agent considers them.
+        category = (item.get("type") or "").lower()
+        formality = (item.get("formality") or "casual").lower()
+        # Only expand "casual"-anchored items into broader casual
+        # contexts. We never auto-promote a casual item to a formal
+        # occasion — that's a real semantic step.
+        if "casual" in tags and formality in ("casual", "smart_casual"):
+            if "weekend" not in tags:
+                tags.append("weekend")
+            if category in ("dress", "top", "bottom") and "dinner" not in tags:
+                tags.append("dinner")
+
+    if tags == raw_tags:
         return False
-    derived = _default_occasion_tags(
-        item.get("type", ""),
-        item.get("formality", ""),
-    )
-    merged = list(dict.fromkeys(tags + derived))   # preserve order, dedupe
-    item["tags"] = merged
+    item["tags"] = tags
     return True
 
 
@@ -721,6 +753,21 @@ def filter_items_by_occasion(occasion_tag: str, season: str = "all") -> dict:
 
 
 def check_gaps(outfit_pieces: list, required_types: list) -> list:
+    """
+    Return the required piece-types not covered by `outfit_pieces`.
+
+    Special case: a dress satisfies the conventional "top + bottom"
+    requirement on its own. Without that rule, the agent would flag
+    "missing top, missing bottom" the moment it builds an outfit
+    around a dress — turning a deliberate one-piece choice into a
+    false wardrobe gap.
+    """
     covered = {piece.get("type", "").lower() for piece in outfit_pieces}
-    missing = [t for t in required_types if t.lower() not in covered]
+    has_dress = "dress" in covered
+    required_lower = [t.lower() for t in required_types]
+    # If a dress is present and the requirement is "top + bottom",
+    # treat both as covered (the dress IS the top + bottom).
+    if has_dress and set(required_lower) >= {"top", "bottom"}:
+        required_lower = [t for t in required_lower if t not in ("top", "bottom")]
+    missing = [t for t in required_lower if t not in covered]
     return missing
