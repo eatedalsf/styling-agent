@@ -557,8 +557,36 @@ input[type="number"],
     border-color: #111111 !important;
     color: #111111 !important;
 }
-/* Primary button — solid black, white text. Alta-style CTA. */
-.stButton > button[kind="primary"] {
+/* Primary button — Alta-style CTA, solid matte black with white text.
+   Split into two scoped rules so the *shape* matches the context:
+     - st.button (regular buttons, including the active nav pill):
+       keeps the SAME pill geometry as inactive buttons. Only the color
+       flips, never the size or radius. This is what makes the nav row
+       feel like a single coherent set with one item highlighted.
+     - st.form_submit_button (Save Profile, Save to wardrobe, etc.):
+       rectangular CTA, larger touch target. */
+[data-testid="stButton"] > button[kind="primary"] {
+    background: #111111 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #111111 !important;
+    border-radius: 99px !important;
+    font-size: 0.84rem !important;
+    padding: 0.5rem 0.85rem !important;
+    font-weight: 500 !important;
+    min-height: 48px !important;
+    box-shadow: none !important;
+}
+[data-testid="stButton"] > button[kind="primary"]:hover {
+    background: #2E2E2E !important;
+    border-color: #2E2E2E !important;
+    color: #FFFFFF !important;
+}
+[data-testid="stButton"] > button[kind="primary"]:active {
+    transform: translateY(1px) !important;
+}
+
+/* Form-submit primary — rectangular CTA. */
+[data-testid="stFormSubmitButton"] > button[kind="primary"] {
     background: #111111 !important;
     color: #FFFFFF !important;
     border: 1px solid #111111 !important;
@@ -567,12 +595,12 @@ input[type="number"],
     padding: 0.82rem 1.6rem !important;
     box-shadow: none !important;
 }
-.stButton > button[kind="primary"]:hover {
+[data-testid="stFormSubmitButton"] > button[kind="primary"]:hover {
     background: #2E2E2E !important;
     border-color: #2E2E2E !important;
     color: #FFFFFF !important;
 }
-.stButton > button[kind="primary"]:active {
+[data-testid="stFormSubmitButton"] > button[kind="primary"]:active {
     transform: translateY(1px) !important;
 }
 
@@ -1066,59 +1094,51 @@ _name, _initial = _profile_display()
 _bar_left, _bar_right = st.columns([4, 1], gap="small")
 
 with _bar_left:
+    # Wordmark only — the "Prototype" tag was removed.
     st.markdown(f"""
     <div class="brand">
         <span class="brand-mark">W</span>
         <span class="brand-wordmark">Wearly</span>
-        <span class="brand-tag">Prototype</span>
     </div>
     """, unsafe_allow_html=True)
 
 with _bar_right:
     # The popover's trigger button is the only popover in the whole app,
-    # so we style it via the global [data-testid="stPopover"] selector
-    # (see CSS block above). Earlier attempts used a .profile-popover-slot
-    # wrapper div, but Streamlit renders each st.markdown call as a
-    # SIBLING block, never wrapping the popover — so that scoping never
-    # took effect. The global selector works and is safe.
+    # so we style it via the global [data-testid="stPopover"] selector.
+    # Dropdown contents are intentionally minimal — items that already
+    # live in the main nav (Profile, Wardrobe, Before/After) are NOT
+    # duplicated here. Only items unique to a user-menu surface remain:
+    # the local-account status note, a backup shortcut (a Wardrobe
+    # sub-feature), and Sign out.
     with st.popover(
         f"Hi, {_name}",
         use_container_width=True,
         help="Wearly has no accounts — your data stays local on this device.",
     ):
-        st.markdown(f"""
-        <div class="profile-menu-header">
-            <div class="profile-menu-avatar">{_initial}</div>
-            <div class="profile-menu-greeting">
-                <div class="profile-menu-hi">Hi, {_name}.</div>
-                <div class="profile-menu-sub">Signed in locally · no cloud account</div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        st.divider()
-
-        if st.button("Open profile", key="menu_profile_btn", use_container_width=True):
-            _goto("profile")
-        if st.button("My wardrobe", key="menu_wardrobe_btn", use_container_width=True):
-            _goto("wardrobe")
-        if st.button("Backup & restore", key="menu_backup_btn", use_container_width=True):
-            # The Backup expander lives at the top of the Wardrobe screen.
-            _goto("wardrobe")
-        if st.button("Before / after demo", key="menu_demo_btn", use_container_width=True):
-            _goto("demo")
-
-        st.divider()
-
         st.markdown(
-            "<div class='profile-menu-footnote'>"
-            "Wearly stores your wardrobe and wear history locally. "
-            "Signing out clears your fit profile but keeps your closet."
+            "<div class='profile-menu-sub' style='padding:0.5rem 0.6rem 0.4rem;'>"
+            "Signed in locally · no cloud account"
             "</div>",
             unsafe_allow_html=True,
         )
+
+        st.divider()
+
+        if st.button("Backup & restore", key="menu_backup_btn", use_container_width=True):
+            # Routes to the Wardrobe screen where the Backup expander
+            # lives at the top — Backup is a Wardrobe sub-feature, so
+            # there's no other place to surface it as a top-level link.
+            _goto("wardrobe")
         if st.button("Sign out", key="menu_signout_btn", use_container_width=True):
             _sign_out()
+
+        st.markdown(
+            "<div class='profile-menu-footnote'>"
+            "Signing out clears your fit profile but keeps your wardrobe "
+            "and wear history."
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
 # Visual divider under the app bar — matches the old single-row look.
 st.markdown(
