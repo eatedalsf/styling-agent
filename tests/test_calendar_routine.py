@@ -254,5 +254,64 @@ class TestRoutineTool(_DiskSnapshot, unittest.TestCase):
         self.assertIsNone(get_block_for_now(target))
 
 
+class TestCalendarSubscription(_DiskSnapshot, unittest.TestCase):
+    """URL-subscription save/load/disconnect behavior (no network)."""
+
+    @classmethod
+    def setUpClass(cls):
+        from calendar_import import SUBSCRIPTION_PATH
+        cls.FILES = (SUBSCRIPTION_PATH,)
+        super().setUpClass()
+
+    def setUp(self):
+        from calendar_import import SUBSCRIPTION_PATH
+        if os.path.exists(SUBSCRIPTION_PATH):
+            os.remove(SUBSCRIPTION_PATH)
+
+    def test_rejects_non_http_url(self):
+        from calendar_import import subscribe_calendar_url
+        r = subscribe_calendar_url("not-a-url")
+        self.assertFalse(r["success"])
+        self.assertIn("http://", r["error"])
+
+    def test_webcal_normalizes_to_https(self):
+        from calendar_import import subscribe_calendar_url, get_subscription
+        r = subscribe_calendar_url("webcal://p99-caldav.icloud.com/cal.ics")
+        self.assertTrue(r["success"])
+        sub = get_subscription()
+        self.assertTrue(sub["url"].startswith("https://"))
+        self.assertEqual(sub["label"], "iCloud")
+
+    def test_provider_label_inference(self):
+        from calendar_import import subscribe_calendar_url, get_subscription
+        for url, expected in (
+            ("https://calendar.google.com/calendar/ical/x/basic.ics", "Google Calendar"),
+            ("https://p99-caldav.icloud.com/published/x.ics",         "iCloud"),
+            ("https://outlook.live.com/owa/calendar/x/cid-abc.ics",   "Outlook"),
+            ("https://my-server.example/cal.ics",                     "Custom calendar"),
+        ):
+            r = subscribe_calendar_url(url)
+            self.assertTrue(r["success"], r.get("error"))
+            sub = get_subscription()
+            self.assertEqual(sub["label"], expected,
+                             f"Expected {expected!r} for {url!r}, got {sub['label']!r}")
+
+    def test_unsubscribe_clears_record(self):
+        from calendar_import import (
+            subscribe_calendar_url, unsubscribe_calendar, get_subscription,
+        )
+        subscribe_calendar_url("https://calendar.example/feed.ics")
+        self.assertTrue(get_subscription())
+        r = unsubscribe_calendar()
+        self.assertTrue(r["success"])
+        self.assertEqual(get_subscription(), {})
+
+    def test_refresh_without_subscription_returns_clear_error(self):
+        from calendar_import import refresh_subscription
+        r = refresh_subscription()
+        self.assertFalse(r["success"])
+        self.assertIn("subscribed", r["error"].lower())
+
+
 if __name__ == "__main__":
     unittest.main()

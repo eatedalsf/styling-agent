@@ -1777,72 +1777,208 @@ def _render_home():
 
 def _render_calendar_import() -> None:
     """
-    Privacy-respecting calendar connection: the user exports an .ics
-    file from their existing calendar app (Google: Settings → Export;
-    Apple: File → Export ICS; Outlook: Export calendar) and uploads it
-    here. We parse it locally and merge the events into the same
-    calendar_events.json the agent already reads.
+    Privacy-respecting calendar connection — two paths:
 
-    No OAuth, no account, no third-party tokens stored. The user can
-    re-upload anytime to refresh.
+      1. URL subscription  — paste the private .ics URL your calendar
+         provider exposes. Wearly auto-fetches it. Closest thing to a
+         real "connect my Google/Apple calendar" without OAuth.
+      2. File upload       — export the .ics manually and drop it in.
+         Fallback for corporate/Exchange calendars that don't expose
+         a public feed URL.
+
+    Both paths feed into the same calendar_events.json. No OAuth, no
+    third-party tokens. The URL is treated as a credential and is
+    stored locally only.
     """
     try:
-        from calendar_import import import_ics_events
+        from calendar_import import (
+            import_ics_events, subscribe_calendar_url, unsubscribe_calendar,
+            refresh_subscription, get_subscription,
+        )
     except Exception as _e:
-        st.caption(f"Calendar import unavailable: {_e}")
+        st.caption(f"Calendar connection unavailable: {_e}")
         return
 
-    with st.expander("Connect your real calendar (upload .ics)", expanded=False):
+    with st.expander("Connect your real calendar", expanded=False):
         st.markdown(
-            "<div style='font-size:0.84rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.6rem;'>"
-            "Export your calendar to an <strong>.ics</strong> file and drop it here. "
-            "Wearly parses the events locally — <strong>no Google/Apple sign-in, "
-            "no third-party server</strong>. Your calendar credentials never leave "
-            "your device."
-            "</div>"
-            "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
-            "<strong>How to export:</strong> "
-            "<em>Google Calendar</em> → Settings → \"Import & export\" → Export. "
-            "<em>Apple Calendar</em> → File → Export → Export… "
-            "<em>Outlook</em> → File → Save Calendar."
+            "<div style='font-size:0.84rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.8rem;'>"
+            "Two ways to connect. Both run locally — <strong>no Google/Apple "
+            "sign-in</strong>, no third-party tokens, no account on Wearly's side."
             "</div>",
             unsafe_allow_html=True,
         )
-        up = st.file_uploader(
-            "Drop your .ics file",
-            type=["ics"],
-            accept_multiple_files=False,
-            key="cal_ics_upload",
-            label_visibility="collapsed",
-        )
-        replace_mode = st.checkbox(
-            "Replace existing events (otherwise merge)",
-            value=False,
-            key="cal_ics_replace",
-            help="Off: events with the same id refresh in place; new events append. "
-                 "On: clear the calendar and keep only what's in this file.",
-        )
-        if up is not None:
-            if st.button("Import events", key="cal_ics_import_btn",
-                         type="primary", use_container_width=True):
-                try:
-                    text = up.getvalue().decode("utf-8", errors="replace")
-                except Exception as _e:
-                    st.error(f"Could not read the file: {_e}")
-                else:
-                    res = import_ics_events(text, replace=replace_mode)
-                    if res.get("success"):
-                        st.success(
-                            f"Imported {len(res['added'])} new event"
-                            f"{'' if len(res['added']) == 1 else 's'}"
-                            f" · refreshed {len(res['updated'])}"
-                            f" · total now {res['total']}."
-                            + (f" ({res['skipped']} block"
-                               f"{'' if res['skipped'] == 1 else 's'} couldn't be parsed.)"
-                               if res.get("skipped") else "")
-                        )
+
+        _tab_url, _tab_file = st.tabs([
+            "🔗  Calendar URL (recommended)",
+            "📁  Upload .ics file",
+        ])
+
+        # ── Tab 1: URL subscription (auto-refreshing) ─────────────────
+        with _tab_url:
+            st.markdown(
+                "<div style='font-size:0.84rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.6rem;'>"
+                "Paste the private <strong>.ics URL</strong> your calendar exposes. "
+                "Wearly fetches it whenever you ask — events stay in sync without you "
+                "having to re-upload."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+
+            st.markdown(
+                "<details style='font-size:0.78rem; color:#6E6E73; line-height:1.55; "
+                "background:#FAFAFA; border:1px solid #EEEEEE; border-radius:6px; "
+                "padding:0.7rem 0.9rem; margin-bottom:0.8rem;'>"
+                "<summary style='cursor:pointer; color:#111111; font-weight:500;'>"
+                "Where do I find this URL?</summary>"
+                "<div style='margin-top:0.6rem;'>"
+                "<strong>Google Calendar</strong> · open "
+                "<a href='https://calendar.google.com' target='_blank' style='color:#111111;'>"
+                "calendar.google.com</a> → click the ⚙ → <em>Settings</em> → "
+                "scroll to your calendar in the left list → click it → scroll to "
+                "<em>\"Integrate calendar\"</em> → copy <strong>Secret address in "
+                "iCal format</strong> (it ends with <code>.ics</code>)."
+                "<br><br>"
+                "<strong>Apple iCloud Calendar</strong> · open "
+                "<a href='https://www.icloud.com/calendar/' target='_blank' style='color:#111111;'>"
+                "iCloud.com/calendar</a> → hover the calendar in the sidebar → "
+                "click the <em>share</em> icon → tick <em>\"Public Calendar\"</em> → "
+                "copy the URL (starts with <code>webcal://</code> — Wearly converts it "
+                "automatically)."
+                "<br><br>"
+                "<strong>What this URL is.</strong> It's a private link — anyone with "
+                "it can read this one calendar (not your account). Wearly stores it "
+                "locally only. If you ever want to revoke access, regenerate the URL "
+                "in your calendar provider's settings."
+                "</div></details>",
+                unsafe_allow_html=True,
+            )
+
+            current_sub = get_subscription()
+            if current_sub:
+                last = current_sub.get("last_synced_at", "")
+                last_count = current_sub.get("last_event_count", "—")
+                st.markdown(
+                    "<div style='background:#FFFFFF; border:1px solid #EEEEEE; "
+                    "border-radius:6px; padding:0.7rem 0.9rem; margin-bottom:0.8rem;'>"
+                    f"<div style='font-size:0.7rem; color:#1D6033; letter-spacing:0.1em; "
+                    f"text-transform:uppercase; font-weight:600;'>Connected</div>"
+                    f"<div style='font-size:0.92rem; color:#111111; margin-top:0.3rem;'>"
+                    f"{current_sub.get('label','Calendar')}</div>"
+                    f"<div style='font-size:0.74rem; color:#6E6E73; margin-top:0.25rem;'>"
+                    f"Last sync: {last or 'never'} · "
+                    f"{last_count} event{'' if last_count == 1 else 's'}"
+                    f"</div></div>",
+                    unsafe_allow_html=True,
+                )
+                col_r, col_u = st.columns([3, 1], gap="small")
+                with col_r:
+                    if st.button("↻  Refresh from calendar", key="cal_url_refresh",
+                                 type="primary", use_container_width=True):
+                        with st.spinner("Fetching your calendar…"):
+                            res = refresh_subscription(replace=False)
+                        if res.get("success"):
+                            st.success(
+                                f"Synced. {len(res['added'])} new · "
+                                f"{len(res['updated'])} refreshed · "
+                                f"{res['total']} total."
+                            )
+                            st.rerun()
+                        else:
+                            st.error(res.get("error", "Sync failed."))
+                with col_u:
+                    if st.button("Disconnect", key="cal_url_unsub",
+                                 use_container_width=True):
+                        unsubscribe_calendar()
+                        st.toast("Disconnected — calendar events kept.")
+                        st.rerun()
+            else:
+                st.text_input(
+                    "Calendar URL",
+                    placeholder="https://calendar.google.com/calendar/ical/.../basic.ics  "
+                                "or  webcal://p##-caldav.icloud.com/...",
+                    key="cal_url_input",
+                    label_visibility="collapsed",
+                )
+                if st.button("Connect & sync now", key="cal_url_subscribe",
+                             type="primary", use_container_width=True):
+                    url = (st.session_state.get("cal_url_input") or "").strip()
+                    if not url:
+                        st.error("Paste a calendar URL above.")
                     else:
-                        st.error(res.get("error", "Import failed."))
+                        sub_res = subscribe_calendar_url(url)
+                        if not sub_res.get("success"):
+                            st.error(sub_res.get("error", "Could not save the URL."))
+                        else:
+                            with st.spinner(f"Fetching your {sub_res['label']}…"):
+                                res = refresh_subscription(replace=False)
+                            if res.get("success"):
+                                st.success(
+                                    f"Connected to your {sub_res['label']}. "
+                                    f"Imported {len(res['added'])} new event"
+                                    f"{'' if len(res['added']) == 1 else 's'}"
+                                    f" · {res['total']} total."
+                                )
+                                st.rerun()
+                            else:
+                                # The URL was saved, but the first fetch failed.
+                                # Keep the URL so the user can retry without
+                                # re-pasting; surface the actual error clearly.
+                                st.error(
+                                    f"URL saved, but the first sync failed: "
+                                    f"{res.get('error','unknown error')}"
+                                )
+
+        # ── Tab 2: file upload (fallback) ─────────────────────────────
+        with _tab_file:
+            st.markdown(
+                "<div style='font-size:0.84rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.6rem;'>"
+                "Drop a <strong>.ics</strong> file you exported from your calendar app. "
+                "Useful when your calendar doesn't expose a public URL (corporate "
+                "Outlook / Exchange calendars typically don't)."
+                "</div>"
+                "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
+                "<strong>How to export:</strong> "
+                "<em>Google Calendar</em> → Settings → \"Import & export\" → Export. "
+                "<em>Apple Calendar</em> → File → Export → Export… "
+                "<em>Outlook</em> → File → Save Calendar."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            up = st.file_uploader(
+                "Drop your .ics file",
+                type=["ics"],
+                accept_multiple_files=False,
+                key="cal_ics_upload",
+                label_visibility="collapsed",
+            )
+            replace_mode = st.checkbox(
+                "Replace existing events (otherwise merge)",
+                value=False,
+                key="cal_ics_replace",
+                help="Off: events with the same id refresh in place; new events append. "
+                     "On: clear the calendar and keep only what's in this file.",
+            )
+            if up is not None:
+                if st.button("Import events", key="cal_ics_import_btn",
+                             type="primary", use_container_width=True):
+                    try:
+                        text = up.getvalue().decode("utf-8", errors="replace")
+                    except Exception as _e:
+                        st.error(f"Could not read the file: {_e}")
+                    else:
+                        res = import_ics_events(text, replace=replace_mode)
+                        if res.get("success"):
+                            st.success(
+                                f"Imported {len(res['added'])} new event"
+                                f"{'' if len(res['added']) == 1 else 's'}"
+                                f" · refreshed {len(res['updated'])}"
+                                f" · total now {res['total']}."
+                                + (f" ({res['skipped']} block"
+                                   f"{'' if res['skipped'] == 1 else 's'} couldn't be parsed.)"
+                                   if res.get("skipped") else "")
+                            )
+                        else:
+                            st.error(res.get("error", "Import failed."))
 
 
 def _render_routine_editor() -> None:

@@ -53,6 +53,7 @@ def _find_data_file(filename: str) -> str:
 
 
 CALENDAR_PATH = _find_data_file("calendar_events.json")
+SUBSCRIPTION_PATH = _find_data_file("calendar_subscription.json")
 
 
 # Canonical occasion tags Wearly's agent recognizes. When the ICS title
@@ -333,3 +334,187 @@ def import_ics_events(text: str, replace: bool = False) -> dict:
 
     return {"success": True, "added": added, "updated": updated,
             "skipped": skipped, "total": len(merged), "error": None}
+
+
+# ---- URL subscription -----------------------------------------------
+#
+# The closest thing to "auto-connected" without OAuth: the user pastes
+# the private .ics feed URL their calendar provider exposes. Wearly
+# fetches it whenever asked. No third-party credentials are stored —
+# only the URL — but the URL IS itself a capability (anyone who knows
+# it can read the calendar). We surface that fact in the UI copy.
+#
+# Where the URL lives:
+#   - Google Calendar : Settings -> select the calendar -> "Integrate
+#                       calendar" -> "Secret address in iCal format"
+#                       (icalendar URL, starts with https://calendar...)
+#   - iCloud / Apple  : iCloud.com -> Calendar -> share the calendar
+#                       publicly -> copy URL (starts with webcal:// or
+#                       https://p##-caldav.icloud.com/...). We rewrite
+#                       webcal:// to https:// for fetching.
+
+import urllib.request as _urlreq
+import urllib.error as _urlerr
+
+
+def _load_subscription() -> dict:
+    """Read the subscription file. Returns {} when missing or malformed."""
+    if not os.path.exists(SUBSCRIPTION_PATH):
+        return {}
+    try:
+        with open(SUBSCRIPTION_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except Exception:
+        return {}
+
+
+def get_subscription() -> dict:
+    """
+    Public accessor for the saved subscription record. Returns::
+
+        {
+          "url":            "<the ics URL>",
+          "label":          "Google Calendar" | "iCloud" | "Custom",
+          "last_synced_at": ISO-8601 string,
+          "last_event_count": int,
+        }
+
+    Or {} when no subscription is saved.
+    """
+    sub = _load_subscription()
+    if not sub.get("url"):
+        return {}
+    return sub
+
+
+def _save_subscription(sub: dict) -> None:
+    on_disk = {
+        "_comment": "Calendar subscription. Stored locally only — the URL "
+                    "is treated as a credential and never transmitted to "
+                    "any third party except the calendar provider itself.",
+        **sub,
+    }
+    _atomic_write(SUBSCRIPTION_PATH, on_disk)
+
+
+def _normalize_calendar_url(url: str) -> str:
+    """Rewrite webcal://... to https://... so urllib can fetch it."""
+    url = (url or "").strip()
+    if url.startswith("webcal://"):
+        return "https://" + url[len("webcal://"):]
+    if url.startswith("webcals://"):
+        return "https://" + url[len("webcals://"):]
+    return url
+
+
+def _infer_provider_label(url: str) -> str:
+    """Best-effort 'where is this from' label for the UI."""
+    u = (url or "").lower()
+    if "google.com" in u or "googleusercontent" in u:
+        return "Google Calendar"
+    if "icloud.com" in u or "caldav.icloud" in u:
+        return "iCloud"
+    if "outlook" in u or "office" in u:
+        return "Outlook"
+    return "Custom calendar"
+
+
+def subscribe_calendar_url(url: str) -> dict:
+    """
+    Save (or update) the subscribed calendar URL. Does NOT fetch yet —
+    callers should follow up with refresh_subscription() to verify the
+    URL works and import the events.
+
+    Returns {"success": bool, "url": str, "label": str, "error": ...}.
+    """
+    norm = _normalize_calendar_url(url)
+    if not norm.startswith(("http://", "https://")):
+        return {"success": False, "url": url, "label": "",
+                "error": "URL must start with http://, https://, or webcal://."}
+
+    sub = _load_subscription()
+    sub.update({
+        "url":   norm,
+        "label": _infer_provider_label(norm),
+    })
+    try:
+        _save_subscription(sub)
+    except Exception as e:
+        return {"success": False, "url": norm, "label": sub.get("label", ""),
+                "error": f"Could not save subscription: {e}"}
+    return {"success": True, "url": norm, "label": sub["label"], "error": None}
+
+
+def unsubscribe_calendar() -> dict:
+    """Remove the saved calendar subscription (events stay in calendar_events.json)."""
+    try:
+        if os.path.exists(SUBSCRIPTION_PATH):
+            os.remove(SUBSCRIPTION_PATH)
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+    return {"success": True, "error": None}
+
+
+def refresh_subscription(replace: bool = False, timeout: int = 10) -> dict:
+    """
+    Fetch the subscribed URL and merge the resulting events into
+    calendar_events.json. Behaves like import_ics_events() under the
+    hood and returns the same result shape, plus a "fetched_bytes" key
+    so the UI can show how much came in.
+
+    `replace=True` discards events currently on disk before merging
+    (useful for a clean re-sync).
+    """
+    sub = _load_subscription()
+    url = sub.get("url")
+    if not url:
+        return {"success": False, "error": "No calendar URL subscribed yet.",
+                "added": [], "updated": [], "skipped": 0, "total": 0,
+                "fetched_bytes": 0}
+
+    # Polite default User-Agent — some providers reject the python-urllib
+    # default. We don't impersonate a browser; we identify as Wearly.
+    req = _urlreq.Request(url, headers={
+        "User-Agent": "Wearly/0.4 (+https://eatedalsf.github.io/styling-agent)",
+        "Accept": "text/calendar, */*;q=0.5",
+    })
+    try:
+        with _urlreq.urlopen(req, timeout=timeout) as resp:
+            blob = resp.read()
+    except _urlerr.HTTPError as e:
+        return {"success": False,
+                "error": f"Calendar server returned HTTP {e.code}. "
+                         f"The URL may have expired or you may need to "
+                         f"regenerate it from your calendar provider.",
+                "added": [], "updated": [], "skipped": 0, "total": 0,
+                "fetched_bytes": 0}
+    except _urlerr.URLError as e:
+        return {"success": False,
+                "error": f"Couldn't reach the calendar server: {e.reason}. "
+                         f"Check the URL or your network.",
+                "added": [], "updated": [], "skipped": 0, "total": 0,
+                "fetched_bytes": 0}
+    except Exception as e:
+        return {"success": False, "error": f"Fetch failed: {e}",
+                "added": [], "updated": [], "skipped": 0, "total": 0,
+                "fetched_bytes": 0}
+
+    try:
+        text = blob.decode("utf-8", errors="replace")
+    except Exception:
+        text = blob.decode("latin-1", errors="replace")
+
+    res = import_ics_events(text, replace=replace)
+    res["fetched_bytes"] = len(blob)
+
+    # Stamp the subscription record with last-sync metadata.
+    if res.get("success"):
+        sub["last_synced_at"]   = datetime.utcnow().isoformat() + "Z"
+        sub["last_event_count"] = res.get("total", 0)
+        try:
+            _save_subscription(sub)
+        except Exception:
+            pass  # non-fatal: events were still imported
+
+    return res
