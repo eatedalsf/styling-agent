@@ -682,7 +682,17 @@ input[type="number"],
     text-transform: none !important;
     padding: 0.5rem 0.85rem !important;
     font-weight: 500 !important;
+    /* Keep button labels on a single line. Two-word actions like
+       "Re-sync calendar" otherwise wrap into two lines at narrow
+       column widths, which looks broken. */
+    white-space: nowrap !important;
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
+}
+/* Labels inside the button (Streamlit wraps the text in a <p>) also
+   need the nowrap so the wrap doesn't happen one layer deeper. */
+.stButton > button p,
+.stButton > button div {
+    white-space: nowrap !important;
 }
 .stButton > button:hover {
     background: #F5F5F5 !important;
@@ -2854,7 +2864,11 @@ def _render_planner():
                 st.error(f"Could not plan upcoming events: {_e}")
         st.session_state["planner_plans"] = plans
 
-    col_l, col_r = st.columns([5, 1], gap="small")
+    # Right column needs ~12 characters of horizontal space for the
+    # "↻ Re-sync calendar" label to stay on one line. A 5:1 split
+    # collapses it to two lines; 5:3 keeps it inline at every common
+    # viewport width.
+    col_l, col_r = st.columns([5, 3], gap="small")
     with col_r:
         if st.button("↻ Re-sync calendar", key="planner_refresh",
                      use_container_width=True,
