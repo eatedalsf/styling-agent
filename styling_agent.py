@@ -186,23 +186,55 @@ def run_agent(
 
             if _routine_blk:
                 step1["status"] = "fallback"
+                _r_label  = _routine_blk.get('label') or 'no label'
+                _r_loc    = _routine_blk.get('location') or ''
+                _r_note   = _routine_blk.get('note') or ''
+                _r_meta_bits = [s for s in (_r_loc, _r_note) if s]
+                _r_meta = (" · " + ", ".join(_r_meta_bits)) if _r_meta_bits else ""
                 step1["output"] = (
                     f"No calendar event for today. Routine match: "
                     f"{_routine_blk['weekday'].title()} "
                     f"{_routine_blk['start']}–{_routine_blk['end']} → "
                     f"{_routine_blk['occasion']} "
-                    f"({_routine_blk['label'] or 'no label'})."
+                    f"({_r_label}){_r_meta}."
                 )
+                # Build the routine-fallback occasion. We stuff
+                # location + note into the occasion's notes field so
+                # the reasoning trail downstream can mention them
+                # ("remote", "office", "outdoor", "campus", …).
+                _occ_notes_bits = [
+                    "From your weekly routine — Wearly falls back to this "
+                    "when the calendar is empty."
+                ]
+                if _r_loc:
+                    _occ_notes_bits.append(f"Location: {_r_loc}.")
+                if _r_note:
+                    _occ_notes_bits.append(f"Note: {_r_note}.")
                 occasion = {
                     "type":      _routine_blk["occasion"],
-                    "title":     _routine_blk["label"] or _routine_blk["occasion"].title(),
+                    "title":     _r_label if _r_label != 'no label' else _routine_blk["occasion"].title(),
                     "formality": _routine_blk["occasion"],
                     "date":      "Today",
                     "time":      _routine_blk["start"],
-                    "notes":     "From your weekly routine — Wearly falls back to "
-                                 "this when the calendar is empty.",
+                    "notes":     " ".join(_occ_notes_bits),
                     "source":    "routine",
+                    "location":  _r_loc,
+                    "routine_note": _r_note,
                 }
+                # Routine-only signals that nudge selection without
+                # overriding occasion. Location words like "outdoor"
+                # or "campus" should hint at weather sensitivity and
+                # comfort; "office" at polish; "remote" at comfort.
+                # We surface as a free-text todays_context the existing
+                # _profile_alignment_bonus picks up. Caller-supplied
+                # todays_context wins when both are present.
+                if not todays_context:
+                    _ctx_bits = []
+                    if _r_loc:  _ctx_bits.append(f"routine location: {_r_loc}")
+                    if _r_note: _ctx_bits.append(_r_note)
+                    if _ctx_bits:
+                        todays_context = " — ".join(_ctx_bits)
+                        result["todays_context"] = todays_context
             else:
                 step1["status"] = "fallback"
                 step1["output"] = (
@@ -1023,3 +1055,96 @@ def plan_summary(plans: list) -> dict:
         "preferred_stores": pref_stores,
         "narrative": narrative,
     }
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# WEEKLY ROUTINE PLANNING
+# ──────────────────────────────────────────────────────────────────────────────
+
+def plan_routine_week() -> list:
+    """
+    Produce a Mon→Sun list of routine-driven outfit plans, one per
+    weekday. Used by the "Routine Week Outfits" view in the app —
+    separate from `plan_upcoming_events` because routine outfits are
+    NOT calendar events; they're the user's normal weekly rhythm.
+
+    For each weekday's first routine block (chronologically), we run
+    the agent in `everyday` mode with that block's occasion. The
+    block's location and note flow into the run as a free-text
+    `todays_context` so the reasoning trail can mention "outdoor",
+    "office", "remote", etc.
+
+    Returns a list of 7 dicts. Days with no routine activity return
+    a placeholder dict with `empty=True` so the UI can render a
+    "no routine for <weekday>" card.
+
+    Calendar events are not consulted here — that's a deliberate
+    contract. The Planner view shows calendar events; the Routine
+    view shows the recurring weekly rhythm; the two surfaces stay
+    cleanly separated.
+    """
+    try:
+        from routine_tool import get_weekly_blocks, DAYS
+    except Exception:
+        return []
+
+    weekly = get_weekly_blocks() or []
+    plans: list = []
+    for blk in weekly:
+        weekday = blk.get("weekday")
+        if blk.get("empty"):
+            plans.append({
+                "weekday": weekday,
+                "empty":   True,
+                "event":   {"title": "No routine block",
+                            "type":  "casual",
+                            "date":  ""},
+            })
+            continue
+
+        # Build a per-block "today's context" so the agent can speak
+        # to location and notes in its reasoning trail.
+        ctx_bits: list = []
+        if blk.get("location"):
+            ctx_bits.append(f"location: {blk['location']}")
+        if blk.get("note"):
+            ctx_bits.append(blk["note"])
+        todays_ctx = " — ".join(ctx_bits) if ctx_bits else ""
+
+        try:
+            r = run_agent(
+                mode="everyday",
+                everyday_request=blk.get("label") or blk.get("occasion") or "casual",
+                todays_context=todays_ctx,
+            )
+        except Exception as e:
+            plans.append({
+                "weekday": weekday,
+                "empty":   False,
+                "event":   {"title": blk.get("label") or blk.get("occasion"),
+                            "type":  blk.get("occasion"),
+                            "date":  ""},
+                "error":   str(e),
+                "recommendation": [],
+                "reasoning": [f"Could not plan {weekday}: {e}"],
+                "gaps": [],
+            })
+            continue
+
+        # Stamp source so the result page (if the user clicks one of
+        # these cards) renders "Outfit for <activity>" instead of
+        # "Today's outfit". Routine-sourced results get source=routine.
+        if isinstance(r, dict):
+            r["source"]  = "routine"
+            r["weekday"] = weekday
+            # Surface the routine metadata on the event object so the
+            # UI can render the activity name + location.
+            ev = r.get("event") or {}
+            ev["title"]     = blk.get("label") or blk.get("occasion", "Routine")
+            ev["time"]      = f"{blk.get('start','')}"
+            ev["type"]      = blk.get("occasion") or "casual"
+            ev["location"]  = blk.get("location") or ""
+            ev["note"]      = blk.get("note") or ""
+            r["event"] = ev
+        plans.append(r)
+    return plans

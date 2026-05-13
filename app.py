@@ -1414,11 +1414,16 @@ _SECTIONS = [
     ("home",     "Home"),
     ("today",    "Today"),
     ("planner",  "Planner"),
+    ("routine",  "Routine"),
     ("wardrobe", "Wardrobe"),
     ("shop",     "Shop"),
     # Profile and Before / After were moved out of the top nav into
     # the user dropdown menu — see the popover block above. The top
     # nav is reserved for the daily-use destinations.
+    #
+    # Planner   = actual calendar events (week / month / all upcoming).
+    # Routine   = recurring weekly rhythm fallback (no calendar needed).
+    # Today     = the current recommendation, whatever its source.
 ]
 _active = st.session_state["section"]
 
@@ -2666,134 +2671,200 @@ def _render_calendar_import() -> None:
 
 def _render_routine_editor() -> None:
     """
-    Weekly-routine editor. The user defines their typical week — what
-    they usually do and when. The agent falls back to this when the
-    calendar has no specific event for the current moment.
+    Weekly-routine editor — REDESIGNED.
+
+    The old editor showed an input row under every weekday, which made
+    it feel like a per-event scheduler. The new editor centers on a
+    single "Add activity" form (name + multi-day select + start/end +
+    location/note), with a list view of saved activities below. One
+    activity can recur on multiple days; the same activity name can
+    also be added multiple times with different days/times.
 
     Body-positive framing: describes the rhythm of your week, never
-    prescribes it. Every block is optional. The Sunday-empty case is
-    valid; the agent just defaults to casual when nothing matches.
+    prescribes it. Every activity is optional. Wearly only consults
+    the routine when the calendar has no event for the current
+    moment — never as an override.
     """
     try:
-        from routine_tool import get_routine, save_routine, DAYS, VALID_OCCASIONS
+        from routine_tool import (
+            get_routine, add_activity, remove_activity,
+            format_time_12h, DAYS, VALID_OCCASIONS,
+        )
     except Exception as _e:
         st.caption(f"Routine editor unavailable: {_e}")
         return
 
-    cur = get_routine().get("schedule", {}) or {}
-    # Bring the routine into session-state for live editing without
-    # round-tripping disk on every interaction.
-    if "routine_draft" not in st.session_state:
-        st.session_state["routine_draft"] = {d: list(cur.get(d, [])) for d in DAYS}
-
-    draft = st.session_state["routine_draft"]
-    occ_options = ["work", "gym", "dinner", "formal", "casual"]
-
     with st.expander("Your weekly routine — fallback when the calendar is empty",
                      expanded=False):
         st.markdown(
-            "<div style='font-size:0.82rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.8rem;'>"
-            "Describe the rhythm of your typical week. Wearly uses this only "
-            "<strong>when your calendar has no event</strong> for the current moment "
-            "— never as an override. Every block is optional."
+            "<div style='font-size:0.82rem; color:#2E2E2E; line-height:1.55; "
+            "margin-bottom:0.9rem;'>"
+            "Describe the rhythm of your typical week — work, gym, class, "
+            "remote-work blocks, errand windows. Wearly uses this only "
+            "<strong>when your calendar has no event</strong> for the "
+            "current moment — never as an override."
             "</div>",
             unsafe_allow_html=True,
         )
 
-        # One section per weekday, each with its current blocks + an add row.
-        for day in DAYS:
+        # ── Existing activities (saved on disk) ───────────────────
+        activities = get_routine().get("activities", []) or []
+        if activities:
             st.markdown(
-                f"<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
-                f"text-transform:uppercase; font-weight:600; margin:1rem 0 0.4rem;'>"
-                f"{day.title()}</div>",
+                "<div style='font-size:0.7rem; color:#8E8E93; "
+                "letter-spacing:0.14em; text-transform:uppercase; "
+                "font-weight:600; margin-bottom:0.5rem;'>"
+                f"Your routine ({len(activities)} "
+                f"activit{'y' if len(activities) == 1 else 'ies'})</div>",
                 unsafe_allow_html=True,
             )
-            blocks = draft.get(day, [])
-            # Existing blocks — each is removable.
-            for i, blk in enumerate(blocks):
-                row = st.columns([2, 2, 2, 4, 1], gap="small")
+            for a in activities:
+                days_pretty = ", ".join(d.title() for d in (a.get("days") or []))
+                start12 = format_time_12h(a.get("start", ""))
+                end12   = format_time_12h(a.get("end", ""))
+                loc     = a.get("location", "") or ""
+                note    = a.get("note", "") or ""
+                meta_bits = [s for s in (loc, note) if s]
+                meta_line = " · ".join(meta_bits)
+                row = st.columns([6, 1], gap="small")
                 with row[0]:
                     st.markdown(
-                        f"<div style='font-size:0.84rem; color:#2E2E2E; "
-                        f"padding-top:0.4rem;'>{blk['start']}</div>",
+                        "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+                        "border-radius:6px; padding:0.7rem 0.95rem; "
+                        "margin-bottom:0.55rem;'>"
+                        "<div style='display:flex; align-items:baseline; "
+                        "gap:0.6rem; flex-wrap:wrap;'>"
+                        f"<div style='font-size:0.94rem; color:#1C1917; "
+                        f"font-weight:500;'>{a.get('name','—')}</div>"
+                        f"<div style='font-size:0.72rem; color:#8E8E93; "
+                        f"letter-spacing:0.06em;'>{a.get('occasion','casual').upper()}"
+                        f"</div></div>"
+                        f"<div style='font-size:0.82rem; color:#6E6E73; "
+                        f"margin-top:0.25rem;'>"
+                        f"{days_pretty} · {start12} – {end12}"
+                        + (f" · {meta_line}" if meta_line else "")
+                        + "</div></div>",
                         unsafe_allow_html=True,
                     )
                 with row[1]:
-                    st.markdown(
-                        f"<div style='font-size:0.84rem; color:#2E2E2E; "
-                        f"padding-top:0.4rem;'>{blk['end']}</div>",
-                        unsafe_allow_html=True,
-                    )
-                with row[2]:
-                    st.markdown(
-                        f"<div style='font-size:0.84rem; color:#111111; "
-                        f"padding-top:0.4rem; font-weight:500;'>{blk['occasion']}</div>",
-                        unsafe_allow_html=True,
-                    )
-                with row[3]:
-                    st.markdown(
-                        f"<div style='font-size:0.82rem; color:#6E6E73; "
-                        f"padding-top:0.4rem;'>{blk.get('label','') or '—'}</div>",
-                        unsafe_allow_html=True,
-                    )
-                with row[4]:
-                    if st.button("✕", key=f"rt_rm_{day}_{i}",
-                                 help="Remove this block"):
-                        draft[day].pop(i)
+                    if st.button(
+                        "Delete",
+                        key=f"routine_del_{a.get('id','x')}",
+                        use_container_width=True,
+                    ):
+                        rd = remove_activity(a.get("id"))
+                        if rd.get("success"):
+                            st.toast(f"Removed '{a.get('name','activity')}'.")
+                        else:
+                            st.error(rd.get("error", "Could not remove."))
                         st.rerun()
+        else:
+            st.markdown(
+                "<div style='font-size:0.82rem; color:#8E8E93; "
+                "margin:0.4rem 0 1rem; font-style:italic;'>"
+                "No routine activities yet. Add one below — Wearly will "
+                "fall back to it whenever your calendar is empty."
+                "</div>",
+                unsafe_allow_html=True,
+            )
 
-            # Add-a-block row.
-            add = st.columns([2, 2, 2, 4, 1], gap="small")
-            with add[0]:
-                new_start = st.text_input(
-                    f"start_{day}", value="", placeholder="07:00",
-                    label_visibility="collapsed",
-                    key=f"rt_add_start_{day}",
-                )
-            with add[1]:
-                new_end = st.text_input(
-                    f"end_{day}", value="", placeholder="08:00",
-                    label_visibility="collapsed",
-                    key=f"rt_add_end_{day}",
-                )
-            with add[2]:
-                new_occ = st.selectbox(
-                    f"occ_{day}", options=occ_options,
-                    label_visibility="collapsed",
-                    key=f"rt_add_occ_{day}",
-                )
-            with add[3]:
-                new_label = st.text_input(
-                    f"label_{day}", value="", placeholder="e.g. Morning workout",
-                    label_visibility="collapsed",
-                    key=f"rt_add_label_{day}",
-                )
-            with add[4]:
-                if st.button("+", key=f"rt_add_btn_{day}",
-                             help="Add this block to the day"):
-                    if new_start and new_end:
-                        draft[day].append({
-                            "start":    new_start.strip(),
-                            "end":      new_end.strip(),
-                            "occasion": new_occ,
-                            "label":    new_label.strip(),
-                        })
-                        # Clear the add-row inputs by removing their state.
-                        for k in (f"rt_add_start_{day}", f"rt_add_end_{day}",
-                                  f"rt_add_label_{day}"):
-                            st.session_state.pop(k, None)
-                        st.rerun()
+        # ── Add activity form ─────────────────────────────────────
+        st.markdown(
+            "<div style='font-size:0.7rem; color:#8E8E93; "
+            "letter-spacing:0.14em; text-transform:uppercase; "
+            "font-weight:600; margin:1.1rem 0 0.45rem;'>"
+            "Add routine activity</div>",
+            unsafe_allow_html=True,
+        )
 
-        st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
-        if st.button("Save routine", key="rt_save_btn",
-                     type="primary", use_container_width=True):
-            res = save_routine(draft)
-            if res.get("success"):
-                st.success("Routine saved. Wearly will use it whenever the "
-                           "calendar is empty for the current moment.")
-                # Refresh the cached draft from disk so the editor reflects
-                # any normalization the save layer did.
-                st.session_state.pop("routine_draft", None)
+        with st.form("routine_add_form", clear_on_submit=True):
+            r1 = st.columns([2, 2], gap="medium")
+            with r1[0]:
+                a_name = st.text_input(
+                    "Activity",
+                    placeholder="e.g. Work, Morning gym, Class, Errands",
+                    key="routine_add_name",
+                )
+            with r1[1]:
+                a_occasion = st.selectbox(
+                    "Occasion (used by the agent)",
+                    options=["(auto-infer)"] + sorted(VALID_OCCASIONS),
+                    index=0,
+                    key="routine_add_occasion",
+                    help=(
+                        "Leave on auto-infer to have Wearly guess from the "
+                        "activity name (e.g. 'Morning gym' → gym). Override "
+                        "explicitly when needed."
+                    ),
+                )
+
+            # Day picker with group shortcuts. Multiple groups can be
+            # selected; routine_tool._normalize_days expands them.
+            day_options = [
+                "Every day", "Weekdays", "Weekends",
+                "Monday", "Tuesday", "Wednesday", "Thursday",
+                "Friday", "Saturday", "Sunday",
+            ]
+            a_days = st.multiselect(
+                "Days",
+                options=day_options,
+                default=[],
+                key="routine_add_days",
+                help="Pick one or more days. 'Weekdays' = Mon–Fri, "
+                     "'Weekends' = Sat–Sun, 'Every day' = all 7.",
+            )
+
+            r2 = st.columns([1, 1], gap="medium")
+            with r2[0]:
+                a_start = st.text_input(
+                    "Start time",
+                    placeholder="e.g. 7:00 AM",
+                    key="routine_add_start",
+                    help="12-hour ('7:00 AM') or 24-hour ('07:00') both work.",
+                )
+            with r2[1]:
+                a_end = st.text_input(
+                    "End time",
+                    placeholder="e.g. 8:00 AM",
+                    key="routine_add_end",
+                )
+
+            a_location = st.text_input(
+                "Location / note (optional)",
+                placeholder="e.g. office, remote, gym, campus, outdoor walk",
+                key="routine_add_location",
+                help=(
+                    "Influences outfit reasoning when relevant: 'outdoor' nudges "
+                    "weather sensitivity, 'office' nudges polish, 'remote' "
+                    "nudges comfort."
+                ),
+            )
+
+            submit = st.form_submit_button(
+                "Add to routine", type="primary", use_container_width=True,
+            )
+            if submit:
+                fields = {
+                    "name":     a_name,
+                    "days":     a_days,
+                    "start":    a_start,
+                    "end":      a_end,
+                    "location": a_location,
+                    "note":     "",
+                }
+                if a_occasion and a_occasion != "(auto-infer)":
+                    fields["occasion"] = a_occasion
+                rd = add_activity(fields)
+                if rd.get("success"):
+                    st.success(
+                        f"Added '{rd['activity']['name']}' "
+                        f"({', '.join(d.title() for d in rd['activity']['days'])} · "
+                        f"{format_time_12h(rd['activity']['start'])}–"
+                        f"{format_time_12h(rd['activity']['end'])})."
+                    )
+                    st.rerun()
+                else:
+                    st.error(rd.get("error", "Could not add activity."))
                 st.rerun()
             else:
                 st.error(res.get("error", "Could not save."))
@@ -3152,6 +3223,151 @@ def _render_planner():
         _render_summary_pill(_summaries["all"])
         _render_planner_card_list(all_plans, scope_label="upcoming",
                                   scope_key="all")
+
+
+def _render_routine_week() -> None:
+    """
+    Weekly Routine Outfits — separate from the Planner (which only
+    shows real calendar events).
+
+    Routine outfits are for the user's normal weekly rhythm: what
+    they wear on a typical Monday, Tuesday, etc., when no calendar
+    event is on the books. Calendar events still win when both
+    exist for the same moment — this view is the rhythm, not the
+    schedule.
+    """
+    st.markdown("""
+    <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
+        <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Routine week</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem; line-height:1.55;">
+            Outfits for your normal weekly rhythm — work / gym / class /
+            errands. Wearly only consults this when your calendar has no
+            event for that moment. Edit your routine activities in
+            <a href="?section=profile" target="_self" style="color:#111111; font-weight:500;">Profile</a>.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    try:
+        from styling_agent import plan_routine_week
+        from routine_tool import get_routine, format_time_12h
+    except Exception as _e:
+        st.error(f"Routine week unavailable: {_e}")
+        return
+
+    activities = get_routine().get("activities", []) or []
+    if not activities:
+        st.markdown(
+            "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+            "border-radius:6px; padding:1.4rem 1.5rem; margin-top:0.4rem;'>"
+            "<div style='font-family:\"DM Serif Display\",serif; "
+            "font-size:1.25rem; color:#1C1917;'>"
+            "No routine activities yet"
+            "</div>"
+            "<div style='font-size:0.88rem; color:#6E6E73; margin-top:0.5rem; "
+            "line-height:1.55;'>"
+            "Open <a href='?section=profile' target='_self' style='color:#111111; "
+            "font-weight:500;'>Profile</a> → <em>Your weekly routine</em>, "
+            "and add an activity (work, gym, class, remote work, errands, …). "
+            "Wearly will then plan outfits for every weekday of your normal "
+            "week here."
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    with st.spinner("Planning each day of your routine week…"):
+        try:
+            plans = plan_routine_week()
+        except Exception as _e:
+            plans = []
+            st.error(f"Could not plan routine week: {_e}")
+
+    if not plans:
+        st.info("No routine plans returned.")
+        return
+
+    # 7 cards — Mon through Sun. Empty days get a quiet placeholder.
+    for p in plans:
+        weekday = (p.get("weekday") or "").title() or "—"
+        if p.get("empty"):
+            st.markdown(
+                "<div style='background:#FFFFFF; border:1px dashed #E5E5E5; "
+                "border-radius:6px; padding:0.9rem 1.1rem; margin-bottom:0.7rem;'>"
+                f"<div style='font-size:0.78rem; color:#8E8E93; "
+                f"letter-spacing:0.14em; text-transform:uppercase; "
+                f"font-weight:600;'>{weekday}</div>"
+                "<div style='font-size:0.84rem; color:#6E6E73; "
+                "margin-top:0.3rem;'>No routine activity scheduled.</div>"
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            continue
+
+        ev = p.get("event") or {}
+        rec = p.get("recommendation") or []
+        title = ev.get("title") or "Routine"
+        time_pretty = format_time_12h(ev.get("time") or "")
+        location = ev.get("location") or ""
+
+        items_html = ""
+        for it in rec[:5]:
+            color = (it.get("color") or "").strip()
+            try:
+                hex_color = color_to_swatch(color) if color else "#FAFAFA"
+            except Exception:
+                hex_color = "#FAFAFA"
+            items_html += (
+                "<div style='display:inline-flex; align-items:center; "
+                "gap:0.45rem; padding:0.32rem 0.75rem; background:#FFFFFF; "
+                "border:1px solid #E5E5E5; border-radius:99px; "
+                "font-size:0.78rem; color:#3D332D; margin:0 0.35rem 0.35rem 0;'>"
+                f"<span style='width:12px; height:12px; border-radius:50%; "
+                f"background:{hex_color}; border:1px solid rgba(28,25,23,0.10); "
+                f"display:inline-block;'></span>"
+                f"{it.get('name','—')}</div>"
+            )
+
+        # The day card.
+        cols = st.columns([5, 1], gap="small")
+        with cols[0]:
+            st.markdown(
+                "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+                "border-radius:6px; padding:0.95rem 1.1rem; margin-bottom:0.7rem;'>"
+                f"<div style='font-size:0.66rem; color:#8E8E93; "
+                f"letter-spacing:0.14em; text-transform:uppercase; "
+                f"font-weight:600;'>{weekday}</div>"
+                f"<div style='font-family:\"DM Serif Display\",serif; "
+                f"font-size:1.25rem; color:#1C1917; margin-top:0.25rem;'>"
+                f"{title}</div>"
+                + (f"<div style='font-size:0.82rem; color:#6E6E73; "
+                   f"margin-top:0.2rem;'>"
+                   + " · ".join(filter(None, [time_pretty, location]))
+                   + "</div>" if (time_pretty or location) else "")
+                + f"<div style='margin-top:0.55rem;'>{items_html}</div>"
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        with cols[1]:
+            if st.button(
+                "Plan in detail →",
+                key=f"routine_detail_{weekday}",
+                use_container_width=True,
+            ):
+                # Same context-aware pattern Planner uses: stamp source
+                # so the result page reads "Outfit for <activity>"
+                # instead of "Today's outfit".
+                p_stamped = dict(p)
+                p_stamped["source"] = "planner"   # reuse the "planned" framing
+                st.session_state["result"]   = p_stamped
+                st.session_state["last_run"] = {
+                    "mode":            "everyday",
+                    "everyday_request": ev.get("title") or ev.get("type") or "casual",
+                    "source":          "planner",
+                    "todays_context":  ev.get("note") or "",
+                }
+                st.session_state["section"] = "today"
+                st.rerun()
 
 
 def _render_planner_card_list(plans: list, scope_label: str,
@@ -5014,6 +5230,7 @@ _router = {
     "home":     _render_home,
     "today":    _render_today,
     "planner":  _render_planner,
+    "routine":  _render_routine_week,
     "wardrobe": _render_wardrobe,
     "shop":     _render_shop,
     "profile":  _render_profile,

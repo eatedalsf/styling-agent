@@ -409,6 +409,132 @@ class TestRoutineTool(_DiskSnapshot, unittest.TestCase):
         target = datetime(2026, 5, 11, 22, 0)  # 22:00 Monday — outside
         self.assertIsNone(get_block_for_now(target))
 
+    # ── New canonical activities API (Task 2 redesign) ──────────
+
+    def test_add_activity_multi_day(self):
+        """One activity spanning Mon + Wed expands to two schedule days."""
+        from routine_tool import add_activity, get_routine
+        r = add_activity({
+            "name":  "Morning gym",
+            "days":  ["Monday", "Wednesday"],
+            "start": "7:00 AM",
+            "end":   "8:00 AM",
+            "location": "gym",
+        })
+        self.assertTrue(r["success"], r.get("error"))
+        got = get_routine()
+        self.assertEqual(len(got["activities"]), 1)
+        self.assertEqual(got["activities"][0]["days"], ["monday", "wednesday"])
+        self.assertEqual(got["activities"][0]["start"], "07:00")
+        self.assertEqual(got["schedule"]["monday"][0]["occasion"], "gym")
+        self.assertEqual(got["schedule"]["wednesday"][0]["occasion"], "gym")
+
+    def test_day_group_shortcuts_expand(self):
+        """'Weekdays' expands to Mon..Fri; 'Weekends' to Sat+Sun;
+        'Every day' to all 7."""
+        from routine_tool import add_activity, get_routine
+        add_activity({"name": "Work", "days": ["Weekdays"],
+                       "start": "9:00 AM", "end": "5:00 PM",
+                       "location": "office"})
+        got = get_routine()
+        self.assertEqual(
+            got["activities"][0]["days"],
+            ["monday", "tuesday", "wednesday", "thursday", "friday"],
+        )
+        for d in ("monday", "tuesday", "friday"):
+            self.assertEqual(got["schedule"][d][0]["occasion"], "work")
+        for d in ("saturday", "sunday"):
+            self.assertEqual(got["schedule"][d], [])
+
+    def test_parse_time_input_accepts_12h_and_24h(self):
+        from routine_tool import parse_time_input
+        self.assertEqual(parse_time_input("7:00 AM"), "07:00")
+        self.assertEqual(parse_time_input("7am"),     "07:00")
+        self.assertEqual(parse_time_input("12 PM"),   "12:00")
+        self.assertEqual(parse_time_input("12 AM"),   "00:00")
+        self.assertEqual(parse_time_input("6:30 PM"), "18:30")
+        self.assertEqual(parse_time_input("07:00"),   "07:00")
+        self.assertEqual(parse_time_input("23:59"),   "23:59")
+        self.assertIsNone(parse_time_input("not a time"))
+
+    def test_format_time_12h(self):
+        from routine_tool import format_time_12h
+        self.assertEqual(format_time_12h("07:00"), "7:00 AM")
+        self.assertEqual(format_time_12h("18:30"), "6:30 PM")
+        self.assertEqual(format_time_12h("00:30"), "12:30 AM")
+        self.assertEqual(format_time_12h("12:00"), "12:00 PM")
+        self.assertEqual(format_time_12h(""),      "")
+
+    def test_remove_activity(self):
+        from routine_tool import add_activity, remove_activity, get_routine
+        r = add_activity({"name": "Gym", "days": ["Monday"],
+                          "start": "7:00", "end": "8:00"})
+        aid = r["activity"]["id"]
+        rd = remove_activity(aid)
+        self.assertTrue(rd["success"], rd.get("error"))
+        self.assertEqual(get_routine()["activities"], [])
+
+    def test_update_activity_partial(self):
+        from routine_tool import add_activity, update_activity, get_routine
+        r = add_activity({"name": "Gym", "days": ["Monday"],
+                          "start": "7:00", "end": "8:00"})
+        aid = r["activity"]["id"]
+        upd = update_activity(aid, {"days": ["Tuesday", "Thursday"],
+                                     "location": "home gym"})
+        self.assertTrue(upd["success"], upd.get("error"))
+        got = get_routine()["activities"][0]
+        self.assertEqual(got["days"], ["tuesday", "thursday"])
+        self.assertEqual(got["location"], "home gym")
+        self.assertEqual(got["start"], "07:00")   # preserved
+
+    def test_legacy_schedule_migrates_on_read(self):
+        """A routine.json with the old per-day shape is read back as
+        an activities list — no manual migration needed."""
+        import json as _json
+        from routine_tool import ROUTINE_PATH, get_routine
+        legacy = {
+            "schedule": {
+                "monday":    [{"start": "07:00", "end": "08:00",
+                               "occasion": "gym", "label": "Morning"}],
+                "wednesday": [{"start": "09:00", "end": "17:00",
+                               "occasion": "work", "label": "Office"}],
+                "tuesday": [], "thursday": [], "friday": [],
+                "saturday": [], "sunday": [],
+            }
+        }
+        with open(ROUTINE_PATH, "w", encoding="utf-8") as f:
+            _json.dump(legacy, f)
+        got = get_routine()
+        self.assertEqual(len(got["activities"]), 2)
+        names = sorted(a["name"] for a in got["activities"])
+        self.assertEqual(names, ["Morning", "Office"])
+
+    def test_multiple_same_activity_different_days(self):
+        """Gym Monday 7 AM + Gym Tuesday 6 PM coexist."""
+        from routine_tool import add_activity, get_routine
+        add_activity({"name": "Gym", "days": ["Monday"],
+                      "start": "7:00 AM", "end": "8:00 AM"})
+        add_activity({"name": "Gym", "days": ["Tuesday"],
+                      "start": "6:00 PM", "end": "7:00 PM"})
+        got = get_routine()
+        self.assertEqual(len(got["activities"]), 2)
+        self.assertEqual(got["schedule"]["monday"][0]["start"], "07:00")
+        self.assertEqual(got["schedule"]["tuesday"][0]["start"], "18:00")
+
+    def test_add_activity_validates_inverted_times(self):
+        from routine_tool import add_activity
+        r = add_activity({"name": "Bad", "days": ["Monday"],
+                          "start": "9:00 AM", "end": "8:00 AM"})
+        self.assertFalse(r["success"])
+        self.assertIn("after start time", r["error"])
+
+    def test_occasion_auto_inferred_from_name(self):
+        from routine_tool import add_activity, get_routine
+        add_activity({"name": "Morning yoga", "days": ["Monday"],
+                      "start": "7:00", "end": "8:00"})
+        got = get_routine()["activities"][0]
+        self.assertEqual(got["occasion"], "gym")
+
 
 class TestCalendarSubscription(_DiskSnapshot, unittest.TestCase):
     """URL-subscription save/load/disconnect behavior (no network)."""
