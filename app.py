@@ -521,6 +521,23 @@ div[data-testid="stPopoverBody"] > div {
     border: 1px solid #EEEEEE;
 }
 
+/* Force Latin (Western Arabic) numerals on number inputs. If the user's
+   browser or system locale is set to Arabic, the default font fallback
+   stack will render <input type="number"> values like "0.00" as
+   "٠٫٠٠" (Arabic-Indic digits). Force LTR direction, isolate the
+   bidi run, prefer DM Sans / system Latin fonts, and explicitly request
+   lining numerals via OpenType features. */
+input[type="number"],
+[data-testid="stNumberInput"] input,
+[data-testid="stTextInput"] input {
+    direction: ltr !important;
+    unicode-bidi: isolate !important;
+    text-align: left !important;
+    font-family: 'DM Sans', 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
+    font-feature-settings: "lnum" 1, "tnum" 1 !important;
+    font-variant-numeric: lining-nums tabular-nums !important;
+}
+
 /* Default button (secondary actions) — white card, dark text, thin border. */
 .stButton > button {
     background: #FFFFFF !important;
@@ -759,6 +776,117 @@ def _run_and_store(mode: str, everyday_request: str = None,
         "todays_context": ctx,
     }
     return res
+
+
+def _measurement_diagram_svg() -> str:
+    """
+    Inline SVG schematic of the body-measurement points A–J. NOT a copy
+    of any published image — a clean abstract silhouette with labeled
+    horizontal lines at the relevant body positions. Mirrors the
+    measurement set in fit_tool.MEASUREMENT_FIELDS.
+    """
+    return """
+    <div style="display:flex; gap:1.5rem; align-items:flex-start; flex-wrap:wrap;
+                background:#FFFFFF; border:1px solid #EEEEEE; border-radius:6px;
+                padding:1rem; margin:0.4rem 0;">
+      <svg viewBox="0 0 220 480" width="220" height="480"
+           xmlns="http://www.w3.org/2000/svg" role="img"
+           aria-label="Body measurement diagram with labeled points">
+        <!-- Stylized silhouette outline (front view, abstract) -->
+        <path d="M110,18
+                 c -10,0 -18,8 -18,18
+                 c 0,10 5,16 12,20
+                 c -6,4 -10,10 -10,18
+                 v 14
+                 c -16,4 -28,10 -34,22
+                 v 36
+                 c 0,8 4,16 10,22
+                 c -2,6 -2,14 0,22
+                 c 2,8 4,20 4,30
+                 c 0,18 2,40 6,58
+                 c -2,8 -2,18 0,30
+                 c 2,10 0,22 -2,32
+                 c -2,14 0,30 4,46
+                 c 2,10 6,18 8,22
+                 c -2,6 -4,12 -4,18
+                 c 0,2 1,4 4,4
+                 h 6
+                 c 3,0 4,-2 4,-4
+                 c 0,-4 -2,-10 -2,-14
+                 v -6
+                 c 4,-12 6,-26 6,-40
+                 c 0,-8 0,-16 -2,-22
+                 c 4,-12 4,-22 2,-30
+                 c 2,-18 4,-40 4,-58
+                 c 0,-10 2,-22 4,-30
+                 c 2,-8 2,-16 0,-22
+                 c 6,-6 10,-14 10,-22
+                 v -36
+                 c -6,-12 -18,-18 -34,-22
+                 v -14
+                 c 0,-8 -4,-14 -10,-18
+                 c 7,-4 12,-10 12,-20
+                 c 0,-10 -8,-18 -18,-18 z"
+              fill="#F5F5F5" stroke="#111111" stroke-width="1.5"/>
+
+        <!-- Horizontal measurement lines + labels -->
+        <!-- Bust -->
+        <line x1="58" y1="115" x2="162" y2="115" stroke="#111111" stroke-width="1.5"/>
+        <circle cx="58"  cy="115" r="2.5" fill="#111111"/>
+        <circle cx="162" cy="115" r="2.5" fill="#111111"/>
+        <text x="170" y="119" font-family="DM Sans,sans-serif" font-size="13" font-weight="600" fill="#111111">Bust</text>
+
+        <!-- Waist -->
+        <line x1="68" y1="170" x2="152" y2="170" stroke="#111111" stroke-width="1.5"/>
+        <circle cx="68"  cy="170" r="2.5" fill="#111111"/>
+        <circle cx="152" cy="170" r="2.5" fill="#111111"/>
+        <text x="160" y="174" font-family="DM Sans,sans-serif" font-size="13" font-weight="600" fill="#111111">Waist</text>
+
+        <!-- High hips -->
+        <line x1="64" y1="200" x2="156" y2="200" stroke="#111111" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="160" y="204" font-family="DM Sans,sans-serif" font-size="11" fill="#6E6E73">High hips</text>
+
+        <!-- Hips -->
+        <line x1="58" y1="230" x2="162" y2="230" stroke="#111111" stroke-width="1.5"/>
+        <circle cx="58"  cy="230" r="2.5" fill="#111111"/>
+        <circle cx="162" cy="230" r="2.5" fill="#111111"/>
+        <text x="170" y="234" font-family="DM Sans,sans-serif" font-size="13" font-weight="600" fill="#111111">Hips</text>
+
+        <!-- Inseam (left leg downward arrow) -->
+        <line x1="100" y1="240" x2="100" y2="440" stroke="#111111" stroke-width="1" stroke-dasharray="3,3"/>
+        <polygon points="100,440 96,432 104,432" fill="#111111"/>
+        <text x="40" y="340" font-family="DM Sans,sans-serif" font-size="11" fill="#6E6E73">Inseam</text>
+
+        <!-- Sleeve (vertical line outside the body, schematic) -->
+        <line x1="38" y1="115" x2="38" y2="240" stroke="#111111" stroke-width="1" stroke-dasharray="3,3"/>
+        <text x="6" y="180" font-family="DM Sans,sans-serif" font-size="11" fill="#6E6E73">Sleeve</text>
+
+        <!-- Full trouser length (right side, full vertical) -->
+        <line x1="200" y1="170" x2="200" y2="440" stroke="#111111" stroke-width="1" stroke-dasharray="3,3"/>
+        <polygon points="200,440 196,432 204,432" fill="#111111"/>
+        <text x="180" y="430" font-family="DM Sans,sans-serif" font-size="11" fill="#6E6E73" text-anchor="end">Full trouser</text>
+      </svg>
+
+      <div style="flex:1; min-width:180px; font-family:DM Sans,sans-serif; font-size:0.84rem; color:#2E2E2E; line-height:1.6;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
+          What each field measures
+        </div>
+        <div><strong>Height</strong> &mdash; floor to top of head, in bare feet.</div>
+        <div><strong>Bust</strong> &mdash; around the fullest part of the chest.</div>
+        <div><strong>Natural waist</strong> &mdash; narrowest part of the torso.</div>
+        <div><strong>Hips</strong> &mdash; fullest part of the hips and seat.</div>
+        <div><strong>High hips</strong> &mdash; about 8 cm / 3 in below the waist.</div>
+        <div><strong>Back waist length</strong> &mdash; nape down the spine to the waist.</div>
+        <div><strong>Front waist length</strong> &mdash; hollow above the collarbone to the waist.</div>
+        <div><strong>Inseam</strong> &mdash; inner thigh to ankle.</div>
+        <div><strong>Sleeve length</strong> &mdash; shoulder bone to wristbone with a slight elbow bend.</div>
+        <div><strong>3/4 trouser length</strong> &mdash; waist to mid-calf.</div>
+        <div><strong>Full trouser length</strong> &mdash; waist to ankle.</div>
+        <div><strong>Shoulder width</strong> &mdash; shoulder bone to shoulder bone, across the back.</div>
+        <div><strong>Neck</strong> &mdash; base of the neck where a collar would sit.</div>
+      </div>
+    </div>
+    """
 
 
 def _profile_display():
@@ -2927,20 +3055,29 @@ def _render_profile():
                 )
 
             # ── Section 4: Measurements ──────────────────────────
+            # Single "?" entry point at the heading level. Per-field
+            # tooltips were dropped — the diagram inside the expander
+            # serves the same purpose with less visual clutter.
             st.markdown(
+                "<div style='display:flex; align-items:baseline; gap:0.6rem; "
+                "margin:1.4rem 0 0.4rem;'>"
                 "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
-                "text-transform:uppercase; font-weight:600; margin:1.4rem 0 0.4rem;'>"
-                "Body measurements</div>", unsafe_allow_html=True,
+                "text-transform:uppercase; font-weight:600;'>"
+                "Body measurements</div>"
+                "</div>",
+                unsafe_allow_html=True,
             )
-            st.markdown(
-                "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
-                "Stored locally. Each field has a small <strong>?</strong> tip explaining how to "
-                "measure — bust, waist, and hips paraphrased from "
-                "<a href='https://thesewingrevival.com/pages/choosing-your-size' target='_blank' "
-                "style='color:#111111;'>The Sewing Revival</a>. Helps Wearly suggest pieces that fit "
-                "your <em>actual</em> proportions."
-                "</div>", unsafe_allow_html=True,
-            )
+            with st.expander("?  How to measure (diagram)", expanded=False):
+                st.markdown(_measurement_diagram_svg(), unsafe_allow_html=True)
+                st.markdown(
+                    "<div style='font-size:0.74rem; color:#8E8E93; line-height:1.55; margin-top:0.6rem;'>"
+                    "Bust, waist, and hips instructions paraphrased from "
+                    "<a href='https://thesewingrevival.com/pages/choosing-your-size' target='_blank' "
+                    "style='color:#111111;'>The Sewing Revival</a>. "
+                    "Other tips are standard tailoring instructions."
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
 
             # Import the field definitions from fit_tool so the form and the
             # data model never drift.
@@ -2964,8 +3101,6 @@ def _render_profile():
                 for _i, (_key, _label, _tip) in enumerate(_row):
                     with _cols[_i]:
                         _current_in = measurements.get(_key)
-                        # The number_input displays whichever unit the user
-                        # picked; we convert from stored inches.
                         _initial = 0.0
                         if isinstance(_current_in, (int, float)) and _current_in:
                             _initial = float(_current_in) * (_IN2CM if _use_cm else 1.0)
@@ -2975,10 +3110,10 @@ def _render_profile():
                             max_value=_max_input,
                             step=_step,
                             value=round(_initial, 1),
-                            help=_tip,
+                            # No per-field help= — the single diagram
+                            # expander above is the canonical reference.
                             key=f"measure_{_key}",
                         )
-                        # Convert back to inches for storage.
                         new_measurements[_key] = (
                             _shown / _IN2CM if _use_cm else _shown
                         )
