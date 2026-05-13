@@ -1747,9 +1747,13 @@ def _render_home():
     else:
         w_city, w_temp, w_cond, w_advice = "—", "—", "—", ""
 
+    # Non-empty placeholder when there are no notes — keeps the line
+    # in the f-string below from collapsing to pure whitespace, which
+    # markdown would otherwise parse as a paragraph break and then
+    # render the subsequent indented HTML as a code block.
     notes_html = (
         f'<div style="font-size:0.8rem; color:#6E6E73; margin-top:0.3rem; font-style:italic; line-height:1.5;">{ev_notes}</div>'
-        if ev_notes else ""
+        if ev_notes else "<span></span>"
     )
 
     st.markdown(f"""
@@ -2562,11 +2566,35 @@ def _render_planner():
     recommended outfit with images, any wardrobe gaps + a one-click
     "Save to wishlist" for the missing piece type.
     """
+    # Defensive imports. Streamlit reruns the script on every rerender
+    # but it does NOT clear sys.modules — so when calendar_tool /
+    # styling_agent have changed on disk since this Streamlit process
+    # started, `from <mod> import <new_name>` raises ImportError because
+    # Python returns the stale cached module. We catch that, force a
+    # reload, and try again. Restarting Streamlit is the proper fix
+    # but this keeps the Planner usable without restarting.
     try:
         from styling_agent import plan_upcoming_events
         from calendar_import import get_subscription
         from calendar_tool import has_real_calendar_events
         from shopping_tool import add_wishlist_item, gap_is_on_wishlist
+    except ImportError:
+        try:
+            import importlib
+            import calendar_tool as _ct, styling_agent as _sa
+            importlib.reload(_ct)
+            importlib.reload(_sa)
+            from styling_agent import plan_upcoming_events
+            from calendar_import import get_subscription
+            from calendar_tool import has_real_calendar_events
+            from shopping_tool import add_wishlist_item, gap_is_on_wishlist
+        except Exception as _e:
+            st.error(
+                f"Planner unavailable: {_e}. "
+                "If you just pulled new code, restart Streamlit "
+                "(Ctrl+C in the terminal, then `streamlit run app.py`)."
+            )
+            return
     except Exception as _e:
         st.error(f"Planner unavailable: {_e}")
         return
