@@ -2356,10 +2356,9 @@ def _render_today():
                 _run_and_store("calendar")
             st.rerun()
 
-        # Calendar connection: .ics file upload. The honest, privacy-
-        # respecting path — no OAuth, no third-party tokens, no account.
-        # The user exports their calendar themselves; we parse it.
-        _render_calendar_import()
+        # Note: the calendar-connection surface used to live here but
+        # moved to the Profile screen — it's a one-time setup, not a
+        # daily-use control.
 
 
 # ─────────────────────────────────────────────
@@ -3553,6 +3552,12 @@ def _render_profile():
     # returning users see their saved values pre-filled. Every field is
     # optional. Wearly never frames a body as a problem.
     measurements = profile.get("measurements", {}) or {}
+
+    # Calendar connection — once-and-done setup. The user pastes a
+    # private .ics URL from Google / iCloud OR uploads an export. The
+    # agent auto-refreshes from the URL on every plan, so this lives
+    # in the Profile screen as a setup step rather than on Today.
+    _render_calendar_import()
 
     # The weekly-routine editor — the agent's fallback when the
     # calendar is empty for the current moment.
