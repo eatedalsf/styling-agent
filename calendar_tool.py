@@ -24,20 +24,56 @@ def _find_data_file(filename):
 
 
 DATA_PATH = _find_data_file("calendar_events.json")
+SEED_DATA_PATH = _find_data_file("seed_calendar_events.json")
+
+
+def _load_calendar_events() -> list:
+    """
+    Read events from the user's own calendar file. Falls back to the
+    seed demo events ONLY when the user file is missing or empty —
+    so a fresh Streamlit Cloud container shows a populated demo
+    calendar to public reviewers, but a real user with an imported
+    calendar always sees ONLY their own events.
+
+    Returns [] on unrecoverable errors. Never raises.
+    """
+    # Path 1: the user's own events (created by the .ics importer and
+    # the URL-subscription refresh).
+    if os.path.exists(DATA_PATH):
+        try:
+            with open(DATA_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and data:
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    # Path 2: seed demo events for the first-time / public-reviewer case.
+    if os.path.exists(SEED_DATA_PATH):
+        try:
+            with open(SEED_DATA_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return []
 
 
 def get_upcoming_events(days_ahead: int = 7) -> dict:
     """
     Reads upcoming calendar events within the next N days.
     Returns a dict with 'success', 'events', and 'error' keys.
+
+    Reads from the user's calendar_events.json (created when they
+    import an .ics or subscribe to a calendar URL). Falls back to the
+    bundled seed_calendar_events.json so the public demo deploy is
+    never empty.
     """
-    try:
-        with open(DATA_PATH, "r") as f:
-            all_events = json.load(f)
-    except FileNotFoundError:
+    all_events = _load_calendar_events()
+    if not all_events:
         return {"success": False, "events": [], "error": "Calendar data file not found."}
-    except json.JSONDecodeError:
-        return {"success": False, "events": [], "error": "Calendar data is malformed."}
 
     today = datetime.today().date()
     upcoming = []

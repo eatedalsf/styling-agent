@@ -1,8 +1,0 @@
-{
-  "_comment": "User fit / style profile overlay. Merged with the owner block in wardrobe.json by fit_tool.get_fit_profile(). Every field is optional — the agent works with whatever the user shares. Body-positive language only: highlight, balance, support, improve, increase. Never hide, fix, minimize, correct.",
-  "modesty_preference": null,
-  "comfort_needs": [],
-  "style_goals": [],
-  "highlight_features": [],
-  "balance_areas": []
-}

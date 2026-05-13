@@ -34,6 +34,27 @@ htmlcov/
 # kept out of version control so the repo doesn't bloat with user uploads.
 wardrobe_images/
 
+# ──────────────────────────────────────────────────────────────────────
+# Per-user state files (written by the running app, never committed)
+# ──────────────────────────────────────────────────────────────────────
+# Tracking these would mean every push rebuilds the Streamlit Cloud
+# container from git and OVERWRITES the user's imported calendar
+# events / added wardrobe items / fit profile / wishlist / routine.
+# It would also leak real personal data (calendar event titles,
+# addresses, body measurements) into a public repo.
+#
+# Default seed/demo data lives in seed_*.json files; the running app
+# falls back to those when no user overlay exists.
+calendar_events.json
+calendar_subscription.json
+user_profile.json
+user_wardrobe.json
+wear_history.json
+routine.json
+wishlist.json
+favorite_stores.json
+stores.json
+
 # MkDocs build artifacts — the staging directory populated by
 # scripts/stage_docs.py and the built static site MkDocs emits.
 _docs_build/

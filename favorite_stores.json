@@ -1,4 +1,0 @@
-{
-  "_comment": "Favorite stores. Updated via the Shop section in the Streamlit app. The agent reads this list to make shopping suggestions store-aware when a wardrobe gap is detected.",
-  "stores": []
-}
