@@ -2497,18 +2497,9 @@ def _render_wardrobe():
             unsafe_allow_html=True,
         )
 
-    # ── Coming-soon roadmap chips (preserved from prior pass) ───
-    st.markdown("""
-    <div style="margin-top:2rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
-        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Coming soon</div>
-        <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
-            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Photo upload</span>
-            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Product link import</span>
-            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Wear history</span>
-            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Item editing</span>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # The previous "Coming soon" chips listed features that are now all
+    # shipped (photo upload, product link import, wear history, item
+    # editing). Removed — keeping them would be misleading.
 
 
 
