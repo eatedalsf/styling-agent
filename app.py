@@ -1775,6 +1775,211 @@ def _render_home():
 # TODAY — outfit result (or empty state)
 # ─────────────────────────────────────────────
 
+def _render_calendar_import() -> None:
+    """
+    Privacy-respecting calendar connection: the user exports an .ics
+    file from their existing calendar app (Google: Settings → Export;
+    Apple: File → Export ICS; Outlook: Export calendar) and uploads it
+    here. We parse it locally and merge the events into the same
+    calendar_events.json the agent already reads.
+
+    No OAuth, no account, no third-party tokens stored. The user can
+    re-upload anytime to refresh.
+    """
+    try:
+        from calendar_import import import_ics_events
+    except Exception as _e:
+        st.caption(f"Calendar import unavailable: {_e}")
+        return
+
+    with st.expander("Connect your real calendar (upload .ics)", expanded=False):
+        st.markdown(
+            "<div style='font-size:0.84rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.6rem;'>"
+            "Export your calendar to an <strong>.ics</strong> file and drop it here. "
+            "Wearly parses the events locally — <strong>no Google/Apple sign-in, "
+            "no third-party server</strong>. Your calendar credentials never leave "
+            "your device."
+            "</div>"
+            "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
+            "<strong>How to export:</strong> "
+            "<em>Google Calendar</em> → Settings → \"Import & export\" → Export. "
+            "<em>Apple Calendar</em> → File → Export → Export… "
+            "<em>Outlook</em> → File → Save Calendar."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        up = st.file_uploader(
+            "Drop your .ics file",
+            type=["ics"],
+            accept_multiple_files=False,
+            key="cal_ics_upload",
+            label_visibility="collapsed",
+        )
+        replace_mode = st.checkbox(
+            "Replace existing events (otherwise merge)",
+            value=False,
+            key="cal_ics_replace",
+            help="Off: events with the same id refresh in place; new events append. "
+                 "On: clear the calendar and keep only what's in this file.",
+        )
+        if up is not None:
+            if st.button("Import events", key="cal_ics_import_btn",
+                         type="primary", use_container_width=True):
+                try:
+                    text = up.getvalue().decode("utf-8", errors="replace")
+                except Exception as _e:
+                    st.error(f"Could not read the file: {_e}")
+                else:
+                    res = import_ics_events(text, replace=replace_mode)
+                    if res.get("success"):
+                        st.success(
+                            f"Imported {len(res['added'])} new event"
+                            f"{'' if len(res['added']) == 1 else 's'}"
+                            f" · refreshed {len(res['updated'])}"
+                            f" · total now {res['total']}."
+                            + (f" ({res['skipped']} block"
+                               f"{'' if res['skipped'] == 1 else 's'} couldn't be parsed.)"
+                               if res.get("skipped") else "")
+                        )
+                    else:
+                        st.error(res.get("error", "Import failed."))
+
+
+def _render_routine_editor() -> None:
+    """
+    Weekly-routine editor. The user defines their typical week — what
+    they usually do and when. The agent falls back to this when the
+    calendar has no specific event for the current moment.
+
+    Body-positive framing: describes the rhythm of your week, never
+    prescribes it. Every block is optional. The Sunday-empty case is
+    valid; the agent just defaults to casual when nothing matches.
+    """
+    try:
+        from routine_tool import get_routine, save_routine, DAYS, VALID_OCCASIONS
+    except Exception as _e:
+        st.caption(f"Routine editor unavailable: {_e}")
+        return
+
+    cur = get_routine().get("schedule", {}) or {}
+    # Bring the routine into session-state for live editing without
+    # round-tripping disk on every interaction.
+    if "routine_draft" not in st.session_state:
+        st.session_state["routine_draft"] = {d: list(cur.get(d, [])) for d in DAYS}
+
+    draft = st.session_state["routine_draft"]
+    occ_options = ["work", "gym", "dinner", "formal", "casual"]
+
+    with st.expander("Your weekly routine — fallback when the calendar is empty",
+                     expanded=False):
+        st.markdown(
+            "<div style='font-size:0.82rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.8rem;'>"
+            "Describe the rhythm of your typical week. Wearly uses this only "
+            "<strong>when your calendar has no event</strong> for the current moment "
+            "— never as an override. Every block is optional."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+        # One section per weekday, each with its current blocks + an add row.
+        for day in DAYS:
+            st.markdown(
+                f"<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                f"text-transform:uppercase; font-weight:600; margin:1rem 0 0.4rem;'>"
+                f"{day.title()}</div>",
+                unsafe_allow_html=True,
+            )
+            blocks = draft.get(day, [])
+            # Existing blocks — each is removable.
+            for i, blk in enumerate(blocks):
+                row = st.columns([2, 2, 2, 4, 1], gap="small")
+                with row[0]:
+                    st.markdown(
+                        f"<div style='font-size:0.84rem; color:#2E2E2E; "
+                        f"padding-top:0.4rem;'>{blk['start']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with row[1]:
+                    st.markdown(
+                        f"<div style='font-size:0.84rem; color:#2E2E2E; "
+                        f"padding-top:0.4rem;'>{blk['end']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with row[2]:
+                    st.markdown(
+                        f"<div style='font-size:0.84rem; color:#111111; "
+                        f"padding-top:0.4rem; font-weight:500;'>{blk['occasion']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with row[3]:
+                    st.markdown(
+                        f"<div style='font-size:0.82rem; color:#6E6E73; "
+                        f"padding-top:0.4rem;'>{blk.get('label','') or '—'}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with row[4]:
+                    if st.button("✕", key=f"rt_rm_{day}_{i}",
+                                 help="Remove this block"):
+                        draft[day].pop(i)
+                        st.rerun()
+
+            # Add-a-block row.
+            add = st.columns([2, 2, 2, 4, 1], gap="small")
+            with add[0]:
+                new_start = st.text_input(
+                    f"start_{day}", value="", placeholder="07:00",
+                    label_visibility="collapsed",
+                    key=f"rt_add_start_{day}",
+                )
+            with add[1]:
+                new_end = st.text_input(
+                    f"end_{day}", value="", placeholder="08:00",
+                    label_visibility="collapsed",
+                    key=f"rt_add_end_{day}",
+                )
+            with add[2]:
+                new_occ = st.selectbox(
+                    f"occ_{day}", options=occ_options,
+                    label_visibility="collapsed",
+                    key=f"rt_add_occ_{day}",
+                )
+            with add[3]:
+                new_label = st.text_input(
+                    f"label_{day}", value="", placeholder="e.g. Morning workout",
+                    label_visibility="collapsed",
+                    key=f"rt_add_label_{day}",
+                )
+            with add[4]:
+                if st.button("+", key=f"rt_add_btn_{day}",
+                             help="Add this block to the day"):
+                    if new_start and new_end:
+                        draft[day].append({
+                            "start":    new_start.strip(),
+                            "end":      new_end.strip(),
+                            "occasion": new_occ,
+                            "label":    new_label.strip(),
+                        })
+                        # Clear the add-row inputs by removing their state.
+                        for k in (f"rt_add_start_{day}", f"rt_add_end_{day}",
+                                  f"rt_add_label_{day}"):
+                            st.session_state.pop(k, None)
+                        st.rerun()
+
+        st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+        if st.button("Save routine", key="rt_save_btn",
+                     type="primary", use_container_width=True):
+            res = save_routine(draft)
+            if res.get("success"):
+                st.success("Routine saved. Wearly will use it whenever the "
+                           "calendar is empty for the current moment.")
+                # Refresh the cached draft from disk so the editor reflects
+                # any normalization the save layer did.
+                st.session_state.pop("routine_draft", None)
+                st.rerun()
+            else:
+                st.error(res.get("error", "Could not save."))
+
+
 def _render_today():
     res = st.session_state.get("result")
     if res:
@@ -1830,6 +2035,11 @@ def _render_today():
             with st.spinner("Reading your calendar · checking the weather · filtering your closet · scoring color harmony…"):
                 _run_and_store("calendar")
             st.rerun()
+
+        # Calendar connection: .ics file upload. The honest, privacy-
+        # respecting path — no OAuth, no third-party tokens, no account.
+        # The user exports their calendar themselves; we parse it.
+        _render_calendar_import()
 
 
 # ─────────────────────────────────────────────
@@ -3023,6 +3233,10 @@ def _render_profile():
     # returning users see their saved values pre-filled. Every field is
     # optional. Wearly never frames a body as a problem.
     measurements = profile.get("measurements", {}) or {}
+
+    # The weekly-routine editor — the agent's fallback when the
+    # calendar is empty for the current moment.
+    _render_routine_editor()
 
     with st.expander("Edit your profile, preferences & measurements", expanded=False):
         st.markdown("""

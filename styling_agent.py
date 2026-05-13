@@ -160,10 +160,46 @@ def run_agent(
     if mode == "calendar":
         calendar_result = get_upcoming_events(days_ahead=7)
         if not calendar_result["success"] or not calendar_result["events"]:
-            step1["status"] = "fallback"
-            step1["output"] = "No upcoming calendar events found. Defaulting to everyday casual."
-            occasion = {"type": "casual", "title": "Everyday Casual", "formality": "casual",
-                        "date": "Today", "time": "", "notes": ""}
+            # ── Routine fallback ──────────────────────────────────
+            # When the calendar has no upcoming event, consult the
+            # user's weekly routine for the current weekday + time.
+            # The routine is the user's documented rhythm — not a
+            # guess. If no block matches the current moment either,
+            # default to everyday casual.
+            try:
+                from routine_tool import get_block_for_now
+                _routine_blk = get_block_for_now()
+            except Exception:
+                _routine_blk = None
+
+            if _routine_blk:
+                step1["status"] = "fallback"
+                step1["output"] = (
+                    f"No calendar event for today. Routine match: "
+                    f"{_routine_blk['weekday'].title()} "
+                    f"{_routine_blk['start']}–{_routine_blk['end']} → "
+                    f"{_routine_blk['occasion']} "
+                    f"({_routine_blk['label'] or 'no label'})."
+                )
+                occasion = {
+                    "type":      _routine_blk["occasion"],
+                    "title":     _routine_blk["label"] or _routine_blk["occasion"].title(),
+                    "formality": _routine_blk["occasion"],
+                    "date":      "Today",
+                    "time":      _routine_blk["start"],
+                    "notes":     "From your weekly routine — Wearly falls back to "
+                                 "this when the calendar is empty.",
+                    "source":    "routine",
+                }
+            else:
+                step1["status"] = "fallback"
+                step1["output"] = (
+                    "No upcoming calendar events and no matching routine block. "
+                    "Defaulting to everyday casual."
+                )
+                occasion = {"type": "casual", "title": "Everyday Casual",
+                            "formality": "casual", "date": "Today",
+                            "time": "", "notes": ""}
         else:
             raw_event = calendar_result["events"][0]
             occasion = raw_event
