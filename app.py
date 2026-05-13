@@ -35,6 +35,80 @@ except ModuleNotFoundError:
 from datetime import datetime
 
 # ─────────────────────────────────────────────
+# AUTO-RELOAD STALE PROJECT MODULES
+# ─────────────────────────────────────────────
+#
+# Streamlit reruns the script on every interaction but it does NOT
+# clear sys.modules — so any project module imported by an earlier
+# rerun stays cached for the life of the Streamlit process. When the
+# user pulls new code and Streamlit's file-watcher reruns the
+# script, the imports return the OLD module objects: stale defaults,
+# stale function bodies, even stale class definitions.
+#
+# We watch the mtime of every locally-authored module and force
+# importlib.reload() on the ones that changed since this Streamlit
+# process started. The price is ~one stat() call per module per
+# render (microseconds). The win: contributors who pull new code
+# while their Streamlit is running just refresh the browser, no
+# Ctrl+C / restart required.
+#
+# Built-in / third-party modules (streamlit, datetime, etc.) are
+# skipped because reloading those is fragile and they don't change
+# during a session anyway.
+
+_VOLATILE_MODULES = (
+    "calendar_tool",
+    "calendar_import",
+    "styling_agent",
+    "wardrobe_tool",
+    "weather_tool",
+    "color_tool",
+    "fit_tool",
+    "history_tool",
+    "shopping_tool",
+    "routine_tool",
+    "graph_tool",
+    "rule_refs",
+    "wardrobe_query",
+    "compact_kg",
+    "link_import",
+    "backup_tool",
+)
+
+# Map of module name -> mtime last seen on disk. First render fills
+# this; subsequent renders compare and reload on change.
+_MTIME_CACHE: dict = {}
+
+
+def _reload_volatile_modules() -> None:
+    """Reload any locally-authored module whose .py mtime changed."""
+    import importlib
+    for name in _VOLATILE_MODULES:
+        mod = sys.modules.get(name)
+        if mod is None or not getattr(mod, "__file__", None):
+            continue
+        try:
+            current_mtime = os.path.getmtime(mod.__file__)
+        except OSError:
+            continue
+        last = _MTIME_CACHE.get(name)
+        if last is None:
+            _MTIME_CACHE[name] = current_mtime
+            continue
+        if current_mtime > last:
+            try:
+                importlib.reload(mod)
+                _MTIME_CACHE[name] = current_mtime
+            except Exception:
+                # Reload failed (e.g. circular import mid-edit) — keep
+                # the stale module rather than crashing the app.
+                pass
+
+
+_reload_volatile_modules()
+
+
+# ─────────────────────────────────────────────
 # PAGE CONFIG
 # ─────────────────────────────────────────────
 st.set_page_config(
