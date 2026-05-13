@@ -2654,15 +2654,27 @@ def _render_planner():
         f"All upcoming ({len(all_plans)})",
     ])
     with _tab_week:
-        _render_planner_card_list(week_plans, scope_label="this week")
+        _render_planner_card_list(week_plans, scope_label="this week",
+                                  scope_key="week")
     with _tab_month:
-        _render_planner_card_list(month_plans, scope_label="this month")
+        _render_planner_card_list(month_plans, scope_label="this month",
+                                  scope_key="month")
     with _tab_all:
-        _render_planner_card_list(all_plans, scope_label="upcoming")
+        _render_planner_card_list(all_plans, scope_label="upcoming",
+                                  scope_key="all")
 
 
-def _render_planner_card_list(plans: list, scope_label: str) -> None:
-    """Render a list of event-plan cards, with an empty-state nudge."""
+def _render_planner_card_list(plans: list, scope_label: str,
+                              scope_key: str) -> None:
+    """Render a list of event-plan cards, with an empty-state nudge.
+
+    `scope_key` is a short string ('week' / 'month' / 'all') used to
+    namespace the button keys for this tab. Streamlit renders all tab
+    contents simultaneously, so the same event appearing in multiple
+    tabs would otherwise collide on its st.button key. Each tab passes
+    its own scope_key; that way an event id 'EVT001' becomes three
+    independent button keys: planner_detail_week_EVT001 etc.
+    """
     try:
         from shopping_tool import add_wishlist_item, gap_is_on_wishlist
     except Exception:
@@ -2679,10 +2691,12 @@ def _render_planner_card_list(plans: list, scope_label: str) -> None:
         return
 
     for p in plans:
-        _render_planner_event_card(p, add_wishlist_item, gap_is_on_wishlist)
+        _render_planner_event_card(p, add_wishlist_item, gap_is_on_wishlist,
+                                   scope_key=scope_key)
 
 
-def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist) -> None:
+def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
+                               scope_key: str = "default") -> None:
     """One rich card per event: header, weather, outfit-with-images,
     gaps, save-to-wishlist actions, plan-in-detail button."""
     ev = p.get("event") or {}
@@ -2782,7 +2796,7 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist) -
         # One Save-to-wishlist button per gap, if the wishlist tool is available.
         if add_wishlist_item and gap_is_on_wishlist:
             for gi, gap in enumerate(gaps):
-                key_suffix = f"{ev.get('id','x')}_{gi}_{gap}"
+                key_suffix = f"{scope_key}_{ev.get('id','x')}_{gi}_{gap}"
                 if gap_is_on_wishlist(gap):
                     st.caption(f"✓ '{gap}' is already on your wishlist.")
                 else:
@@ -2811,7 +2825,7 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist) -
     with cols[1]:
         if st.button(
             "Plan in detail →",
-            key=f"planner_detail_{ev.get('id','x')}",
+            key=f"planner_detail_{scope_key}_{ev.get('id','x')}",
             use_container_width=True,
         ):
             st.session_state["result"] = p
