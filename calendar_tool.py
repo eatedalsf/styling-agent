@@ -27,13 +27,20 @@ DATA_PATH = _find_data_file("calendar_events.json")
 SEED_DATA_PATH = _find_data_file("seed_calendar_events.json")
 
 
-def _load_calendar_events() -> list:
+def _load_calendar_events(seed_fallback: bool = True) -> list:
     """
-    Read events from the user's own calendar file. Falls back to the
-    seed demo events ONLY when the user file is missing or empty —
-    so a fresh Streamlit Cloud container shows a populated demo
-    calendar to public reviewers, but a real user with an imported
-    calendar always sees ONLY their own events.
+    Read events from the user's own calendar file.
+
+    When `seed_fallback=True` (default), falls back to the bundled
+    seed demo events if the user file is missing or empty — so a
+    fresh Streamlit Cloud container shows a populated demo calendar
+    to public reviewers, and the Today / everyday flows never crash
+    for a first-time visitor.
+
+    When `seed_fallback=False`, the seed is never consulted: the
+    function returns only what the user has actually imported via
+    .ics or URL subscription. The Planner uses this mode so it never
+    shows fabricated events.
 
     Returns [] on unrecoverable errors. Never raises.
     """
@@ -48,8 +55,8 @@ def _load_calendar_events() -> list:
         except (json.JSONDecodeError, OSError):
             pass
 
-    # Path 2: seed demo events for the first-time / public-reviewer case.
-    if os.path.exists(SEED_DATA_PATH):
+    # Path 2: seed demo events (Today / everyday fallback only).
+    if seed_fallback and os.path.exists(SEED_DATA_PATH):
         try:
             with open(SEED_DATA_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -61,19 +68,40 @@ def _load_calendar_events() -> list:
     return []
 
 
-def get_upcoming_events(days_ahead: int = 7) -> dict:
+def has_real_calendar_events() -> bool:
+    """
+    True iff the user has an actual, non-empty calendar_events.json on
+    disk (from .ics import or URL subscription). Distinguishes a real
+    calendar connection from "we have nothing but the demo seed."
+
+    The Planner uses this to decide between rendering its weekly /
+    monthly / all-upcoming tabs vs. showing the "Connect your
+    calendar" empty state.
+    """
+    return bool(_load_calendar_events(seed_fallback=False))
+
+
+def get_upcoming_events(days_ahead: int = 7, seed_fallback: bool = True) -> dict:
     """
     Reads upcoming calendar events within the next N days.
     Returns a dict with 'success', 'events', and 'error' keys.
 
-    Reads from the user's calendar_events.json (created when they
-    import an .ics or subscribe to a calendar URL). Falls back to the
-    bundled seed_calendar_events.json so the public demo deploy is
-    never empty.
+    By default falls back to the bundled `seed_calendar_events.json`
+    when no user-imported calendar exists, so the Today and everyday
+    flows always have something to reason about.
+
+    Pass `seed_fallback=False` to get a *real-calendar-only* view —
+    used by the Planner, which must never display fabricated events.
     """
-    all_events = _load_calendar_events()
+    all_events = _load_calendar_events(seed_fallback=seed_fallback)
     if not all_events:
-        return {"success": False, "events": [], "error": "Calendar data file not found."}
+        msg = (
+            "No real calendar events found. Connect a calendar via "
+            "Profile -> Connect your calendar to populate this view."
+            if not seed_fallback
+            else "Calendar data file not found."
+        )
+        return {"success": False, "events": [], "error": msg}
 
     today = datetime.today().date()
     upcoming = []

@@ -587,25 +587,33 @@ def run_agent(
 # AHEAD-OF-TIME PLANNING
 # ──────────────────────────────────────────────────────────────────────────────
 
-def plan_upcoming_events(limit: int = 5, days_ahead: int = 14) -> list:
+def plan_upcoming_events(limit: int = 5, days_ahead: int = 14,
+                         seed_fallback: bool = False) -> list:
     """
     Pre-plan an outfit for each of the user's next `limit` calendar
     events within `days_ahead` days. Returns a list of `result` dicts —
     one per event, in chronological order. Each result has the same
     shape as a single run_agent() call.
 
-    Calling this is a convenience wrapper for the "Coming up this week"
-    panel in the UI. The full agent runs once per event, so weather +
-    color scoring + rule citations are all populated per outfit. The
-    list is short by design (default 5) — Wearly is a planner, not a
-    forecaster, and brands of weather data degrade past ~7 days anyway.
+    Calling this is a convenience wrapper for the Planner screen and
+    the "Coming up this week" panel. The full agent runs once per
+    event, so weather + color scoring + rule citations are all
+    populated per outfit. The list is short by design (default 5) —
+    Wearly is a planner, not a forecaster, and weather data degrades
+    past ~7 days anyway.
 
-    Returns an empty list when the calendar has no upcoming events.
+    Defaults to `seed_fallback=False`: the Planner is a real-calendar-
+    only surface. When the user has no .ics/URL import yet, this
+    returns [] and the UI shows a "Connect your calendar" empty state
+    instead of fabricated events. The Today / everyday flows still
+    use the seed via run_agent's own calendar tool call.
+
     Errors during individual event runs are caught — that one event
     gets an `error`-stamped result, and the rest still plan.
     """
     try:
-        cal_result = get_upcoming_events(days_ahead=days_ahead)
+        cal_result = get_upcoming_events(days_ahead=days_ahead,
+                                          seed_fallback=seed_fallback)
     except Exception:
         return []
     if not cal_result.get("success") or not cal_result.get("events"):

@@ -2565,6 +2565,7 @@ def _render_planner():
     try:
         from styling_agent import plan_upcoming_events
         from calendar_import import get_subscription
+        from calendar_tool import has_real_calendar_events
         from shopping_tool import add_wishlist_item, gap_is_on_wishlist
     except Exception as _e:
         st.error(f"Planner unavailable: {_e}")
@@ -2578,32 +2579,46 @@ def _render_planner():
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Planner</div>
         <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">
-            Outfits, gaps, and wishlist suggestions for every event on your calendar — week and month ahead.
+            Outfits, gaps, and wishlist suggestions for every event on your real
+            calendar — week and month ahead. Connect a calendar to populate this view.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Empty-calendar guidance — link to the Profile screen where Connect lives.
+    # The Planner is a real-calendar-only surface. Determine whether
+    # the user has either (a) a subscription URL set, or (b) at least
+    # one event in their own calendar_events.json (from an .ics
+    # upload or a prior subscription sync). If neither, show a
+    # dedicated empty state and stop — no fabricated seed events.
     sub = get_subscription()
-    if not sub:
+    has_events = has_real_calendar_events()
+    if not sub and not has_events:
         st.markdown(
             "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
-            "border-radius:6px; padding:1.2rem 1.4rem;'>"
-            "<div style='font-family:\"DM Serif Display\",serif; font-size:1.15rem; color:#1C1917;'>"
-            "No calendar connected"
+            "border-radius:6px; padding:1.4rem 1.5rem; margin-top:0.4rem;'>"
+            "<div style='font-family:\"DM Serif Display\",serif; font-size:1.25rem; color:#1C1917;'>"
+            "Connect your calendar"
             "</div>"
-            "<div style='font-size:0.86rem; color:#6E6E73; margin-top:0.4rem; line-height:1.55;'>"
-            "Open the <a href='?section=profile' target='_self' style='color:#111111; "
-            "font-weight:500;'>Profile screen</a> to connect Google Calendar or "
-            "iCloud (one URL paste, no sign-in). After that, the Planner "
-            "shows every upcoming event with a recommended outfit."
+            "<div style='font-size:0.88rem; color:#6E6E73; margin-top:0.5rem; line-height:1.55;'>"
+            "The Planner only shows real events from <em>your</em> calendar — "
+            "it never fabricates demo events. To populate this view, open the "
+            "<a href='?section=profile' target='_self' style='color:#111111; "
+            "font-weight:500;'>Profile screen</a> and either:"
+            "<ul style='margin:0.6rem 0 0.4rem 1.2rem; padding:0; line-height:1.65;'>"
+            "<li>paste a Google Calendar or iCloud ICS URL (one click, no sign-in), or</li>"
+            "<li>upload an <code>.ics</code> file exported from your calendar app.</li>"
+            "</ul>"
+            "After that, every upcoming event will appear here with a recommended outfit, "
+            "weather, wardrobe gaps, and one-click wishlist suggestions for missing pieces."
             "</div></div>",
             unsafe_allow_html=True,
         )
+        return
 
-    # Plan up to 30 events across 60 days — plenty for week + month tabs.
-    # Cached per-session so flipping between tabs is instant; the
-    # refresh button below clears the cache.
+    # Plan up to 30 events across 60 days — plenty for week + month
+    # tabs. Cached per-session so flipping between tabs is instant;
+    # the refresh button below clears the cache. seed_fallback stays
+    # at its False default — the Planner is real-calendar-only.
     plans = st.session_state.get("planner_plans")
     if plans is None:
         with st.spinner("Reading your calendar and planning each event…"):
@@ -2623,8 +2638,10 @@ def _render_planner():
     if not plans:
         st.markdown(
             "<div style='margin-top:1rem; font-size:0.86rem; color:#6E6E73;'>"
-            "Nothing on your calendar in the next 60 days yet. Add an event "
-            "in Google Calendar or Apple Calendar and click <strong>↻ Refresh</strong>."
+            "Your calendar is connected, but there are no events in the next "
+            "60 days. Add an event in Google Calendar or Apple Calendar (or "
+            "upload a fresh <code>.ics</code> from Profile) and click "
+            "<strong>↻ Refresh</strong>."
             "</div>",
             unsafe_allow_html=True,
         )
