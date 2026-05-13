@@ -46,18 +46,33 @@ theme:
   font:
     text: "DM Sans"
     code: "DM Mono"
-  # Navigation: left sidebar (no top tabs), matching the canonical
-  # MkDocs Material default. Dropping `navigation.tabs` /
-  # `navigation.tabs.sticky` is what surfaces the sidebar; the rest
-  # of the flags below shape how it expands.
+  # Navigation: canonical Material left sidebar with collapsible /
+  # expandable nested groups, matching the SEIS 666 course book.
+  #
+  # WHAT NOT TO ENABLE — and why:
+  #   - navigation.tabs / navigation.tabs.sticky
+  #     Adds horizontal tabs in the header strip. Makes the site
+  #     read like a marketing nav, not a textbook.
+  #   - navigation.sections
+  #     Renders every top-level YAML section as a static label,
+  #     NOT a collapsible group. Children show flat underneath.
+  #   - navigation.expand
+  #     Forces every group expanded all the time. Combined with
+  #     `sections`, that's a 50+ line flat list.
+  #
+  # With NEITHER `sections` NOR `expand` enabled (and `tabs` off),
+  # each YAML section becomes a clickable / collapsible header in
+  # the left rail — the textbook-style nav the user asked for.
   features:
-    - navigation.sections        # group top-level entries as headers
-    - navigation.expand          # expand all sections in the sidebar
     - navigation.top             # "back to top" button
     - navigation.tracking        # update URL hash on section scroll
-    - navigation.indexes         # section page acts as index
-    - navigation.instant         # SPA-style page swaps (fast)
+    - navigation.indexes         # section's first page acts as its index
+    - navigation.footer          # prev / next links at the bottom
+    - navigation.instant         # SPA-style fast page swaps
     - toc.follow                 # right-side TOC scrolls with content
+    # NOT toc.integrate — that would move the TOC INTO the left
+    # sidebar; we want the TOC in its own right column for in-page
+    # navigation, separate from the cross-page sidebar.
     - search.highlight
     - search.suggest
     - search.share
