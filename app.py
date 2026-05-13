@@ -2594,19 +2594,25 @@ def _render_shop():
                     f'<div style="font-size:0.8rem; color:#6E6E73; margin-top:0.3rem; font-style:italic;">{it["notes"]}</div>'
                 ) if it.get("notes") else ""
 
+                # Single-line HTML — no per-line indentation, so Streamlit's
+                # markdown parser doesn't treat the indented inner tags as a
+                # code block when interpolated `</div>` / `<a>` content
+                # appears.
+                row_html = (
+                    '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+                    'border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">'
+                    '<div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">'
+                    f'<span style="font-family:\'DM Serif Display\',serif; font-size:1.05rem; color:#1C1917;">{it.get("name","—")}</span>'
+                    f'<span style="font-size:0.66rem; color:{pri_color}; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;">{priority}</span>'
+                    f'{linked}'
+                    '</div>'
+                    f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.3rem;">{meta}{source_link}</div>'
+                    f'{notes_block}'
+                    '</div>'
+                )
                 row_a, row_b = st.columns([5, 1], gap="small")
                 with row_a:
-                    st.markdown(f"""
-                    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
-                        <div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
-                            <span style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{it.get('name','—')}</span>
-                            <span style="font-size:0.66rem; color:{pri_color}; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;">{priority}</span>
-                            {linked}
-                        </div>
-                        <div style="font-size:0.78rem; color:#6E6E73; margin-top:0.3rem;">{meta}{source_link}</div>
-                        {notes_block}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(row_html, unsafe_allow_html=True)
                 with row_b:
                     if st.button("Remove", key=f"wl_rm_{it.get('id','')}", use_container_width=True):
                         rr = remove_wishlist_item(it.get("id", ""))
@@ -2694,15 +2700,20 @@ def _render_shop():
                 link_block = f' · <a href="{url}" target="_blank" style="color:#111111;">{url}</a>' if url else ""
                 notes_block = f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.2rem; font-style:italic;">{notes}</div>' if notes else ""
 
+                # Same flat-HTML pattern as the wishlist row above —
+                # no leading whitespace per line so the markdown parser
+                # doesn't misinterpret interpolated tags.
+                row_html = (
+                    '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+                    'border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">'
+                    f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.05rem; color:#1C1917;">{name}</div>'
+                    f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.2rem;">{url or "no link saved"}</div>'
+                    f'{notes_block}'
+                    '</div>'
+                )
                 row_a, row_b = st.columns([5, 1], gap="small")
                 with row_a:
-                    st.markdown(f"""
-                    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
-                        <div style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{name}</div>
-                        <div style="font-size:0.78rem; color:#6E6E73; margin-top:0.2rem;">{url or "no link saved"}{link_block if False else ""}</div>
-                        {notes_block}
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(row_html, unsafe_allow_html=True)
                 with row_b:
                     if st.button("Remove", key=f"st_rm_{name}", use_container_width=True):
                         rr = remove_favorite_store(name)
