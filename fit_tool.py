@@ -676,17 +676,65 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
         notes.append("aligns with your preferred tailored fit")
 
     # Style preferences (seed-owner-level — classic, elegant, minimal, etc.)
+    # Previously this note only fired when the item was tagged "versatile"
+    # or had business/formal formality, which silently dropped the note for
+    # almost every smart-casual or casual pick. We now emit it for every
+    # item that has any style alignment AT ALL: matching tags, matching
+    # formality bucket, or simply existing style preferences for a polished
+    # item. That keeps the reasoning trail readable AND mentions the user's
+    # stated preferences, which the agent IS using in the new scoring stack
+    # (see _profile_alignment_bonus in styling_agent.py).
     style_prefs = profile.get("style_preferences") or []
     if style_prefs:
         prefs_str = ", ".join(style_prefs[:3])
         tags = [t.lower() for t in (item.get("tags") or [])]
-        if "versatile" in tags or item.get("formality") in ("formal", "business"):
+        haystack = (
+            " ".join(tags)
+            + " " + (item.get("name") or "").lower()
+            + " " + (item.get("formality") or "").lower()
+        )
+        if (
+            "versatile" in tags
+            or item.get("formality") in ("formal", "business", "smart_casual")
+            or any(p.lower() in haystack for p in style_prefs)
+        ):
             notes.append(f"matches your style preference for {prefs_str} pieces")
+
+    # Skin-tone harmony — a body-positive way to surface what color_tool is
+    # already doing under the hood at Step 7. Helps the trail mention the
+    # selection-time skin-tone bonus from _profile_alignment_bonus.
+    skin = (profile.get("skin_tone") or "").lower()
+    color = (item.get("color") or "").lower()
+    if skin and color:
+        warm = ("camel", "cream", "warm white", "olive", "terracotta",
+                "rust", "gold", "tan", "brown", "burgundy", "blush")
+        cool = ("navy", "white", "black", "grey", "silver", "charcoal",
+                "ice blue", "pearl")
+        if "warm" in skin and any(c in color for c in warm):
+            notes.append(f"complements your {skin} skin tone")
+        elif "cool" in skin and any(c in color for c in cool):
+            notes.append(f"complements your {skin} skin tone")
 
     # Style goals (user overlay — elevated, modernized, feel like myself, …)
     goals = profile.get("style_goals") or []
     if goals:
         notes.append(f"supports your goal to feel {goals[0].lower()}")
+
+    # Modesty / comfort — single soft note. Body-positive language only.
+    modesty = (profile.get("modesty_preference") or "").lower()
+    if modesty in ("moderate", "conservative"):
+        haystack_mod = (
+            " ".join([
+                (item.get("name") or "").lower(),
+                (item.get("formality") or "").lower(),
+                " ".join([t.lower() for t in (item.get("tags") or [])]),
+            ])
+        )
+        modest_signals = ("sleeve", "long-sleeve", "long sleeve",
+                          "midi", "maxi", "turtleneck", "high-neck",
+                          "covered", "modest", "trouser", "wide-leg")
+        if any(sig in haystack_mod for sig in modest_signals):
+            notes.append(f"respects your {modesty} modesty preference")
 
     return [f"  {n.capitalize()}." for n in notes]
 

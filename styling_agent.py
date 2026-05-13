@@ -330,6 +330,16 @@ def run_agent(
     outfit = []
     reasoning = []
 
+    # Wishlist taste inference (Goal 5). Computed once per run so it's
+    # available both for the reasoning narrative (this section) AND for
+    # the candidate scoring (Goal 4, further down). Module call is
+    # cheap; on a clean wishlist it returns {}.
+    try:
+        from wardrobe_query import infer_wishlist_taste
+        _wishlist_taste = infer_wishlist_taste()
+    except Exception:
+        _wishlist_taste = {}
+
     # Surface every rejection reason in the reasoning trail so the user
     # can see WHY this regenerated outfit is different from the previous one.
     # Surface today's free-text context first so the rest of the trail reads
@@ -349,6 +359,16 @@ def run_agent(
         rs = rej.get("reason", "rejected")
         reasoning.append(
             f"Skipping '{nm}' — you flagged it as: {rs}. {cite('wardrobe#R5')}"
+        )
+
+    # Goal 5: surface the wishlist taste signal so the user can see
+    # the agent is reading their saved aspirations. We write this
+    # once per run, BEFORE the per-item lines, so subsequent picks
+    # read "in light of" the taste profile.
+    if _wishlist_taste.get("summary"):
+        reasoning.append(
+            f"{_wishlist_taste['summary']} I prioritized wardrobe items "
+            f"that resemble this direction. {cite('wardrobe#R4')}"
         )
 
     # ── Wear-history tie-breaker ──────────────────────────────────────────
@@ -427,15 +447,143 @@ def run_agent(
     bottoms    = [i for i in clothing_pool if i.get("type") == "bottom"]
     activewear = [i for i in clothing_pool if i.get("type") == "activewear"]
 
+    # Profile-aware scoring signals are computed once per run so we
+    # don't re-derive them per candidate.
+    _prof = _fit_profile_full or profile or {}
+    _pref_fit          = (_prof.get("preferred_fit") or "").lower().strip()
+    _style_prefs       = [s.lower() for s in (_prof.get("style_preferences") or [])]
+    _style_goals       = [s.lower() for s in (_prof.get("style_goals") or [])]
+    _comfort_needs     = [c.lower() for c in (_prof.get("comfort_needs") or [])]
+    _modesty           = (_prof.get("modesty_preference") or "").lower().strip()
+    _highlights        = [h.lower() for h in (_prof.get("highlight_features") or [])]
+    _balances          = [b.lower() for b in (_prof.get("balance_areas") or [])]
+    _skin_tone         = (_prof.get("skin_tone") or "").lower().strip()
+
+    # Wishlist taste signals (the dict itself was built earlier; here
+    # we just pre-extract the fields used in the scoring loop so each
+    # candidate doesn't re-read them).
+    _wishlist_colors     = set(_wishlist_taste.get("colors") or [])
+    _wishlist_categories = set(_wishlist_taste.get("categories") or [])
+    _wishlist_formality  = (_wishlist_taste.get("preferred_formality") or "").lower()
+
+    def _profile_alignment_bonus(item: dict) -> float:
+        """
+        How well does this item align with the user's stated
+        profile? Returns a 0..~0.6 weight that nudges selection
+        toward items the user said they want, BEFORE reasoning.
+
+        Signals (each capped, additive, never negative):
+          +0.20 preferred fit appears in name/formality
+          +0.15 style preference appears in tags / name
+          +0.10 style goal aligns with item formality
+          +0.10 comfort need matches the item's tags
+          +0.10 modesty preference compatible with the item
+          +0.08 item color complements skin tone
+          +0.08 wishlist signal: same color OR same category OR
+                same formality bucket as what the user has saved
+
+        Language contract: this function's results are CONSUMED by
+        the selector. The visible reasoning lines are still written
+        by fit_alignment_notes() (which is body-positive only).
+        """
+        s = 0.0
+        item_form  = (item.get("formality") or "").lower()
+        item_name  = (item.get("name") or "").lower()
+        item_color = (item.get("color") or "").lower()
+        item_tags  = [t.lower() for t in (item.get("tags") or [])]
+        item_haystack = " ".join([item_name, item_form] + item_tags)
+
+        # --- preferred fit (e.g. "tailored", "relaxed", "loose") ---
+        if _pref_fit:
+            if _pref_fit in item_haystack:
+                s += 0.20
+            elif _pref_fit == "tailored" and item_form in ("business", "smart_casual", "formal"):
+                s += 0.15
+            elif _pref_fit == "relaxed" and item_form in ("casual",):
+                s += 0.15
+
+        # --- style preferences (e.g. "classic", "elegant", "minimal") ---
+        for pref in _style_prefs[:3]:
+            if pref and (pref in item_haystack):
+                s += 0.05      # up to 3 prefs => +0.15
+        # Also reward "versatile" tagging when the user prefers
+        # classic/elegant/minimal styles.
+        if any(p in ("classic", "elegant", "minimal", "polished") for p in _style_prefs):
+            if "versatile" in item_tags or item_form in ("business", "smart_casual"):
+                s += 0.05
+
+        # --- style goals (e.g. "elevated", "feminine", "modernized") ---
+        if _style_goals:
+            primary = _style_goals[0]
+            if primary in ("elevated", "polished") and item_form in ("business", "smart_casual", "formal"):
+                s += 0.10
+            if primary in ("comfortable", "easy", "relaxed") and item_form in ("casual",):
+                s += 0.10
+            if primary in item_haystack:
+                s += 0.05
+
+        # --- comfort needs (e.g. "stretch", "soft", "breathable") ---
+        for need in _comfort_needs:
+            if need and need in item_haystack:
+                s += 0.05
+                break       # one match is enough; cap at +0.05
+
+        # --- modesty preference ---
+        # The skill rule (fit-silhouette-rules.md R2) says modesty
+        # adjusts coverage, not body shape. We bias toward sleeved /
+        # longer / less-skin tags when modesty is "moderate" or
+        # "conservative". Never penalize — only add bonus to matching.
+        if _modesty in ("moderate", "conservative"):
+            modest_signals = ("sleeve", "long-sleeve", "long sleeve",
+                              "midi", "maxi", "turtleneck", "high-neck",
+                              "covered", "modest", "trouser", "wide-leg")
+            if any(sig in item_haystack for sig in modest_signals):
+                s += 0.10
+
+        # --- skin tone harmony ---
+        # We don't re-implement the full color_tool scoring per item
+        # here — that runs at Step 7. But we can give a small
+        # selection-time nudge for "obviously friendly" colors.
+        if _skin_tone:
+            warm_friendly = ("camel", "cream", "warm white", "olive",
+                             "terracotta", "rust", "gold", "tan", "brown",
+                             "burgundy", "blush")
+            cool_friendly = ("navy", "white", "black", "grey", "silver",
+                             "charcoal", "ice blue", "pearl")
+            if "warm" in _skin_tone and any(c in item_color for c in warm_friendly):
+                s += 0.08
+            elif "cool" in _skin_tone and any(c in item_color for c in cool_friendly):
+                s += 0.08
+
+        # --- wishlist taste (rule-based, conservative) ---
+        # Items resembling what the user already saves to wishlist
+        # match their aspirational direction. Capped at +0.08 total.
+        ws = 0.0
+        if _wishlist_colors and item_color:
+            if any(wc in item_color or item_color in wc for wc in _wishlist_colors):
+                ws += 0.04
+        if _wishlist_categories and item.get("type", "").lower() in _wishlist_categories:
+            ws += 0.02
+        if _wishlist_formality and item_form == _wishlist_formality:
+            ws += 0.02
+        s += min(0.08, ws)
+
+        return s
+
     def _score_main_piece(item: dict) -> float:
         """
         Score a candidate top OR dress. Higher = better fit for this
-        moment. Currently:
-          + formality match (most weighted)
-          + freshness (wear-history tie-breaker, see history_tool)
-          + user-added bonus (very small) so user items beat equally-
-            ranked seed items — Wearly should meaningfully use the
-            wardrobe the user actually built.
+        moment.
+
+        Signal stack (cumulative, conservative):
+          + formality match (most weighted, capped at 1.0)
+          + freshness (wear-history tie-breaker, 0..0.4)
+          + user-added bonus (very small, 0.15) so user items beat
+            equally-ranked seed items
+          + profile alignment (0..~0.6) — Goal 4: body/fit/skin-tone/
+            comfort/modesty/style preferences influence selection
+            BEFORE post-hoc reasoning, not just narration.
+          + wishlist taste (folded into profile alignment) — Goal 5
 
         See book/04-styling-knowledge-base.md "Why rules, not ML."
         """
@@ -448,14 +596,15 @@ def run_agent(
             s += 0.5
         elif occasion_tag == "casual" and item.get("formality") in ("casual", "smart_casual"):
             s += 0.5
+        elif occasion_tag == "work" and item.get("formality") in ("business", "smart_casual", "formal"):
+            s += 0.5
         # Freshness — 0.0..1.0 — already a 0-1 weight.
         s += 0.4 * get_freshness(item.get("id", ""), _history)
-        # User-added preference. Items from the user overlay carry IDs
-        # starting with 'U' (UC###, US###, UA###). A small bias here
-        # ensures the agent uses what the user added when it's otherwise
-        # equivalent. Never strong enough to override formality.
+        # User-added preference.
         if str(item.get("id", "")).startswith("U"):
             s += 0.15
+        # Profile + wishlist alignment.
+        s += _profile_alignment_bonus(item)
         return s
 
     pick_dress = False
@@ -637,15 +786,20 @@ def run_agent(
         if outer_suggestion not in result["shopping_suggestions"]:
             result["shopping_suggestions"].append(outer_suggestion)
 
-    # Augment suggestions with the user's favorite stores, when any are saved.
-    # Adds a single extra line: "Check {stores} first — your saved favorite
-    # store(s)." See shopping_tool.store_aware_suggestions().
+    # Augment suggestions with the user's favorite stores AND wishlist.
+    # The store call is now gap-aware: a missing dress routes to the
+    # favorite store that already has a saved dress on the wishlist
+    # first, and if the wishlist already covers the gap we tell the
+    # user instead of re-suggesting a new buy. See
+    # shopping_tool.store_aware_suggestions().
     if result["gaps"] and result["shopping_suggestions"]:
         try:
             from shopping_tool import store_aware_suggestions
+            primary_gap = result["gaps"][0] if result["gaps"] else None
             result["shopping_suggestions"] = store_aware_suggestions(
                 result["shopping_suggestions"],
                 occasion_tag=occasion_tag,
+                gap=primary_gap,
             )
         except Exception:
             # Tool unavailable → leave suggestions unchanged. Never block the

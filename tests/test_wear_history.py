@@ -203,13 +203,29 @@ class TestFreshnessMath(_HistorySnapshotMixin, unittest.TestCase):
 class TestAgentFreshnessTieBreaker(_HistorySnapshotMixin, unittest.TestCase):
 
     def test_baseline_outfit_with_no_history(self):
-        # Sanity: agent runs and includes White Button-Down Blouse as the top
-        # (it's the first work-tagged top in the wardrobe seed file).
+        # Sanity: agent runs and chooses a work-appropriate top from the
+        # seed wardrobe. The specific top is no longer asserted by name
+        # because Goal 4 added profile-aware scoring (skin tone, style
+        # preferences, modesty, …) that can legitimately tip ties
+        # between business-formality tops like the White Button-Down,
+        # the Blush Pink Wrap Blouse, or the Black Fitted Turtleneck.
+        # All three are valid for a work occasion; which one wins is
+        # now a function of the merged profile and the wear history.
         from styling_agent import run_agent
         r = run_agent(mode="everyday", everyday_request="work")
         self.assertIsNone(r.get("error"))
-        names = [i["name"] for i in r["recommendation"]]
-        self.assertIn("White Button-Down Blouse", names)
+        tops = [i for i in r["recommendation"] if i.get("type") == "top"]
+        self.assertGreaterEqual(
+            len(tops), 1,
+            "Agent should always pick at least one top for a 'work' request."
+        )
+        # The chosen top must be work-tagged in the seed catalog.
+        chosen_top = tops[0]
+        self.assertIn(
+            "work",
+            [t.lower() for t in (chosen_top.get("tags") or [])],
+            f"Chosen top {chosen_top.get('name')!r} should be work-tagged.",
+        )
 
     def test_recently_worn_top_yields_to_fresher_alternative(self):
         # White Button-Down (C001) is the default work top. If we mark it

@@ -286,30 +286,106 @@ def remove_wishlist_item(item_id: str) -> dict:
 # STORE-AWARE SUGGESTIONS (used by the agent)
 # ─────────────────────────────────────────────
 
-def store_aware_suggestions(base_suggestions: list, occasion_tag: str = None) -> list:
+def store_aware_suggestions(
+    base_suggestions: list,
+    occasion_tag: str = None,
+    gap: str = None,
+) -> list:
     """
-    Return a copy of `base_suggestions` with an extra line tacked on
-    that names the user's saved favorite stores (when any exist).
+    Return a copy of `base_suggestions` with two kinds of context
+    layered on top:
 
-    The agent calls this from Step 6 once a wardrobe gap is detected.
-    No retailer lookup is performed — this is a prototype hint, not a
-    live shopping search. See book/08-shopping-gap-logic.md.
+      1. A favorite-store routing line: "Check Aritzia or Zara first —
+         your saved favorite stores."
+      2. A wishlist-routing line, when the user has a matching saved
+         item: "Your wishlist already has 'Cursive Dress' from Aritzia
+         that fits this gap." Stops Wearly from re-suggesting
+         something the user already wants to acquire.
+
+    Goal 6: when `gap` is provided, favorites are RE-RANKED by which
+    one already has a wishlist item matching this gap. If you've
+    saved a dress from Aritzia AND Aritzia is a favorite store, the
+    agent suggests Aritzia FIRST for a missing dress — not just
+    "check your favorites in saved order."
+
+    No retailer lookup. Everything is derived from data the user
+    saved themselves. See book/08-shopping-gap-logic.md.
     """
     base_suggestions = list(base_suggestions or [])
-    stores = get_favorite_stores().get("stores", [])
-    if not stores:
-        return base_suggestions
-    names = [s.get("name", "").strip() for s in stores if s.get("name")]
-    if not names:
-        return base_suggestions
-    if len(names) == 1:
-        line = f"Check {names[0]} first — your saved favorite store."
-    elif len(names) == 2:
-        line = f"Check {names[0]} or {names[1]} first — your saved favorite stores."
-    else:
-        head = ", ".join(names[:-1])
-        line = f"Check {head}, or {names[-1]} first — your saved favorite stores."
-    return base_suggestions + [line]
+
+    stores = get_favorite_stores().get("stores", []) or []
+    fav_names = [s.get("name", "").strip() for s in stores if s.get("name")]
+
+    # Rank favorites by which one has wishlist items matching this gap.
+    if gap and fav_names:
+        wishlist_items = get_wishlist().get("items", []) or []
+        store_scores: dict = {n: 0 for n in fav_names}
+        gap_lower = (gap or "").strip().lower()
+        for w in wishlist_items:
+            ws_name = (w.get("preferred_store") or "").strip()
+            if not ws_name:
+                continue
+            matched_fav = next(
+                (n for n in fav_names if n.lower() == ws_name.lower()),
+                None,
+            )
+            if not matched_fav:
+                continue
+            cat = (w.get("category") or "").lower()
+            tags = [t.lower() for t in (w.get("tags") or [])]
+            if gap_lower and (gap_lower == cat or gap_lower in tags):
+                store_scores[matched_fav] += 2
+            elif cat or tags:
+                store_scores[matched_fav] += 1
+        # Stable re-sort: higher score first, original order otherwise.
+        order_index = {n: i for i, n in enumerate(fav_names)}
+        fav_names = sorted(
+            fav_names,
+            key=lambda n: (-store_scores.get(n, 0), order_index.get(n, 0)),
+        )
+
+    if fav_names:
+        if len(fav_names) == 1:
+            line = f"Check {fav_names[0]} first — your saved favorite store."
+        elif len(fav_names) == 2:
+            line = (
+                f"Check {fav_names[0]} or {fav_names[1]} first — "
+                "your saved favorite stores."
+            )
+        else:
+            head = ", ".join(fav_names[:-1])
+            line = (
+                f"Check {head}, or {fav_names[-1]} first — "
+                "your saved favorite stores."
+            )
+        base_suggestions.append(line)
+
+    # Wishlist already-has-it line for this specific gap.
+    if gap:
+        gap_lower = (gap or "").strip().lower()
+        wishlist_items = get_wishlist().get("items", []) or []
+        already_saved = []
+        for w in wishlist_items:
+            cat = (w.get("category") or "").lower()
+            tags = [t.lower() for t in (w.get("tags") or [])]
+            if gap_lower and (gap_lower == cat or gap_lower in tags):
+                already_saved.append(w)
+        if already_saved:
+            first = already_saved[0]
+            nm = first.get("name") or "an item"
+            st_name = first.get("preferred_store") or ""
+            if st_name:
+                base_suggestions.append(
+                    f"Your wishlist already has \"{nm}\" from {st_name} — "
+                    "you may not need to shop for this gap."
+                )
+            else:
+                base_suggestions.append(
+                    f"Your wishlist already has \"{nm}\" — "
+                    "you may not need to shop for this gap."
+                )
+
+    return base_suggestions
 
 
 def gap_is_on_wishlist(gap: str, occasion_tag: str = None) -> bool:

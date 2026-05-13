@@ -181,3 +181,138 @@ CANNED_QUERIES = [
     ("Work-ready pieces",         lambda: items_for_occasion("work")),
     ("Casual-ready pieces",       lambda: items_for_occasion("casual")),
 ]
+
+
+# ─────────────────────────────────────────────
+# WISHLIST TASTE INFERENCE  (Goal 5)
+# ─────────────────────────────────────────────
+
+def infer_wishlist_taste() -> dict:
+    """
+    Read the user's wishlist and distill a small, rule-based taste
+    profile. Used by the agent at selection time to nudge candidate
+    scores toward items that resemble what the user wants to acquire
+    next — and surfaced as a one-line narrative in the reasoning
+    trail ("your wishlist suggests structured dresses and warm
+    neutrals, so I prioritized similar items from your wardrobe").
+
+    Returns a dict with these keys (any can be empty):
+
+      {
+        "categories":  ["dress", ...],          # most-saved categories
+        "colors":      ["navy", "camel", ...],  # most-saved colors
+        "stores":      ["Aritzia", ...],        # most-saved stores
+        "formality":   "smart_casual" | "casual" | ...   # most-saved
+        "preferred_formality": same as above (alias used internally)
+        "tags":        ["weekend", ...],
+        "item_count":  int,
+        "summary":     "" or "Your wishlist suggests …"  body-positive
+      }
+
+    No LLM. No external API. Deterministic, explainable.
+    """
+    try:
+        from shopping_tool import get_wishlist
+    except Exception:
+        return {}
+
+    items = (get_wishlist() or {}).get("items", []) or []
+    if not items:
+        return {
+            "categories": [], "colors": [], "stores": [],
+            "formality": "", "preferred_formality": "",
+            "tags": [], "item_count": 0, "summary": "",
+        }
+
+    def _norm(value: str) -> str:
+        return (value or "").strip().lower()
+
+    def _count(values):
+        d: dict = {}
+        for v in values:
+            v = _norm(v)
+            if not v:
+                continue
+            d[v] = d.get(v, 0) + 1
+        # Sort by count desc, then alphabetical for determinism.
+        return [k for k, _ in sorted(d.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+    # The wishlist record shape is defined by shopping_tool.add_wishlist_item.
+    # category, preferred_store, tags, plus name/notes/source_url to mine.
+    categories = _count(it.get("category") for it in items)
+    stores     = _count(it.get("preferred_store") for it in items)
+    tag_lists  = []
+    for it in items:
+        tag_lists.extend(it.get("tags") or [])
+    tags = _count(tag_lists)
+
+    # Colors: wishlist doesn't have a dedicated color field, so we
+    # mine the item name + notes for canonical color tokens. Use word
+    # boundaries — naive substring matching would have e.g. "red"
+    # matching inside "structured", inflating the hit count.
+    import re as _re
+    from link_import import COLOR_KEYWORDS
+    color_tokens = sorted(COLOR_KEYWORDS.keys() if isinstance(COLOR_KEYWORDS, dict) else COLOR_KEYWORDS)
+    color_hits: list = []
+    for it in items:
+        haystack = " ".join([
+            _norm(it.get("name")),
+            _norm(it.get("notes")),
+            _norm(it.get("source_url")),
+        ])
+        for c in color_tokens:
+            if not c:
+                continue
+            if _re.search(rf"\b{_re.escape(c)}\b", haystack):
+                color_hits.append(c)
+    colors = _count(color_hits)
+
+    # Formality: the wishlist doesn't store a structured formality
+    # field, but the canonical occasion tags do correlate. Map.
+    _OCC_TO_FORMALITY = {
+        "formal": "formal", "gala": "formal",
+        "work": "business", "interview": "business",
+        "dinner": "smart_casual", "date": "smart_casual",
+        "evening": "smart_casual",
+        "casual": "casual", "weekend": "casual", "brunch": "casual",
+        "gym": "athletic",
+    }
+    formality_votes = []
+    for it in items:
+        for t in (it.get("tags") or []):
+            f = _OCC_TO_FORMALITY.get(_norm(t))
+            if f:
+                formality_votes.append(f)
+    pref_formality = _count(formality_votes)
+    pref_formality = pref_formality[0] if pref_formality else ""
+
+    # Narrative summary. Conservative claims; only mention signals we
+    # actually have. Body-positive language (no "flatter", "hide").
+    bits: list = []
+    if categories:
+        bits.append(
+            f"{'a preference for ' if len(categories) == 1 else 'preferences toward '}"
+            f"{', '.join(categories[:3])}"
+        )
+    if colors:
+        bits.append(f"colors like {', '.join(colors[:3])}")
+    if pref_formality:
+        bits.append(f"a {pref_formality.replace('_',' ')} vibe")
+    if stores:
+        bits.append(f"saved from {', '.join(stores[:3])}")
+
+    if bits:
+        summary = "Your wishlist suggests " + " and ".join(bits) + "."
+    else:
+        summary = ""
+
+    return {
+        "categories":          categories,
+        "colors":              colors,
+        "stores":              stores,
+        "formality":           pref_formality,
+        "preferred_formality": pref_formality,
+        "tags":                tags,
+        "item_count":          len(items),
+        "summary":             summary,
+    }
