@@ -26,10 +26,15 @@ permissions:
   pages: write
   id-token: write
 
-# Allow one concurrent deployment; cancel in-flight runs from prior
-# pushes so we don't queue them up.
+# Concurrency scoped by branch. Two unrelated pushes (e.g. main and a
+# claude/* feature branch within seconds of each other) used to share
+# a single global "pages" group, so the second arrival would cancel
+# the first — sometimes killing the only run authorised to deploy
+# Pages and leaving the site stale until a manual re-trigger. Scoping
+# by ${{ github.ref }} lets cross-branch runs coexist; within a single
+# branch, a newer push still cancels its own in-flight predecessor.
 concurrency:
-  group: "pages"
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
