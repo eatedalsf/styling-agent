@@ -1721,6 +1721,16 @@ def _render_outfit_result(result: dict):
                 )
                 html_doc = render_run_graph_html(result)
                 components.html(html_doc, height=560, scrolling=False)
+                # Explicit legend (Dan-McCreary-style review answer):
+                # library, layout, node-size meaning, color meaning,
+                # edge-label meaning, what to read out of the graph.
+                try:
+                    from graph_tool import legend_for_app as _legend
+                    with st.expander("What does this graph mean? (legend)",
+                                     expanded=False):
+                        st.markdown(_legend(), unsafe_allow_html=True)
+                except Exception:
+                    pass
                 st.caption(
                     "This graph is generated from the agent's *current* result. "
                     "Tap **Plan today's outfit →** or reject an item and "
@@ -5211,10 +5221,19 @@ def _render_demo():
             )
             html_doc = render_schema_graph_html()
             components.html(html_doc, height=600, scrolling=False)
+            try:
+                from graph_tool import legend_for_app as _legend
+                with st.expander("What does this graph mean? (legend)",
+                                 expanded=False):
+                    st.markdown(_legend(), unsafe_allow_html=True)
+            except Exception:
+                pass
             st.caption(
                 "Canonical source: `graph/graph.json` and `graph/schema.md`. "
                 "Read more in the **Knowledge Graph** section of the "
-                "[Intelligent Book](https://eatedalsf.github.io/styling-agent/)."
+                "[Intelligent Book](https://eatedalsf.github.io/styling-agent/). "
+                "For library, layout, and node-size meanings, see "
+                "`docs/knowledge-graph-faq.md`."
             )
         except ImportError as _e:
             st.info(f"Graph rendering unavailable: {_e}")

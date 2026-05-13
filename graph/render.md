@@ -2,6 +2,22 @@
 
 This page renders the schema in `schema.md` as a Mermaid diagram. GitHub renders Mermaid natively, so opening this file on GitHub shows the diagram directly. The schema and the serialized triples live alongside (`schema.md`, `graph.json`).
 
+> **Looking for the FAQ?** Library used, what node size means, what colors mean, why not Neo4j, structured queries, how the graph connects to the agent's reasoning — all in [`docs/knowledge-graph-faq.md`](../docs/knowledge-graph-faq.md). That page is the single source of truth for the visual legend; the same content is also embedded into the app under every interactive graph as a "What does this graph mean?" expander.
+
+## Node-size legend (live-run graph)
+
+Node size encodes a real signal — not just role.
+
+| Node type | Diameter rule | Meaning |
+|---|---|---|
+| `User` | fixed 32 px | visual anchor |
+| `OutfitRecommendation` | `22 + 2 × piece_count`, clamped 22..44 px | how many decisions this run made |
+| `WardrobeItem` | `18 + 2 × worn_count`, clamped 18..30 px | how often you reach for this piece |
+| Context (`CalendarEvent`, `FitProfile`, `WeatherSnapshot`) | fixed 22–26 px | context is context, not centerpiece |
+| Derived (`WardrobeGap`, `ShoppingSuggestion`, `Feedback`) | fixed 18–22 px | downstream of the picks |
+
+Hover tooltips on items state `"Worn: N times (node size encodes this)"` so the rule isn't hidden in the code.
+
 ---
 
 ## The graph at a glance

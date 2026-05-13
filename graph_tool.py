@@ -134,9 +134,18 @@ def _new_network(height_px: int = 520):
 
 
 def _add_node(net, node_id: str, label: str, type_name: str,
-              title: Optional[str] = None) -> None:
-    """Add a styled node based on the entity type. Idempotent — pyvis
-    silently overwrites duplicate IDs, but we guard anyway."""
+              title: Optional[str] = None,
+              size_override: Optional[float] = None) -> None:
+    """
+    Add a styled node based on the entity type. Idempotent — pyvis
+    silently overwrites duplicate IDs, but we guard anyway.
+
+    `size_override` lets the caller bump the node's rendered radius
+    to encode a SEMANTIC signal: how many times an item has been
+    worn, how many pieces an outfit contains, etc. Node size now
+    means something the user can interpret — see the legend block
+    rendered next to every graph and graph/render.md for the rules.
+    """
     style = _NODE_STYLES.get(type_name, _NODE_STYLES["Concept"])
     # Cap label length so long names don't overlap.
     display_label = label if len(label) <= 28 else (label[:25] + "…")
@@ -147,12 +156,16 @@ def _add_node(net, node_id: str, label: str, type_name: str,
         node_font = {"color": style["font_color"], "size": 14,
                      "face": "DM Sans, sans-serif",
                      "strokeWidth": 3, "strokeColor": style["bg"]}
+    final_size = float(size_override) if size_override is not None else style["size"]
+    # Clamp so a heavily-worn item can't dwarf the User anchor, and an
+    # unworn item still reads as a real node.
+    final_size = max(14.0, min(50.0, final_size))
     net.add_node(
         node_id,
         label=display_label,
         color={"background": style["bg"], "border": style["border"]},
         shape=style["shape"],
-        size=style["size"],
+        size=final_size,
         title=title or f"{type_name}: {label}",
         font=node_font,
     )
@@ -282,12 +295,31 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
               title=f"{w_city} · {w_temp}°F · {w_cond}")
     net.add_edge("user", "weather", label="sees_weather")
 
+    # Wear-history map for node-size scaling. Heavily-worn items are
+    # rendered larger so the graph's geometry encodes "what you reach
+    # for most" — the same signal Wearly uses internally as the
+    # freshness tie-breaker (see history_tool.get_freshness). Failure
+    # to load just falls back to a flat size.
+    try:
+        from history_tool import get_history as _gh
+        _wear_hist = _gh().get("history", {}) or {}
+    except Exception:
+        _wear_hist = {}
+
     # ── Outfit Recommendation (the centerpiece) ──
+    # Outfit node size scales with how many pieces are in this outfit:
+    #   1 piece  → 24px   (a one-piece dress, baseline)
+    #   3 pieces → 30px
+    #   6 pieces → 36px   (a fully-loaded everyday outfit)
+    #   12+      → 44px   (capped)
+    _outfit_size = min(44.0, 22.0 + 2.0 * len(outfit))
     of_label = f"Outfit · {len(outfit)} piece{'' if len(outfit) == 1 else 's'}"
     of_title = "Today's outfit"
     if outfit:
         of_title += "\n" + "\n".join(f"  · {i.get('name','—')}" for i in outfit[:8])
-    _add_node(net, "outfit", of_label, "OutfitRecommendation", title=of_title)
+    of_title += f"\n\nSize encodes piece count: {len(outfit)}."
+    _add_node(net, "outfit", of_label, "OutfitRecommendation",
+              title=of_title, size_override=_outfit_size)
     net.add_edge("outfit", "event", label="addresses_event")
     # Convey that fit + weather + occasion drove the outfit choice.
     net.add_edge("fit",     "outfit", label="informs")
@@ -301,21 +333,31 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
     # item is enough to communicate provenance, and Outfit already
     # links back to User via the event chain. Trade-off documented
     # in graph/render.md.
+    #
+    # Item node size encodes WEAR COUNT — the more often the user has
+    # worn this piece (confirmed via the "Wear this outfit today"
+    # button), the bigger its dot. Never-worn items stay at the
+    # baseline. Heavy wearers cap out so the layout stays balanced.
     for item in outfit[:_MAX_ITEM_NODES_PER_RUN]:
         iid_src = item.get("id") or item.get("name") or "item"
         iid = f"item:{iid_src}"
         name = item.get("name", "—")
+        wear_count = int((_wear_hist.get(iid_src) or {}).get("worn_count", 0) or 0)
+        item_size = 18.0 + min(12.0, 2.0 * wear_count)
         meta_lines = [
             f"Color: {item.get('color','—')}",
             f"Type: {item.get('type','—')}",
             f"Formality: {item.get('formality','—')}",
+            f"Worn: {wear_count} time{'' if wear_count == 1 else 's'} "
+            f"(node size encodes this)",
         ]
         # User-added items get a "(your addition)" hint in the tooltip
         # so the graph also expresses who supplied which piece.
         if str(item.get("id", "")).startswith("U"):
             meta_lines.append("Source: your wardrobe additions")
         _add_node(net, iid, name, "WardrobeItem",
-                  title=f"{name}\n" + "\n".join(meta_lines))
+                  title=f"{name}\n" + "\n".join(meta_lines),
+                  size_override=item_size)
         net.add_edge("outfit", iid, label="recommends")
 
     # ── Wardrobe Gaps (if any) ──
@@ -382,3 +424,177 @@ def schema_graph_summary() -> Dict[str, int]:
         "entities": len(data.get("entities", [])),
         "edges":    len(data.get("edges", [])),
     }
+
+
+# ─────────────────────────────────────────────
+# LEGEND — the explicit "what does this graph mean?" block
+# ─────────────────────────────────────────────
+
+# Inspired by Dan McCreary's review of a classmate's graph: every
+# graph needs an explicit legend. Node SIZE, COLOR, SHAPE, and edge
+# DIRECTION all carry meaning, but if the meaning lives only in the
+# code, the user can't read the graph. The dict below is the single
+# source of truth that drives both `legend_for_app` (HTML for
+# Streamlit) and the matching docs page.
+LEGEND_DICT = {
+    "library": {
+        "name":  "pyvis",
+        "wraps": "vis-network.js",
+        "why":   ("Pyvis renders an interactive vis-network HTML "
+                  "graph from Python with no external services. "
+                  "Stdlib + Pillow + Streamlit are the only other "
+                  "runtime deps. Neo4j was rejected because the "
+                  "demo needs to run offline on Streamlit Cloud, "
+                  "with no database daemon, no auth, no backups."),
+    },
+    "layout": {
+        "kind":   "force-directed",
+        "solver": "forceAtlas2Based",
+        "params": {
+            "gravitationalConstant": -110,
+            "centralGravity":         0.02,
+            "springLength":           170,
+            "damping":                0.7,
+            "avoidOverlap":           0.85,
+        },
+        "interaction": ("Drag any node to reposition; the spring "
+                        "settles in ~0.5 s. Scroll to zoom, drag "
+                        "background to pan. Hover for full tooltip."),
+    },
+    "node_size_meaning": {
+        "OutfitRecommendation":
+            "Diameter encodes piece count (1-piece dress ≈ 24px; "
+            "fully-loaded 6-piece outfit ≈ 36px; capped at 44px).",
+        "WardrobeItem":
+            "Diameter encodes wear-count from history_tool: an "
+            "unworn item is 18px, +2px per confirmed wear, "
+            "capped at 30px. Lets you see at a glance which "
+            "pieces you reach for most.",
+        "User":      "Fixed anchor (32px) — the visual centerpoint.",
+        "CalendarEvent / FitProfile / Weather":
+            "Fixed by role (22–26px) so context nodes read as "
+            "context, not as the centerpiece.",
+        "Gaps / Feedback / ShoppingSuggestion":
+            "Smaller (18–22px) — these are derived, not primary.",
+    },
+    "node_color_meaning": [
+        ("User",                 "matte black",  "the wearer, visual anchor"),
+        ("FitProfile",           "warm cream",   "user-declared body/skin/fit"),
+        ("CalendarEvent",        "warm cream + dark border",
+                                                "an occasion the agent reads"),
+        ("WeatherSnapshot",      "warm cream",   "live or cached weather"),
+        ("WardrobeItem",         "soft tan",     "a garment, shoe, or accessory"),
+        ("OutfitRecommendation", "white + bold black border",
+                                                "the centerpiece, today's outfit"),
+        ("WardrobeGap",          "warm pink",    "a missing piece"),
+        ("ShoppingSuggestion",   "warm pink",    "what to buy to close a gap"),
+        ("Feedback",             "muted tan",    "your reject/regenerate signal"),
+    ],
+    "edge_label_meaning": [
+        ("has_fit_profile",   "User → FitProfile"),
+        ("has_event",         "User → CalendarEvent"),
+        ("sees_weather",      "User → WeatherSnapshot"),
+        ("addresses_event",   "Outfit → CalendarEvent"),
+        ("recommends",        "Outfit → WardrobeItem"),
+        ("informs",           "FitProfile / Weather → Outfit"),
+        ("flags_gap",         "Outfit → WardrobeGap"),
+        ("suggests_to_buy",   "WardrobeGap → ShoppingSuggestion"),
+        ("was_rejected_with", "WardrobeItem → Feedback"),
+        ("excludes_from_pool","Feedback → WardrobeItem (future run)"),
+    ],
+    "what_user_learns": (
+        "The graph turns the agent's seven reasoning steps into a "
+        "single picture. You can see at a glance: what context the "
+        "agent read, which pieces it chose, which it rejected, and "
+        "what's still missing. Heavier-worn items are bigger, "
+        "fuller outfits are bigger — geometry encodes pattern."
+    ),
+    "how_it_connects_to_agent": (
+        "Every node in the live-run graph corresponds to a value "
+        "the agent actually computed during run_agent(). The "
+        "reasoning trail explains the choices in prose; the graph "
+        "explains them in shape. They're two views of the same run."
+    ),
+}
+
+
+def legend_for_app() -> str:
+    """
+    Return a self-contained HTML legend ready to pass to
+    st.markdown(..., unsafe_allow_html=True). Designed to render
+    next to either the schema or live-run graph and answer Dan
+    McCreary's questions without forcing the user into the docs.
+    """
+    L = LEGEND_DICT
+    rows_color = "".join(
+        f"<tr><td style='padding:0.18rem 0.6rem 0.18rem 0; "
+        f"font-family:DM Sans,sans-serif; font-size:0.78rem; "
+        f"color:#1C1917; white-space:nowrap;'>{name}</td>"
+        f"<td style='padding:0.18rem 0.6rem 0.18rem 0; font-size:0.78rem; "
+        f"color:#6E6E73;'>{color}</td>"
+        f"<td style='padding:0.18rem 0; font-size:0.78rem; "
+        f"color:#6E6E73;'>{desc}</td></tr>"
+        for name, color, desc in L["node_color_meaning"]
+    )
+    rows_size = "".join(
+        f"<li style='margin-bottom:0.3rem;'>"
+        f"<strong style='color:#1C1917;'>{node_type}:</strong> "
+        f"<span style='color:#6E6E73;'>{meaning}</span></li>"
+        for node_type, meaning in L["node_size_meaning"].items()
+    )
+    rows_edges = "".join(
+        f"<tr><td style='padding:0.15rem 0.6rem 0.15rem 0; "
+        f"font-family:DM Mono,monospace; font-size:0.74rem; "
+        f"color:#111111;'>{label}</td>"
+        f"<td style='padding:0.15rem 0; font-size:0.78rem; "
+        f"color:#6E6E73;'>{flow}</td></tr>"
+        for label, flow in L["edge_label_meaning"]
+    )
+    return (
+        "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+        "border-radius:6px; padding:1rem 1.15rem; margin-top:0.6rem; "
+        "font-family:DM Sans,sans-serif;'>"
+
+        "<div style='font-size:0.66rem; color:#8E8E93; "
+        "letter-spacing:0.14em; text-transform:uppercase; "
+        "font-weight:600; margin-bottom:0.4rem;'>Graph legend</div>"
+
+        f"<div style='font-size:0.82rem; color:#2E2E2E; "
+        f"line-height:1.55; margin-bottom:0.8rem;'>"
+        f"<strong>Library:</strong> "
+        f"{L['library']['name']} (wraps {L['library']['wraps']}).&nbsp; "
+        f"<strong>Layout:</strong> {L['layout']['kind']} "
+        f"({L['layout']['solver']}). "
+        f"<em style='color:#6E6E73;'>"
+        f"{L['layout']['interaction']}</em>"
+        f"</div>"
+
+        "<div style='font-size:0.7rem; color:#8E8E93; "
+        "letter-spacing:0.10em; text-transform:uppercase; "
+        "font-weight:600; margin-top:0.55rem; margin-bottom:0.25rem;'>"
+        "Node size encodes</div>"
+        f"<ul style='font-size:0.82rem; line-height:1.5; padding-left:1.1rem; "
+        f"margin:0.2rem 0 0.55rem;'>{rows_size}</ul>"
+
+        "<div style='font-size:0.7rem; color:#8E8E93; "
+        "letter-spacing:0.10em; text-transform:uppercase; "
+        "font-weight:600; margin-top:0.55rem; margin-bottom:0.25rem;'>"
+        "Node colors</div>"
+        f"<table style='border-collapse:collapse; margin-bottom:0.55rem;'>"
+        f"{rows_color}</table>"
+
+        "<div style='font-size:0.7rem; color:#8E8E93; "
+        "letter-spacing:0.10em; text-transform:uppercase; "
+        "font-weight:600; margin-top:0.55rem; margin-bottom:0.25rem;'>"
+        "Edge labels (read source → target)</div>"
+        f"<table style='border-collapse:collapse; margin-bottom:0.55rem;'>"
+        f"{rows_edges}</table>"
+
+        "<div style='font-size:0.74rem; color:#6E6E73; "
+        "line-height:1.55; padding-top:0.55rem; "
+        "border-top:1px solid #EEEEEE;'>"
+        f"{L['what_user_learns']}<br><br>"
+        f"<em>{L['how_it_connects_to_agent']}</em>"
+        "</div>"
+        "</div>"
+    )
