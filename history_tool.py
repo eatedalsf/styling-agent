@@ -47,7 +47,19 @@ def _history_path() -> str:
     return os.path.join(here, "wear_history.json")
 
 
+def _seed_path() -> str:
+    """
+    Path to the committed demo seed. Used as a read-only fallback when
+    no per-user wear_history.json exists yet — so a fresh clone (and
+    a fresh Streamlit Cloud container) still has visible freshness
+    reasoning in the demo without committing user state.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(here, "seed_wear_history.json")
+
+
 HISTORY_PATH = _history_path()
+SEED_PATH = _seed_path()
 
 
 def _atomic_write_json(path: str, data: dict) -> None:
@@ -75,10 +87,16 @@ def get_history() -> dict:
     Returns:
         {"success": True, "history": {<id>: <entry>}, "error": None}
     """
-    if not os.path.exists(HISTORY_PATH):
+    # Per-user file first; demo seed second; empty third. The seed is
+    # read-only — record_wear() always writes to HISTORY_PATH so we
+    # never mutate the committed seed.
+    read_path = HISTORY_PATH if os.path.exists(HISTORY_PATH) else (
+        SEED_PATH if os.path.exists(SEED_PATH) else None
+    )
+    if read_path is None:
         return {"success": True, "history": {}, "error": None}
     try:
-        with open(HISTORY_PATH, "r", encoding="utf-8") as f:
+        with open(read_path, "r", encoding="utf-8") as f:
             data = json.load(f)
         return {"success": True, "history": dict(data.get("history", {})), "error": None}
     except (json.JSONDecodeError, OSError) as e:

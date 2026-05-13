@@ -57,8 +57,16 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
         {
           "entities":  [ {"id", "type", "label", "props": {...}}, ... ],
           "relations": [ {"source", "target", "predicate"}, ... ],
-          "meta":      { "generated_at", "outfit_summary", "citations" }
+          "meta":      { "generated_at", "outfit_summary",
+                          "cited_rules", "citations",
+                          "color_score", "gap_count" }
         }
+
+    Predicate vocabulary mirrors graph/schema.md
+    (has_fit_profile, has_event, sees_weather, recommends,
+    addresses_event, evaluated_against, flags_gap, suggests_to_buy,
+    was_rejected_with, shaped_run) so the exported file drops into
+    the in-book vis-network viewer without any translation step.
 
     Safe on partial results — every section is guarded.
     """
@@ -94,7 +102,9 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
     add_entity(fit_id, "FitProfile",
                f"{uname}'s fit profile",
                preferred_fit=profile.get("preferred_fit"))
-    add_relation(user_id, fit_id, "has-profile")
+    # Predicate vocabulary mirrors graph/schema.md so this export
+    # drops into the in-book vis-network viewer without translation.
+    add_relation(user_id, fit_id, "has_fit_profile")
 
     # --- CalendarEvent / occasion ------------------------------------
     event = result.get("event") or {}
@@ -105,7 +115,7 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
                    type=event.get("type"),
                    date=event.get("date"),
                    formality=event.get("formality"))
-        add_relation(user_id, eid, "plans")
+        add_relation(user_id, eid, "has_event")
         occasion_node_id = eid
     else:
         occasion_node_id = None
@@ -118,7 +128,7 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
                    temperature_f=weather.get("temperature"),
                    conditions=weather.get("conditions"),
                    season=weather.get("season"))
-        add_relation(user_id, wid, "observes")
+        add_relation(user_id, wid, "sees_weather")
     else:
         wid = None
 
@@ -133,9 +143,10 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
                    color_score=(result.get("color_score") or {}).get("score"))
         add_relation(user_id, rid, "received")
         if occasion_node_id:
-            add_relation(occasion_node_id, rid, "answered-by")
+            # Schema direction: OutfitRecommendation -> CalendarEvent.
+            add_relation(rid, occasion_node_id, "addresses_event")
         if wid:
-            add_relation(rid, wid, "evaluated-against")
+            add_relation(rid, wid, "evaluated_against")
 
         for item in rec:
             iid = "item:" + str(item.get("id") or item.get("name", "unknown"))
@@ -143,32 +154,41 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
                        type=item.get("type"),
                        color=item.get("color"),
                        formality=item.get("formality"))
-            add_relation(rid, iid, "contains")
+            add_relation(rid, iid, "recommends")
     else:
         rid = None
 
     # --- Gaps + ShoppingSuggestions ----------------------------------
+    # --- Gaps + ShoppingSuggestions ----------------------------------
+    # Schema: OutfitRecommendation -flags_gap-> WardrobeGap
+    #         WardrobeGap          -suggests_to_buy-> ShoppingSuggestion
+    last_gap_id: Optional[str] = None
     for i, gap in enumerate(result.get("gaps") or []):
         gid = f"gap:{gap}".lower()
         add_entity(gid, "WardrobeGap", f"Missing: {gap}", piece_type=gap)
         if rid:
-            add_relation(rid, gid, "has-gap")
+            add_relation(rid, gid, "flags_gap")
+        last_gap_id = gid
 
     for i, sugg in enumerate(result.get("shopping_suggestions") or []):
         sid = f"suggestion:{i}"
         text = sugg if isinstance(sugg, str) else sugg.get("text", str(sugg))
         add_entity(sid, "ShoppingSuggestion", text[:60], full_text=text)
-        if rid:
-            add_relation(rid, sid, "suggests")
+        # Prefer a gap-anchored edge if we have one; otherwise leave the
+        # node free-standing (export still validates as a graph).
+        if last_gap_id:
+            add_relation(last_gap_id, sid, "suggests_to_buy")
 
     # --- Feedback (rejections + today's context) ---------------------
+    # Schema direction: WardrobeItem -was_rejected_with-> Feedback.
     rejected = (result.get("rejected_context") or {}).get("reasons", [])
     for rej in rejected or []:
         fid = f"feedback:reject:{rej.get('item_id', 'x')}"
         add_entity(fid, "Feedback", f"Rejected: {rej.get('item_name', '?')}",
                    reason=rej.get("reason"))
-        if rid:
-            add_relation(fid, rid, "rejects")
+        iid = "item:" + str(rej.get("item_id") or rej.get("item_name", "x"))
+        if iid in seen_ids:
+            add_relation(iid, fid, "was_rejected_with")
 
     tctx = result.get("todays_context")
     if tctx:
@@ -176,7 +196,11 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
         add_entity(fid, "Feedback", f"Today's context: {tctx[:40]}",
                    text=tctx)
         if rid:
-            add_relation(fid, rid, "shapes")
+            # No schema predicate exists yet for "context shaped this run."
+            # Use a stable, descriptive snake_case predicate so a future
+            # schema addition can adopt the same name without breaking
+            # exported files.
+            add_relation(fid, rid, "shaped_run")
 
     return {
         "entities": entities,
@@ -184,6 +208,9 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
         "meta": {
             "generated_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
             "outfit_summary": ", ".join(i.get("name", "") for i in rec) if rec else None,
+            # `cited_rules` matches the dfec85e commit message; `citations`
+            # kept as an alias for any existing consumer.
+            "cited_rules": _extract_citations(result.get("reasoning") or []),
             "citations": _extract_citations(result.get("reasoning") or []),
             "color_score": (result.get("color_score") or {}).get("score"),
             "gap_count": len(result.get("gaps") or []),

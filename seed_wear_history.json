@@ -1,0 +1,47 @@
+{
+  "_comment": "Seed wear history for the live demo. Per-user runtime state lives in wear_history.json (gitignored). history_tool.get_history() falls back to THIS file when no per-user file exists, so a fresh clone still produces visible freshness reasoning in the demo. Six realistic entries: one underused work piece (C001), one most-loved piece (C003), two routinely-worn staples (C006, C002). Update the dates if the demo is run far from May 2026.",
+  "history": {
+    "C001": {
+      "worn_count": 2,
+      "last_worn_date": "2026-04-07",
+      "last_event": "Client meeting",
+      "last_outfit": ["C001", "C006", "S002"],
+      "last_feedback": "kept"
+    },
+    "C003": {
+      "worn_count": 5,
+      "last_worn_date": "2026-05-11",
+      "last_event": "Dinner with friends",
+      "last_outfit": ["C003", "C007", "S002"],
+      "last_feedback": "kept"
+    },
+    "C006": {
+      "worn_count": 6,
+      "last_worn_date": "2026-05-02",
+      "last_event": "Office day",
+      "last_outfit": ["C002", "C006", "S002"],
+      "last_feedback": "kept"
+    },
+    "C008": {
+      "worn_count": 4,
+      "last_worn_date": "2026-05-05",
+      "last_event": "Brunch",
+      "last_outfit": ["C004", "C008", "S003"],
+      "last_feedback": "kept"
+    },
+    "C002": {
+      "worn_count": 3,
+      "last_worn_date": "2026-05-09",
+      "last_event": "Office day",
+      "last_outfit": ["C002", "C006", "S002"],
+      "last_feedback": "kept"
+    },
+    "C005": {
+      "worn_count": 2,
+      "last_worn_date": "2026-05-10",
+      "last_event": "Lunch meeting",
+      "last_outfit": ["C005", "C007", "S002"],
+      "last_feedback": "kept"
+    }
+  }
+}

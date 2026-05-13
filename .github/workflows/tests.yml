@@ -32,11 +32,19 @@ jobs:
           pip install -r requirements.txt
 
       - name: Validate JSON data files
+        # Per-user state files (calendar_events.json, wear_history.json,
+        # wishlist.json, user_profile.json, …) are gitignored — they
+        # exist only on a running app. CI validates the committed
+        # seeds + canonical rule/graph data.
         run: |
-          python -c "import json; json.load(open('wardrobe.json'))" \
-            && python -c "import json; json.load(open('calendar_events.json'))" \
-            && python -c "import json; json.load(open('color_rules.json'))" \
-            && python -c "import json; json.load(open('graph/graph.json'))"
+          for f in wardrobe.json \
+                   seed_calendar_events.json \
+                   seed_wear_history.json \
+                   color_rules.json \
+                   graph/graph.json \
+                   graph/learning-graph.json; do
+            python -c "import json; json.load(open('$f')); print('OK', '$f')" || exit 1
+          done
 
       - name: Validate app.py and main.py parse
         run: |

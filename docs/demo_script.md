@@ -141,7 +141,7 @@ Switch to tab 2 — the published Pages site.
 Walk through three pages, ~15 seconds each:
 
 1. **Skills → Skill package overview.** *"This conforms to the agentskills.io standard, Advanced tier per the meta-skills lecture — YAML frontmatter plus executable validator script."*
-2. **Evidence → Evidence & references.** Scroll to §7. *"Ten verified primary citations across eight of nine categories. No fabrications. Springer 2022, ACM MM 2017, ECCV 2018, ISO 11664-4, EUR-Lex GDPR, Privacy by Design 2009, Tim Miller 2019. Every one is real."*
+2. **Evidence → Evidence & references.** Scroll to §7. *"Verified primary citations across all nine evidence categories. No fabrications. Springer 2022, ACM MM 2017, ECCV 2018, ISO 11664-4, EUR-Lex GDPR, Privacy by Design 2009, Tim Miller 2019. Every one is real."*
 3. **Learning Graph → Concept map (interactive).** Switch to hierarchical layout. *"Twenty-eight reader concepts, Bloom-taxonomy tier each, prerequisite edges between them. This is what makes the project an intelligent textbook, not just docs."*
 
 > *"Structure beats prompts. This is what the instructor has been saying all semester — and this is what it looks like fully wired."*
@@ -202,7 +202,7 @@ Point to GitHub URL on the closing slide. Invite questions.
 
 ## Total preparation summary
 
-- **207 passing tests.** `python -m unittest discover -s tests`
+- **237 passing tests.** `python -m unittest discover -s tests`
 - **MkDocs site builds clean.** Auto-deploys on push.
 - **10 verified citations** in the evidence doc, no fabrications.
 - **All 8 Track B deliverables met or exceeded** (see `docs/track-b-evaluation.md`).

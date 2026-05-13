@@ -4,10 +4,8 @@ name: docs
 # GitHub Pages.
 #
 # Build runs on every push (catches broken links / config errors
-# early). Deploy runs only on pushes to main or to the current feature
-# branch — keep it permissive while the project is in prototype mode;
-# tighten to `main` once the book is publicly linked from a stable
-# place.
+# early). Deploy runs only on pushes to `main` — the public Pages
+# site at https://eatedalsf.github.io/styling-agent/ tracks `main`.
 #
 # One-time repo setup (the maintainer does this once):
 #   Settings → Pages → Source: GitHub Actions
@@ -60,14 +58,14 @@ jobs:
         run: mkdocs build --clean
 
       - name: Upload built site as Pages artifact
-        if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/sweet-brown-f3ef68'
+        if: github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/claude/sweet-brown-f3ef68'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

@@ -9,16 +9,16 @@
 
 A mobile-first, clean-luxury personal styling agent that recommends complete outfits using your calendar, real-time weather, wardrobe, and color profile — with full reasoning at every step.
 
-<!-- HERO BLOCK — drop a hero screenshot or GIF into docs/assets/hero.png and the image below
-     will pick it up. The live-demo button is wired to the deployed Streamlit Cloud app. -->
+<!-- HERO BLOCK — the live-demo button is wired to the deployed Streamlit
+     Cloud app. To add a hero screenshot, drop a PNG at docs/assets/hero.png
+     and uncomment the <img> line below. -->
 
 ### 🔗 [**Open the live app →**](https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/) · 📖 [**Read the Intelligent Book →**](https://eatedalsf.github.io/styling-agent/)
 
 > **Live demo:** <https://styling-agent-64jigzmqms4v7f9ugou8bv.streamlit.app/> — hosted on Streamlit Community Cloud. No install, no signup.
 >
 > **Intelligent Book:** <https://eatedalsf.github.io/styling-agent/> — companion documentation site built with MkDocs Material. The agent's design principles, evidence categories, skill rules, knowledge-graph schema, and architecture, all searchable in one place.
->
-> ![Wearly home — hero screenshot](docs/assets/hero.png)
+<!-- > ![Wearly home — hero screenshot](docs/assets/hero.png) -->
 
 **Why Wearly is an agent, not a chatbot**
 - 📅 Reads your **calendar** and turns the next event into a styling occasion.
@@ -107,28 +107,60 @@ To redeploy a fork:
 | 4 *(remaining)* | Wardrobe builder (photo / URL import) + wear-history rotation | ⏳ Deferred |
 | 5 | Shopping + wishlist + favorite stores | ⏳ Deferred |
 
-See `Wearly_Product_Brief.md` for the full vision and `book/` for the Intelligent Book chapters that document the agent's reasoning. The Master Implementation Plan lives at `C:\Users\eated\.claude\plans\now-that-the-two-polymorphic-fiddle.md` (local).
+See `Wearly_Product_Brief.md` for the full vision and `book/` for the Intelligent Book chapters that document the agent's reasoning. The Master Implementation Plan is maintainer-local.
 
 ---
 
 ## Project Structure
 
-The repository currently uses a flat layout — all source, data, and docs sit at the project root:
+The repository uses a flat layout — all source, data, and docs sit at the project root. Per-user runtime state (`calendar_events.json`, `wear_history.json`, `user_profile.json`, `wishlist.json`, etc.) is gitignored; only the `seed_*.json` files are committed so a fresh clone runs cleanly.
 
 ```
 styling-agent/
 ├── main.py                  ← CLI runner (calendar / everyday / compare modes)
-├── app.py                   ← Streamlit web UI
-├── styling_agent.py         ← Core agent logic. Orchestrates all tools.
-├── calendar_tool.py         ← Tool 1: Reads upcoming calendar events
-├── weather_tool.py          ← Tool 2: Fetches real weather (Open-Meteo API)
-├── wardrobe_tool.py         ← Tool 3: Filters wardrobe by occasion + season
-├── color_tool.py            ← Tool 4: Scores outfit colors vs. skin tone
-├── wardrobe.json            ← Wardrobe inventory (clothing, shoes, accessories)
-├── calendar_events.json     ← Mock calendar events
+├── app.py                   ← Streamlit web UI (Today, Planner, Wardrobe, Shop, Profile, Demo)
+├── styling_agent.py         ← Core agent. Orchestrates all tools, builds the reasoning trail.
+│
+│  ── Tools ──
+├── calendar_tool.py         ← Tool 1: Reads upcoming calendar events (seed JSON)
+├── calendar_import.py       ← Tool 1b: .ics file + URL-subscription real-calendar import
+├── weather_tool.py          ← Tool 2: Live weather (Open-Meteo API)
+├── wardrobe_tool.py         ← Tool 3: Wardrobe filtering by occasion + season
+├── color_tool.py            ← Tool 4: Skin-tone color-harmony scoring
+├── history_tool.py          ← Tool 5: Wear history (freshness tie-breaker)
+├── fit_tool.py              ← Tool 6: Fit profile + body-positive language contract
+├── shopping_tool.py         ← Tool 7: Wishlist, favorite stores, gap-driven suggestions
+├── graph_tool.py            ← Tool 8: pyvis-rendered reasoning graph
+├── routine_tool.py          ← Tool 9: Weekly routine fallback when no calendar present
+├── link_import.py           ← Wardrobe-builder: parse a product URL into a closet item
+├── backup_tool.py           ← Backup & restore (persistence across Streamlit Cloud restarts)
+├── compact_kg.py            ← Export one day's reasoning as a portable knowledge graph
+├── wardrobe_query.py        ← Ask-your-wardrobe pre-baked queries
+├── rule_refs.py             ← Canonical registry tying reasoning lines to Skill rule slugs
+│
+│  ── Data ──
+├── wardrobe.json            ← Wardrobe inventory (seed)
+├── seed_calendar_events.json← Demo calendar events
+├── seed_wear_history.json   ← Demo wear history (so freshness reasoning fires on fresh clones)
 ├── color_rules.json         ← Skin-tone color coordination rules
-├── workflow_diagram.md      ← Agent decision flow documentation
-├── requirements.txt         ← Python dependencies (Streamlit)
+│
+│  ── Documentation site (MkDocs Material → GitHub Pages) ──
+├── book/                    ← 13 Intelligent Book chapters
+├── docs/                    ← Architecture, demo script, evidence + references, business model,
+│                              Track B evaluation, micro-sims (color harmony, KG, learning graph)
+├── graph/                   ← graph.json + learning-graph.json + schema.md + render.md
+├── skills/wearly-styling-agent/ ← Skill package (Advanced tier): 8 rule packs + validator
+├── scripts/stage_docs.py    ← Copies Markdown into _docs_build/ for MkDocs to consume
+├── mkdocs.yml               ← MkDocs Material config
+├── requirements-docs.txt    ← Build-only docs deps (never installed on Streamlit Cloud)
+│
+│  ── Runtime / CI / config ──
+├── .streamlit/config.toml   ← Streamlit Cloud theme + server config
+├── .github/workflows/       ← tests.yml + docs.yml (matrix tests, Pages deploy)
+├── tests/                   ← 237 unittest cases
+├── requirements.txt         ← Runtime deps (Streamlit, pyvis)
+├── workflow_diagram.md      ← Agent decision flow
+├── Wearly_Product_Brief.md  ← Full product vision
 └── README.md                ← This file
 ```
 
@@ -280,12 +312,13 @@ The AI-assisted development process is documented as part of the project. This i
 
 ## Expansion Plan (Weeks 10–14)
 
-- Connect to real Google Calendar API (replace mock JSON)
-- Build a web UI with Streamlit for wardrobe photo uploads
-- Add shopping integration (e.g., Nordstrom / ASOS product search)
-- Add Claude API for natural-language outfit explanations
-- Support multiple outfit options (top 3 recommendations)
-- Add user feedback loop to learn preferences over time
+- ✅ Real-calendar import — `.ics` upload + URL subscription (Google / Apple) shipped in `calendar_import.py`.
+- ✅ Streamlit web UI with wardrobe photo + product-link import shipped in `app.py`, `link_import.py`.
+- ✅ Shopping surface — wishlist, favorite stores, gap-driven suggestions shipped in `shopping_tool.py`.
+- ✅ Reject-and-regenerate feedback loop shipped (`rejected_ids` / `rejection_reasons` in `run_agent`).
+- ⏳ Connect Claude API for natural-language outfit narration.
+- ⏳ Surface top-3 outfit alternatives instead of one.
+- ⏳ Multi-day analytics on top of the compact-KG export.
 
 ---
 

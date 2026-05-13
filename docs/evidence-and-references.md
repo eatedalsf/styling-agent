@@ -30,7 +30,7 @@ Each source category below carries six items:
 | **Why it matters for Wearly** | Which rule pack(s) draw on this category. |
 | **Source types to gather** | Specific kinds of sources a researcher should seek (search queries, venues, frameworks). |
 | **Current basis** | What Wearly's rules are informed by *today* — general practice, well-known framework, or verified citation. |
-| **Verification status** | One of: `general practice`, `well-known framework`, `verified citations`, `to verify`. After the May 2026 verified-sources pass, eight of the nine categories now carry `verified citations`. |
+| **Verification status** | One of: `general practice`, `well-known framework`, `verified citations`, `to verify`. After the May 2026 verified-sources pass, all nine categories now carry `verified citations`. |
 | **Pending items** | A short list of specific things still needing verification. |
 
 This pattern lets a future contributor pick any rule pack, find the relevant categories, and either rely on what's there or pick up the verification work.
