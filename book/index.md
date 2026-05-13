@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/cover.svg" alt="Wearly — an Intelligent Book on Personal Styling Agents" width="100%" style="max-width: 920px; border: 1px solid #EEEEEE; border-radius: 4px;" />
+</p>
+
 # The Wearly Intelligent Book
 
 > A mini Intelligent Book documenting how Wearly reasons.

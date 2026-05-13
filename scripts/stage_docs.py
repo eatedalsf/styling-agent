@@ -73,6 +73,11 @@ _REMAPPED_FILES = {
 # index.md. Pattern matches dmccreary/intelligent-textbooks.
 _VERBATIM_DIRS = [
     ("docs/sims", "docs/sims"),
+    # Image assets used by book pages and the site index — e.g. cover.svg.
+    # We stage to a top-level /assets/ path so it's reachable from both
+    # the site root (docs/home.md -> index.md) and any nested book chapter
+    # via "../assets/...".
+    ("docs/assets", "assets"),
 ]
 
 

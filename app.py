@@ -49,26 +49,25 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# CUSTOM CSS — Refined editorial aesthetic
-# Dark ivory + warm terracotta + deep charcoal
-# Font: DM Serif Display + DM Sans
+# CUSTOM CSS — Minimal white-on-white aesthetic
+# Inspired by altadaily.com — generous whitespace, sans-serif,
+# single restrained matte-black accent. Replaces the warm-ivory +
+# terracotta palette with a clean editorial look.
+# Font: DM Serif Display (hero title only) + DM Sans (everything else)
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600;700&display=swap');
 
 html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    color: #1C1917;
+    font-family: 'DM Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    color: #111111;
 }
-/* Soft warm vertical gradient — adds depth without losing the calm.
-   Light at the top where the brand sits, slightly warmer toward the bottom. */
+/* Pure white background — Alta's signature breathing room. */
 [data-testid="stAppViewContainer"] {
-    background: linear-gradient(180deg, #F8F4ED 0%, #F4EDE3 100%) !important;
+    background: #FFFFFF !important;
 }
-[data-testid="stHeader"] { background: transparent !important; }
-/* Tighten the default Streamlit page padding so content sits closer to the
-   app bar — feels more like a phone screen, less like a web page. */
+[data-testid="stHeader"] { background: #FFFFFF !important; }
 .block-container { padding-top: 0.6rem !important; padding-bottom: 4rem !important; max-width: 720px !important; }
 
 /* ───── Product top app bar ───── */
@@ -78,7 +77,7 @@ html, body, [class*="css"] {
     justify-content: space-between;
     padding: 0.85rem 0.2rem 0.95rem;
     margin-bottom: 0.4rem;
-    border-bottom: 1px solid #EDE5DC;
+    border-bottom: 1px solid #EEEEEE;
 }
 .brand {
     display: flex;
@@ -88,11 +87,11 @@ html, body, [class*="css"] {
 .brand-mark {
     width: 26px; height: 26px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #C17F5A 0%, #D4956F 100%);
+    background: #111111;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    color: #FDFAF7;
+    color: #FFFFFF;
     font-family: 'DM Serif Display', serif;
     font-size: 0.95rem;
     line-height: 1;
@@ -101,20 +100,20 @@ html, body, [class*="css"] {
 .brand-wordmark {
     font-family: 'DM Serif Display', serif;
     font-size: 1.45rem;
-    color: #1C1917;
+    color: #111111;
     line-height: 1;
     letter-spacing: -0.01em;
 }
 .brand-tag {
     font-size: 0.6rem;
-    color: #B8A99A;
+    color: #8E8E93;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     font-weight: 600;
-    border: 1px solid #E8D7C8;
+    border: 1px solid #E5E5E5;
     padding: 2px 7px;
     border-radius: 99px;
-    background: #FDFAF7;
+    background: #FFFFFF;
     transform: translateY(-2px);
 }
 .app-bar-right {
@@ -123,52 +122,51 @@ html, body, [class*="css"] {
 .profile-chip {
     display: inline-flex; align-items: center; gap: 0.55rem;
     padding: 0.32rem 0.55rem 0.32rem 0.4rem;
-    background: #FDFAF7;
-    border: 1px solid #E8E0D8;
+    background: #FFFFFF;
+    border: 1px solid #E5E5E5;
     border-radius: 99px;
 }
 .profile-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #D4956F 0%, #C17F5A 100%);
-    color: #FDFAF7;
+    background: #111111;
+    color: #FFFFFF;
     font-family: 'DM Sans', sans-serif;
     font-size: 0.78rem;
     font-weight: 600;
     display: inline-flex; align-items: center; justify-content: center;
 }
 .profile-name {
-    font-size: 0.78rem; color: #4A3D36; font-weight: 500;
+    font-size: 0.78rem; color: #2E2E2E; font-weight: 500;
     max-width: 84px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 
 /* ───── Section nav pills row ───── */
 .nav-row { margin: 0.4rem 0 1.1rem; }
 
-/* Sidebar — light, calm, warm. No dark blocks. */
+/* Sidebar — pure white with a thin grey rule. */
 [data-testid="stSidebar"] {
-    background-color: #FDFAF7 !important;
-    border-right: 1px solid #EDE5DC;
+    background-color: #FFFFFF !important;
+    border-right: 1px solid #EEEEEE;
 }
 [data-testid="stSidebar"] * {
-    color: #1C1917;
+    color: #111111;
 }
 [data-testid="stSidebar"] .stSelectbox label,
 [data-testid="stSidebar"] .stRadio label,
 [data-testid="stSidebar"] p {
-    color: #7C6F64 !important;
+    color: #6E6E73 !important;
     font-size: 0.74rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
 }
 [data-testid="stSidebar"] .stSelectbox > div > div {
-    background-color: #F5F0EB !important;
-    border: 1px solid #E8E0D8 !important;
-    color: #1C1917 !important;
+    background-color: #FAFAFA !important;
+    border: 1px solid #E5E5E5 !important;
+    color: #111111 !important;
 }
-/* Radio option labels — readable on the new ivory background */
 [data-testid="stSidebar"] .stRadio [role="radiogroup"] label {
-    color: #1C1917 !important;
+    color: #111111 !important;
     font-size: 0.92rem;
     letter-spacing: 0;
     text-transform: none;
@@ -179,7 +177,7 @@ html, body, [class*="css"] {
 .main-title {
     font-family: 'DM Serif Display', serif;
     font-size: 3.2rem;
-    color: #1C1917;
+    color: #111111;
     letter-spacing: -0.02em;
     line-height: 1.1;
     margin-bottom: 0;
@@ -187,18 +185,18 @@ html, body, [class*="css"] {
 .main-subtitle {
     font-family: 'DM Sans', sans-serif;
     font-size: 0.95rem;
-    color: #7C6F64;
+    color: #6E6E73;
     letter-spacing: 0.12em;
     text-transform: uppercase;
     margin-top: 0.3rem;
     margin-bottom: 2.5rem;
 }
 
-/* Cards */
+/* Cards — pure white on white, separated by a thin grey rule. */
 .card {
-    background: #FDFAF7;
-    border: 1px solid #E8E0D8;
-    border-radius: 2px;
+    background: #FFFFFF;
+    border: 1px solid #EEEEEE;
+    border-radius: 6px;
     padding: 1.4rem 1.6rem;
     margin-bottom: 1.1rem;
 }
@@ -206,7 +204,7 @@ html, body, [class*="css"] {
     font-size: 0.72rem;
     letter-spacing: 0.14em;
     text-transform: uppercase;
-    color: #A8937E;
+    color: #8E8E93;
     font-weight: 600;
     margin-bottom: 0.75rem;
 }
@@ -217,7 +215,7 @@ html, body, [class*="css"] {
     align-items: center;
     gap: 0.8rem;
     padding: 0.7rem 0;
-    border-bottom: 1px solid #EDE5DC;
+    border-bottom: 1px solid #F2F2F2;
     font-size: 0.95rem;
 }
 .outfit-item:last-child { border-bottom: none; }
@@ -225,22 +223,21 @@ html, body, [class*="css"] {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #C17F5A;
+    background: #111111;
     flex-shrink: 0;
 }
-/* Actual color swatch for outfit items — replaces emoji glyphs */
 .item-swatch {
     width: 16px;
     height: 16px;
     border-radius: 50%;
     flex-shrink: 0;
-    border: 1px solid rgba(28,25,23,0.10);
+    border: 1px solid rgba(0,0,0,0.10);
     box-shadow: inset 0 0 0 1px rgba(255,255,255,0.25);
 }
 .item-color-chip {
     font-size: 0.72rem;
-    color: #9C8A7A;
-    background: #EDE5DC;
+    color: #6E6E73;
+    background: #F4F4F5;
     padding: 2px 8px;
     border-radius: 20px;
     margin-left: auto;
@@ -248,15 +245,15 @@ html, body, [class*="css"] {
 
 /* Score bar */
 .score-bar-bg {
-    background: #EDE5DC;
-    border-radius: 2px;
+    background: #F2F2F2;
+    border-radius: 6px;
     height: 6px;
     margin-top: 0.5rem;
 }
 .score-bar-fill {
     height: 6px;
-    border-radius: 2px;
-    background: linear-gradient(90deg, #C17F5A, #D4956F);
+    border-radius: 6px;
+    background: #111111;
     transition: width 0.6s ease;
 }
 
@@ -266,7 +263,7 @@ html, body, [class*="css"] {
     align-items: flex-start;
     gap: 0.9rem;
     padding: 0.55rem 0;
-    border-bottom: 1px solid #EDE5DC;
+    border-bottom: 1px solid #F2F2F2;
     font-size: 0.87rem;
 }
 .step-row:last-child { border-bottom: none; }
@@ -275,27 +272,27 @@ html, body, [class*="css"] {
     font-weight: 700;
     letter-spacing: 0.06em;
     padding: 2px 7px;
-    border-radius: 2px;
+    border-radius: 3px;
     flex-shrink: 0;
     margin-top: 1px;
 }
-.badge-ok { background: #D4EDDA; color: #1D6033; }
-.badge-fallback { background: #FFF3CD; color: #7D5A00; }
-.badge-gap { background: #F8D7DA; color: #7A1D21; }
-.step-name { font-weight: 600; color: #1C1917; white-space: nowrap; }
-.step-output { color: #6B5C52; }
+.badge-ok { background: #F0F7F2; color: #1D6033; }
+.badge-fallback { background: #FBF5E6; color: #7D5A00; }
+.badge-gap { background: #FCF2F2; color: #7A1D21; }
+.step-name { font-weight: 600; color: #111111; white-space: nowrap; }
+.step-output { color: #6E6E73; }
 
 /* Reasoning */
 .reason-item {
     padding: 0.45rem 0;
-    border-bottom: 1px solid #EDE5DC;
+    border-bottom: 1px solid #F2F2F2;
     font-size: 0.88rem;
-    color: #4A3D36;
+    color: #2E2E2E;
     display: flex;
     gap: 0.6rem;
 }
 .reason-num {
-    color: #C17F5A;
+    color: #111111;
     font-weight: 700;
     flex-shrink: 0;
     font-size: 0.8rem;
@@ -305,10 +302,10 @@ html, body, [class*="css"] {
 /* Before/after */
 .compare-col {
     padding: 1.4rem 1.6rem;
-    border-radius: 2px;
+    border-radius: 6px;
 }
-.compare-before { background: #F0EAE4; border-left: 3px solid #B8A99A; }
-.compare-after  { background: #FAF3EE; border-left: 3px solid #C17F5A; }
+.compare-before { background: #FAFAFA; border-left: 3px solid #D1D1D6; }
+.compare-after  { background: #FFFFFF; border-left: 3px solid #111111; border: 1px solid #EEEEEE; }
 .compare-label {
     font-size: 0.7rem;
     letter-spacing: 0.14em;
@@ -316,17 +313,17 @@ html, body, [class*="css"] {
     font-weight: 700;
     margin-bottom: 0.9rem;
 }
-.compare-before .compare-label { color: #8A7060; }
-.compare-after  .compare-label { color: #9F5A36; }
+.compare-before .compare-label { color: #8E8E93; }
+.compare-after  .compare-label { color: #111111; }
 .compare-row {
     display: flex;
     justify-content: space-between;
     padding: 0.35rem 0;
     font-size: 0.87rem;
-    border-bottom: 1px solid rgba(0,0,0,0.06);
+    border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 .compare-row:last-child { border-bottom: none; }
-.compare-key { color: #6B5C52; }
+.compare-key { color: #6E6E73; }
 .compare-val { font-weight: 600; }
 
 /* Event badge */
@@ -338,23 +335,23 @@ html, body, [class*="css"] {
     font-weight: 600;
     padding: 3px 10px;
     border-radius: 99px;
-    background: #FAF3EE;
-    color: #9F5A36;
-    border: 1px solid #EAD7C9;
+    background: #FAFAFA;
+    color: #111111;
+    border: 1px solid #E5E5E5;
     margin-bottom: 0.6rem;
 }
 
 /* Gap alert */
 .gap-alert {
-    background: #FDF3EE;
-    border: 1px solid #E8C4A8;
-    border-left: 3px solid #C17F5A;
-    border-radius: 2px;
+    background: #FFFFFF;
+    border: 1px solid #EEEEEE;
+    border-left: 3px solid #111111;
+    border-radius: 6px;
     padding: 1rem 1.2rem;
     margin-top: 0.5rem;
 }
-.gap-title { font-weight: 600; color: #8A4A20; font-size: 0.88rem; margin-bottom: 0.5rem; }
-.gap-item { font-size: 0.86rem; color: #6B4030; padding: 0.2rem 0; }
+.gap-title { font-weight: 600; color: #111111; font-size: 0.88rem; margin-bottom: 0.5rem; }
+.gap-item { font-size: 0.86rem; color: #2E2E2E; padding: 0.2rem 0; }
 
 /* Weather */
 .weather-block {
@@ -366,28 +363,29 @@ html, body, [class*="css"] {
 .weather-temp {
     font-family: 'DM Serif Display', serif;
     font-size: 2.4rem;
-    color: #1C1917;
+    color: #111111;
     line-height: 1;
 }
 .weather-detail {
     font-size: 0.82rem;
-    color: #7C6F64;
+    color: #6E6E73;
     line-height: 1.8;
 }
 .weather-advice {
     font-size: 0.84rem;
-    color: #4A3D36;
-    background: #EDE5DC;
+    color: #2E2E2E;
+    background: #FAFAFA;
     padding: 0.5rem 0.9rem;
-    border-radius: 2px;
+    border-radius: 6px;
     margin-top: 0.5rem;
+    border: 1px solid #EEEEEE;
 }
 
-/* Default button (used for section nav, secondary actions) — subtle, warm */
+/* Default button (secondary actions) — white card, dark text, thin border. */
 .stButton > button {
-    background: #FDFAF7 !important;
-    color: #4A3D36 !important;
-    border: 1px solid #E8E0D8 !important;
+    background: #FFFFFF !important;
+    color: #111111 !important;
+    border: 1px solid #E5E5E5 !important;
     border-radius: 99px !important;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 0.84rem !important;
@@ -398,23 +396,24 @@ html, body, [class*="css"] {
     transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
 }
 .stButton > button:hover {
-    background: #F5EDE3 !important;
-    border-color: #D4C4B2 !important;
-    color: #1C1917 !important;
+    background: #F5F5F5 !important;
+    border-color: #111111 !important;
+    color: #111111 !important;
 }
-/* Primary button (the CTA — terracotta filled, larger touch target) */
+/* Primary button — solid black, white text. Alta-style CTA. */
 .stButton > button[kind="primary"] {
-    background: #C17F5A !important;
-    color: #FDFAF7 !important;
-    border: none !important;
-    border-radius: 4px !important;
+    background: #111111 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #111111 !important;
+    border-radius: 6px !important;
     font-size: 0.95rem !important;
     padding: 0.82rem 1.6rem !important;
-    box-shadow: 0 1px 0 rgba(28,25,23,0.04) !important;
+    box-shadow: none !important;
 }
 .stButton > button[kind="primary"]:hover {
-    background: #A86A48 !important;
-    color: #FDFAF7 !important;
+    background: #2E2E2E !important;
+    border-color: #2E2E2E !important;
+    color: #FFFFFF !important;
 }
 .stButton > button[kind="primary"]:active {
     transform: translateY(1px) !important;
@@ -550,10 +549,11 @@ def color_to_swatch(color_str: str) -> str:
     return "#C8B8A8"
 
 def score_color(score):
-    # Warm-palette only: no cool greens or reds.
-    if score >= 80: return "#9F5A36"   # confident deep terracotta
-    if score >= 60: return "#C17F5A"   # accent terracotta
-    return "#8A4A20"                    # warm warning brown
+    # Minimal palette: dark for strong, mid-grey for fine, muted red for low.
+    # Keeps the gauge readable without breaking the white-on-white aesthetic.
+    if score >= 80: return "#111111"   # confident matte black
+    if score >= 60: return "#4A4A4A"   # neutral grey
+    return "#B91C1C"                    # restrained warning red
 
 
 # ─────────────────────────────────────────────
@@ -676,12 +676,12 @@ with st.sidebar:
     st.markdown("""
     <div style="padding:0.3rem 0 0.2rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.5rem; color:#1C1917; line-height:1;">Settings</div>
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.16em; text-transform:uppercase; margin-top:0.35rem;">Prototype controls</div>
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.16em; text-transform:uppercase; margin-top:0.35rem;">Prototype controls</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("---")
 
-    st.markdown("<p style='font-size:0.72rem; color:#7C6F64; line-height:1.55;'>Try a specific occasion instead of today's calendar event:</p>", unsafe_allow_html=True)
+    st.markdown("<p style='font-size:0.72rem; color:#6E6E73; line-height:1.55;'>Try a specific occasion instead of today's calendar event:</p>", unsafe_allow_html=True)
     st.session_state["everyday_choice"] = st.selectbox(
         "Occasion",
         ["Work", "Gym", "Dinner", "Formal Gala", "Weekend Brunch", "Casual Outing"],
@@ -697,8 +697,8 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("""
-    <p style="font-size:0.72rem; color:#7C6F64; line-height:1.6;">
-    <strong style="color:#4A3D36;">Privacy.</strong>
+    <p style="font-size:0.72rem; color:#6E6E73; line-height:1.6;">
+    <strong style="color:#2E2E2E;">Privacy.</strong>
     Your calendar, weather, wardrobe, and profile data are used only for outfit planning in this prototype.
     </p>
     """, unsafe_allow_html=True)
@@ -737,10 +737,10 @@ def _render_outfit_result(result: dict):
             <div style="font-family:'DM Serif Display',serif; font-size:1.35rem; margin-bottom:0.3rem;">
                 {event.get('title','N/A')}
             </div>
-            <div style="font-size:0.84rem; color:#7C6F64;">
+            <div style="font-size:0.84rem; color:#6E6E73;">
                 {event.get('date','Today')} &nbsp;·&nbsp; {event.get('time','')}
             </div>
-            {"<div style='font-size:0.82rem;color:#9C8A7A;margin-top:0.5rem;'>" + event.get('notes','') + "</div>" if event.get('notes') else ""}
+            {"<div style='font-size:0.82rem;color:#6E6E73;margin-top:0.5rem;'>" + event.get('notes','') + "</div>" if event.get('notes') else ""}
         </div>
         """, unsafe_allow_html=True)
 
@@ -782,7 +782,7 @@ def _render_outfit_result(result: dict):
             )
             item_rows.append(row)
 
-        inner = "".join(item_rows) if item_rows else "<p style='color:#9C8A7A'>No items selected.</p>"
+        inner = "".join(item_rows) if item_rows else "<p style='color:#6E6E73'>No items selected.</p>"
         outfit_html = (
             '<div class="card">'
             '<div class="card-title">Your Outfit &mdash; ' + str(len(outfit)) + ' pieces</div>'
@@ -799,21 +799,21 @@ def _render_outfit_result(result: dict):
 
         flags_html = ""
         for f in flags:
-            flags_html += f"<div style='font-size:0.82rem;color:#8A4A20;padding:0.25rem 0;'>{f}</div>"
+            flags_html += f"<div style='font-size:0.82rem;color:#111111;padding:0.25rem 0;'>{f}</div>"
 
         st.markdown(f"""
         <div class="card">
             <div class="card-title">Color Harmony Score</div>
             <div style="font-family:'DM Serif Display',serif; font-size:2.8rem; color:{sc}; line-height:1;">
-                {score_val}<span style="font-size:1.2rem; color:#9C8A7A">/100</span>
+                {score_val}<span style="font-size:1.2rem; color:#6E6E73">/100</span>
             </div>
-            <div style="font-size:0.78rem;color:#9C8A7A;margin:0.3rem 0 0.4rem;">
+            <div style="font-size:0.78rem;color:#6E6E73;margin:0.3rem 0 0.4rem;">
                 Skin tone: {result.get('profile',{}).get('skin_tone','—')}
             </div>
             <div class="score-bar-bg">
                 <div class="score-bar-fill" style="width:{bar_pct}%"></div>
             </div>
-            {flags_html if flags_html else "<div style='font-size:0.83rem;color:#9F5A36;margin-top:0.6rem;'>All colors work well for your skin tone.</div>"}
+            {flags_html if flags_html else "<div style='font-size:0.83rem;color:#111111;margin-top:0.6rem;'>All colors work well for your skin tone.</div>"}
         </div>
         """, unsafe_allow_html=True)
 
@@ -851,15 +851,15 @@ def _render_outfit_result(result: dict):
             if gap_is_on_wishlist(primary_gap):
                 st.markdown(
                     f'<div style="margin-top:0.6rem; padding:0.55rem 0.9rem; '
-                    f'background:#FAF3EE; border:1px solid #EAD7C9; border-radius:99px; '
-                    f'display:inline-block; font-size:0.78rem; color:#9F5A36;">'
+                    f'background:#FAFAFA; border:1px solid #EEEEEE; border-radius:99px; '
+                    f'display:inline-block; font-size:0.78rem; color:#111111;">'
                     f"✓ '{primary_gap}' is already on your wishlist"
                     f"</div>",
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
-                    '<div style="font-size:0.74rem; color:#9C8A7A; margin-top:0.65rem;">'
+                    '<div style="font-size:0.74rem; color:#6E6E73; margin-top:0.65rem;">'
                     "Save a suggestion to your wishlist for later:"
                     "</div>",
                     unsafe_allow_html=True,
@@ -986,11 +986,11 @@ def _render_outfit_result(result: dict):
         already_worn = st.session_state.get("worn_outfit_key") == outfit_key
 
         st.markdown("""
-        <div style="margin:1.4rem 0 0.6rem; padding-top:1.2rem; border-top:1px solid #EDE5DC;">
+        <div style="margin:1.4rem 0 0.6rem; padding-top:1.2rem; border-top:1px solid #EEEEEE;">
             <div style="font-family:'DM Serif Display',serif; font-size:1.25rem; color:#1C1917; line-height:1.2;">
                 Wearing this today?
             </div>
-            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.35rem; line-height:1.55;">
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.35rem; line-height:1.55;">
                 Mark the outfit worn so Wearly can rotate fresher pieces into your next recommendation.
             </div>
         </div>
@@ -1028,11 +1028,11 @@ def _render_outfit_result(result: dict):
     # trail so the user sees WHY the new outfit is different.
     if outfit:
         st.markdown("""
-        <div style="margin:1.6rem 0 0.8rem; padding-top:1.2rem; border-top:1px solid #EDE5DC;">
+        <div style="margin:1.6rem 0 0.8rem; padding-top:1.2rem; border-top:1px solid #EEEEEE;">
             <div style="font-family:'DM Serif Display',serif; font-size:1.25rem; color:#1C1917; line-height:1.2;">
                 Not quite right?
             </div>
-            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.35rem; line-height:1.55;">
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.35rem; line-height:1.55;">
                 Tell Wearly what to swap out and why. The agent will re-run with your feedback —
                 and explain every change.
             </div>
@@ -1103,16 +1103,16 @@ def _render_outfit_result(result: dict):
         prior_reasons_list = prior.get("reasons", []) if isinstance(prior, dict) else []
         if prior_reasons_list:
             chips = "".join(
-                f'<span style="display:inline-block; font-size:0.74rem; color:#9F5A36; padding:0.32rem 0.8rem; background:#FAF3EE; border:1px solid #EAD7C9; border-radius:99px; margin:0 0.4rem 0.4rem 0;">{r.get("item_name","—")} · {r.get("reason","rejected")}</span>'
+                f'<span style="display:inline-block; font-size:0.74rem; color:#111111; padding:0.32rem 0.8rem; background:#FAFAFA; border:1px solid #EEEEEE; border-radius:99px; margin:0 0.4rem 0.4rem 0;">{r.get("item_name","—")} · {r.get("reason","rejected")}</span>'
                 for r in prior_reasons_list
             )
             st.markdown(f"""
-            <div style="margin-top:1.1rem; padding:1rem 1.1rem; background:#FDFAF7; border:1px solid #EDE5DC; border-radius:6px;">
-                <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">
+            <div style="margin-top:1.1rem; padding:1rem 1.1rem; background:#FFFFFF; border:1px solid #EEEEEE; border-radius:6px;">
+                <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">
                     What changed in this run
                 </div>
                 <div>{chips}</div>
-                <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.65rem; line-height:1.55;">
+                <div style="font-size:0.78rem; color:#6E6E73; margin-top:0.65rem; line-height:1.55;">
                     These items were excluded from the candidate pool. The reasoning trail above shows what Wearly chose instead.
                 </div>
             </div>
@@ -1171,30 +1171,30 @@ def _render_home():
         w_city, w_temp, w_cond, w_advice = "—", "—", "—", ""
 
     notes_html = (
-        f'<div style="font-size:0.8rem; color:#9C8A7A; margin-top:0.3rem; font-style:italic; line-height:1.5;">{ev_notes}</div>'
+        f'<div style="font-size:0.8rem; color:#6E6E73; margin-top:0.3rem; font-style:italic; line-height:1.5;">{ev_notes}</div>'
         if ev_notes else ""
     )
 
     st.markdown(f"""
-    <div style="position:relative; background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.55rem 1.6rem 1.4rem; margin-bottom:1.1rem; overflow:hidden; box-shadow:0 1px 0 rgba(28,25,23,0.02);">
-        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, #C17F5A 0%, #D4956F 60%, #E8B998 100%);"></div>
-        <div style="font-size:0.7rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:1rem;">
+    <div style="position:relative; background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.55rem 1.6rem 1.4rem; margin-bottom:1.1rem; overflow:hidden; box-shadow:0 1px 0 rgba(28,25,23,0.02);">
+        <div style="position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg, #111111 0%, #2E2E2E 60%, #E8B998 100%);"></div>
+        <div style="font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:1rem;">
             Today · {today_label}
         </div>
         <div style="margin-bottom:1.1rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.4rem;">Next event</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.4rem;">Next event</div>
             <div style="font-family:'DM Serif Display',serif; font-size:1.45rem; color:#1C1917; line-height:1.15;">{ev_title}</div>
-            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">{ev_meta}</div>
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">{ev_meta}</div>
             {notes_html}
         </div>
-        <div style="height:1px; background:#EDE5DC; margin:0 0 1.05rem;"></div>
+        <div style="height:1px; background:#EEEEEE; margin:0 0 1.05rem;"></div>
         <div>
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.4rem;">Weather · {w_city}</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.4rem;">Weather · {w_city}</div>
             <div style="display:flex; align-items:baseline; gap:0.65rem; flex-wrap:wrap;">
                 <div style="font-family:'DM Serif Display',serif; font-size:1.6rem; color:#1C1917; line-height:1;">{w_temp}°F</div>
-                <div style="font-size:0.95rem; color:#4A3D36;">{w_cond}</div>
+                <div style="font-size:0.95rem; color:#2E2E2E;">{w_cond}</div>
             </div>
-            <div style="font-size:0.82rem; color:#7C6F64; margin-top:0.45rem; line-height:1.5;">{w_advice}</div>
+            <div style="font-size:0.82rem; color:#6E6E73; margin-top:0.45rem; line-height:1.5;">{w_advice}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1207,7 +1207,7 @@ def _render_home():
         _goto("today")
 
     st.markdown("""
-    <div style="text-align:center; font-size:0.72rem; color:#9C8A7A; margin-top:0.55rem; margin-bottom:0.4rem; letter-spacing:0.02em;">
+    <div style="text-align:center; font-size:0.72rem; color:#6E6E73; margin-top:0.55rem; margin-bottom:0.4rem; letter-spacing:0.02em;">
         7 reasoning steps · ~3 seconds · no account required
     </div>
     """, unsafe_allow_html=True)
@@ -1215,18 +1215,18 @@ def _render_home():
     # ── Agent-process pill row ──
     pill = (
         "display:inline-flex; align-items:center; gap:0.45rem; "
-        "padding:0.42rem 0.82rem 0.42rem 0.7rem; background:#FDFAF7; "
-        "border:1px solid #E8E0D8; border-radius:99px; "
+        "padding:0.42rem 0.82rem 0.42rem 0.7rem; background:#FFFFFF; "
+        "border:1px solid #E5E5E5; border-radius:99px; "
         "font-size:0.78rem; color:#3D332D; font-weight:500;"
     )
     num = (
-        "color:#C17F5A; font-size:0.66rem; font-weight:700; "
+        "color:#111111; font-size:0.66rem; font-weight:700; "
         "letter-spacing:0.05em; font-family:'DM Sans',sans-serif;"
     )
     arrow = "color:#C8B8A8; font-size:0.85rem; padding:0 0.05rem;"
     st.markdown(f"""
     <div style="margin-top:1.4rem; padding:1rem 0.2rem 0.4rem; text-align:center;">
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.16em; text-transform:uppercase; font-weight:600; margin-bottom:0.85rem;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.16em; text-transform:uppercase; font-weight:600; margin-bottom:0.85rem;">
             How Wearly thinks
         </div>
         <div style="display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:0.42rem; row-gap:0.55rem;">
@@ -1240,7 +1240,7 @@ def _render_home():
             <span style="{arrow}">→</span>
             <span style="{pill}"><span style="{num}">05</span> Outfit</span>
         </div>
-        <p style="font-size:0.82rem; color:#7C6F64; margin:1rem auto 0; max-width:24rem; line-height:1.55;">
+        <p style="font-size:0.82rem; color:#6E6E73; margin:1rem auto 0; max-width:24rem; line-height:1.55;">
             An <strong style="color:#1C1917;">agent</strong>, not a chatbot.
             Wearly reads your context first, then recommends — and explains every choice.
         </p>
@@ -1248,9 +1248,9 @@ def _render_home():
     """, unsafe_allow_html=True)
 
     st.markdown("""
-    <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EDE5DC;">
-        <p style="font-size:0.74rem; color:#9C8A7A; line-height:1.55; margin:0; max-width:30rem;">
-            <strong style="color:#7C6F64; letter-spacing:0.04em;">Privacy first.</strong>
+    <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
+        <p style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin:0; max-width:30rem;">
+            <strong style="color:#6E6E73; letter-spacing:0.04em;">Privacy first.</strong>
             Calendar, weather, wardrobe, and profile data are used only for outfit planning in this prototype.
             No accounts. No third parties.
         </p>
@@ -1268,7 +1268,7 @@ def _render_today():
         st.markdown("""
         <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
             <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today's outfit</div>
-            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
         </div>
         """, unsafe_allow_html=True)
         _render_outfit_result(res)
@@ -1284,11 +1284,11 @@ def _render_today():
         st.markdown("""
         <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
             <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today</div>
-            <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">No outfit yet — let's plan one.</div>
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">No outfit yet — let's plan one.</div>
         </div>
-        <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:2rem 1.6rem; text-align:center;">
-            <div style="font-family:'DM Serif Display',serif; font-size:1.2rem; color:#4A3D36;">Plan today's outfit</div>
-            <div style="font-size:0.84rem; color:#7C6F64; margin-top:0.5rem; max-width:24rem; margin-left:auto; margin-right:auto; line-height:1.55;">
+        <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:2rem 1.6rem; text-align:center;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.2rem; color:#2E2E2E;">Plan today's outfit</div>
+            <div style="font-size:0.84rem; color:#6E6E73; margin-top:0.5rem; max-width:24rem; margin-left:auto; margin-right:auto; line-height:1.55;">
                 Wearly will read your calendar, check the weather, and choose pieces from your closet — with reasoning at every step.
             </div>
         </div>
@@ -1298,7 +1298,7 @@ def _render_today():
         # adding real-life context grounded the AI's analysis.
         st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
         st.markdown(
-            "<div style='font-size:0.78rem; color:#7C6F64; margin-bottom:0.3rem;'>"
+            "<div style='font-size:0.78rem; color:#6E6E73; margin-bottom:0.3rem;'>"
             "Anything Wearly should know about today? <em>(optional — "
             "e.g. \"tired and want comfort\", \"first day at a new job\", "
             "\"traveling, packable\")</em></div>",
@@ -1346,8 +1346,8 @@ def _render_backup_restore():
 
     with st.expander("Backup & restore your closet", expanded=False):
         st.markdown("""
-        <div style="font-size:0.82rem; color:#4A3D36; line-height:1.55; margin-bottom:0.8rem;">
-            <strong style="color:#9F5A36;">Why this matters.</strong>
+        <div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55; margin-bottom:0.8rem;">
+            <strong style="color:#111111;">Why this matters.</strong>
             On Streamlit Cloud, anything you save (wardrobe items, profile
             preferences, wear history, favorite stores, wishlist) is
             cleared when the container restarts. Download the backup
@@ -1356,8 +1356,8 @@ def _render_backup_restore():
             backups still help for moving between devices or
             version-controlling your closet.
         </div>
-        <div style="font-size:0.74rem; color:#9C8A7A; line-height:1.55; margin-bottom:1rem;">
-            <strong style="color:#7C6F64;">What's in a backup.</strong>
+        <div style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin-bottom:1rem;">
+            <strong style="color:#6E6E73;">What's in a backup.</strong>
             One JSON file bundling your wardrobe (manually added pieces),
             profile, wear history, favorite stores, and wishlist. Seed
             wardrobe and color rules aren't included — those ship with
@@ -1369,7 +1369,7 @@ def _render_backup_restore():
 
         with col_dl:
             st.markdown(
-                '<div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Download backup</div>',
+                '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Download backup</div>',
                 unsafe_allow_html=True,
             )
             st.download_button(
@@ -1384,7 +1384,7 @@ def _render_backup_restore():
 
         with col_ul:
             st.markdown(
-                '<div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Restore from a backup</div>',
+                '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">Restore from a backup</div>',
                 unsafe_allow_html=True,
             )
             uploaded = st.file_uploader(
@@ -1464,13 +1464,13 @@ def _render_ask_wardrobe():
         if wq:
             st.markdown(
                 f"<div style='margin-top:1rem; padding:0.9rem 1rem; "
-                f"background:#FBF6F0; border:1px solid #ECDFD0; border-radius:6px;'>"
-                f"<div style='font-size:0.78rem; color:#7C6F64; text-transform:uppercase; "
+                f"background:#FAFAFA; border:1px solid #EEEEEE; border-radius:6px;'>"
+                f"<div style='font-size:0.78rem; color:#6E6E73; text-transform:uppercase; "
                 f"letter-spacing:0.4px;'>{wq.get('question', '')}</div>"
                 f"<div style='font-size:0.92rem; color:#2E2A27; line-height:1.55; margin-top:0.4rem;'>"
                 f"{wq.get('summary', '')}"
                 f"</div>"
-                f"<div style='font-size:0.72rem; color:#9C8A7A; margin-top:0.5rem;'>"
+                f"<div style='font-size:0.72rem; color:#6E6E73; margin-top:0.5rem;'>"
                 f"{wq.get('rule', '')}"
                 f"</div>"
                 f"</div>",
@@ -1487,10 +1487,10 @@ def _render_ask_wardrobe():
                         co = it.get("color", "")
                         st.markdown(
                             f"<div style='padding:0.6rem 0.7rem; background:#FFFFFF; "
-                            f"border:1px solid #E8E0D8; border-radius:6px; "
+                            f"border:1px solid #E5E5E5; border-radius:6px; "
                             f"font-size:0.82rem; color:#2E2A27; line-height:1.4;'>"
                             f"<strong>{nm}</strong>"
-                            f"<div style='font-size:0.72rem; color:#7C6F64;'>"
+                            f"<div style='font-size:0.72rem; color:#6E6E73;'>"
                             f"{tp}{' · ' + co if co else ''}</div></div>",
                             unsafe_allow_html=True,
                         )
@@ -1503,7 +1503,7 @@ def _render_wardrobe():
     st.markdown("""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Wardrobe</div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Your digital closet — seed pieces plus anything you've added.</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Your digital closet — seed pieces plus anything you've added.</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1542,24 +1542,24 @@ def _render_wardrobe():
     total_user = user_clothing + user_shoes + user_accessories
 
     st.markdown(f"""
-    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.2rem 1.4rem; margin-bottom:1.1rem;">
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.7rem;">Inventory</div>
+    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.2rem 1.4rem; margin-bottom:1.1rem;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.7rem;">Inventory</div>
         <div style="display:flex; gap:1.2rem; flex-wrap:wrap;">
             <div style="flex:1; min-width:120px;">
                 <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_clothing + user_clothing}</div>
-                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">clothing pieces</div>
+                <div style="font-size:0.72rem; color:#6E6E73; margin-top:0.25rem;">clothing pieces</div>
             </div>
             <div style="flex:1; min-width:120px;">
                 <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_shoes + user_shoes}</div>
-                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">shoes</div>
+                <div style="font-size:0.72rem; color:#6E6E73; margin-top:0.25rem;">shoes</div>
             </div>
             <div style="flex:1; min-width:120px;">
                 <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1;">{seed_accessories + user_accessories}</div>
-                <div style="font-size:0.72rem; color:#7C6F64; margin-top:0.25rem;">accessories</div>
+                <div style="font-size:0.72rem; color:#6E6E73; margin-top:0.25rem;">accessories</div>
             </div>
         </div>
-        <div style="font-size:0.76rem; color:#9C8A7A; margin-top:0.85rem; line-height:1.55;">
-            {total_seed} seed piece{'' if total_seed == 1 else 's'} · <strong style="color:#9F5A36;">{total_user} added by you</strong>
+        <div style="font-size:0.76rem; color:#6E6E73; margin-top:0.85rem; line-height:1.55;">
+            {total_seed} seed piece{'' if total_seed == 1 else 's'} · <strong style="color:#111111;">{total_user} added by you</strong>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1568,7 +1568,7 @@ def _render_wardrobe():
     st.markdown("""
     <div style="margin-bottom:0.5rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.3rem; color:#1C1917; line-height:1.2;">Add an item</div>
-        <div style="font-size:0.82rem; color:#7C6F64; margin-top:0.25rem;">Type a piece in by hand, or upload a photo and let Wearly suggest the color. Either way, the item joins the candidate pool the next time you ask for an outfit.</div>
+        <div style="font-size:0.82rem; color:#6E6E73; margin-top:0.25rem;">Type a piece in by hand, or upload a photo and let Wearly suggest the color. Either way, the item joins the candidate pool the next time you ask for an outfit.</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -1637,10 +1637,10 @@ def _render_wardrobe():
     # ── Photo tab ───────────────────────────────────────────────
     with _tab_photo:
         st.markdown("""
-        <div style="font-size:0.82rem; color:#7C6F64; margin-bottom:0.7rem; line-height:1.5;">
+        <div style="font-size:0.82rem; color:#6E6E73; margin-bottom:0.7rem; line-height:1.5;">
             Upload a photo of the piece. Wearly reads the dominant colors in the image and
             suggests the closest named color — you confirm or override before saving.
-            <br><span style="color:#9C8A7A; font-size:0.74rem;">No AI category recognition yet; you'll fill in type, formality, and tags. <a href="#" style="color:#A8937E;">Production path is documented in the Intelligent Book.</a></span>
+            <br><span style="color:#6E6E73; font-size:0.74rem;">No AI category recognition yet; you'll fill in type, formality, and tags. <a href="#" style="color:#8E8E93;">Production path is documented in the Intelligent Book.</a></span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1670,18 +1670,18 @@ def _render_wardrobe():
                         pct = round(s["weight"] * 100)
                         chips += (
                             f'<div style="display:inline-flex; align-items:center; gap:0.45rem; '
-                            f'padding:0.35rem 0.75rem; background:#FDFAF7; border:1px solid #E8E0D8; '
+                            f'padding:0.35rem 0.75rem; background:#FFFFFF; border:1px solid #E5E5E5; '
                             f'border-radius:99px; font-size:0.78rem; color:#3D332D; margin:0 0.4rem 0.4rem 0;">'
                             f'<span style="width:14px; height:14px; border-radius:50%; background:{s["hex"]}; '
                             f'border:1px solid rgba(28,25,23,0.10); display:inline-block;"></span>'
                             f'{s["name"]} · {pct}%</div>'
                         )
                     st.markdown(f"""
-                    <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">
+                    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">
                         Suggested colors
                     </div>
                     <div style="margin-bottom:0.6rem;">{chips}</div>
-                    <div style="font-size:0.76rem; color:#7C6F64; line-height:1.5;">
+                    <div style="font-size:0.76rem; color:#6E6E73; line-height:1.5;">
                         The top suggestion is pre-filled below. You can keep it, pick one of the others,
                         or type in any color.
                     </div>
@@ -1757,11 +1757,11 @@ def _render_wardrobe():
     # ── Link tab ────────────────────────────────────────────────
     with _tab_link:
         st.markdown("""
-        <div style="font-size:0.82rem; color:#7C6F64; margin-bottom:0.7rem; line-height:1.5;">
+        <div style="font-size:0.82rem; color:#6E6E73; margin-bottom:0.7rem; line-height:1.5;">
             Paste a product URL. Wearly will infer the store, suggest an item name from the URL slug,
             and try to read the page's public metadata (page title, og:title, og:image) to pre-fill
             the form. Every field is yours to confirm or edit before saving.
-            <br><span style="color:#9C8A7A; font-size:0.74rem;">
+            <br><span style="color:#6E6E73; font-size:0.74rem;">
                 Some retailers block automated requests. If the fetch fails we still pre-fill from the URL slug alone — no crashes.
             </span>
         </div>
@@ -1813,7 +1813,7 @@ def _render_wardrobe():
                 preview_img_block = (
                     f'<img src="{source_image}" alt="product image" '
                     f'style="width:100%; max-width:220px; border-radius:6px; '
-                    f'border:1px solid #E8E0D8; display:block;" '
+                    f'border:1px solid #E5E5E5; display:block;" '
                     f'onerror="this.style.display=\'none\'">'
                 )
             else:
@@ -1821,7 +1821,7 @@ def _render_wardrobe():
                     '<div style="width:160px; height:120px; background:#F5EDE3; '
                     'border:1px dashed #D4C4B2; border-radius:6px; display:flex; '
                     'align-items:center; justify-content:center; text-align:center; '
-                    'font-size:0.72rem; color:#9C8A7A; padding:0.6rem; line-height:1.35;">'
+                    'font-size:0.72rem; color:#6E6E73; padding:0.6rem; line-height:1.35;">'
                     'No image found —<br>upload a photo later'
                     '</div>'
                 )
@@ -1832,42 +1832,42 @@ def _render_wardrobe():
                 'border:1px solid #C9DDC1; padding:2px 9px; border-radius:99px; '
                 'letter-spacing:0.06em; text-transform:uppercase; font-weight:600;">Page read OK</span>'
                 if fetched else
-                '<span style="font-size:0.66rem; color:#8A4A20; background:#FDF3EE; '
-                'border:1px solid #E8C4A8; padding:2px 9px; border-radius:99px; '
+                '<span style="font-size:0.66rem; color:#111111; background:#FAFAFA; '
+                'border:1px solid #EEEEEE; padding:2px 9px; border-radius:99px; '
                 'letter-spacing:0.06em; text-transform:uppercase; font-weight:600;">URL only</span>'
             )
 
             # Suggested-name placeholder: never show useless text like "Productpage."
-            suggested_name_display = inferred.get("name") or '<span style="color:#A8937E;">Review item name below</span>'
+            suggested_name_display = inferred.get("name") or '<span style="color:#8E8E93;">Review item name below</span>'
 
             # When the fetch failed, surface a calm one-liner explaining the
             # situation. The user can still save once they've reviewed fields.
             fetch_explanation_block = ""
             if not fetched:
                 fetch_explanation_block = (
-                    '<div style="font-size:0.78rem; color:#8A4A20; background:#FDF3EE; '
-                    'border:1px solid #E8C4A8; border-radius:6px; padding:0.7rem 0.95rem; '
+                    '<div style="font-size:0.78rem; color:#111111; background:#FAFAFA; '
+                    'border:1px solid #EEEEEE; border-radius:6px; padding:0.7rem 0.95rem; '
                     'margin-top:0.85rem; line-height:1.55;">'
                     "We couldn't read this page automatically "
-                    f'<span style="color:#9C8A7A;">({fetch_err or "unknown reason"})</span>, '
+                    f'<span style="color:#6E6E73;">({fetch_err or "unknown reason"})</span>, '
                     'but you can still save the item after reviewing the fields below.'
                     '</div>'
                 )
 
             st.markdown(f"""
-            <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.2rem 1.4rem; margin-top:0.4rem; margin-bottom:1rem;">
+            <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.2rem 1.4rem; margin-top:0.4rem; margin-bottom:1rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
-                    <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600;">Link preview</div>
+                    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600;">Link preview</div>
                     {fetch_chip}
                 </div>
                 <div style="display:flex; gap:1.2rem; flex-wrap:wrap;">
                     <div style="flex:0 0 auto; min-width:160px;">{preview_img_block}</div>
                     <div style="flex:1; min-width:220px;">
-                        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Store</div>
+                        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Store</div>
                         <div style="font-size:0.95rem; color:#1C1917; margin-bottom:0.6rem;">{link_data.get('source_store') or '—'}</div>
-                        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Suggested name</div>
+                        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Suggested name</div>
                         <div style="font-family:'DM Serif Display',serif; font-size:1.15rem; color:#1C1917; line-height:1.25;">{suggested_name_display}</div>
-                        <div style="font-size:0.76rem; color:#7C6F64; margin-top:0.5rem; line-height:1.5;">
+                        <div style="font-size:0.76rem; color:#6E6E73; margin-top:0.5rem; line-height:1.5;">
                             Category: <strong>{inferred.get('category') or '— (pick below)'}</strong><br>
                             Color: <strong>{inferred.get('color') or '— (type below)'}</strong><br>
                             Occasion tags: <strong>{', '.join(inferred.get('tags', [])) or '—'}</strong>
@@ -1986,7 +1986,7 @@ def _render_wardrobe():
                         st.error(f"Could not save: {res.get('error', 'unknown error')}")
         else:
             st.markdown(
-                '<div style="font-size:0.82rem; color:#9C8A7A; margin-top:0.4rem;">'
+                '<div style="font-size:0.82rem; color:#6E6E73; margin-top:0.4rem;">'
                 "Paste a URL above and tap <strong>Analyze link →</strong> to see the inferred fields."
                 "</div>",
                 unsafe_allow_html=True,
@@ -2008,8 +2008,8 @@ def _render_wardrobe():
             avail_chip = ""
             if avail != "available":
                 avail_chip = (
-                    f'<span style="margin-left:0.5rem; font-size:0.66rem; color:#8A4A20; '
-                    f'background:#FDF3EE; border:1px solid #E8C4A8; padding:1px 7px; '
+                    f'<span style="margin-left:0.5rem; font-size:0.66rem; color:#111111; '
+                    f'background:#FAFAFA; border:1px solid #EEEEEE; padding:1px 7px; '
                     f'border-radius:99px; letter-spacing:0.06em;">{avail}</span>'
                 )
             # Optional inline thumbnail. Priority:
@@ -2025,22 +2025,22 @@ def _render_wardrobe():
                     thumb_html = (
                         f'<img src="{data_uri}" alt="" '
                         f'style="width:42px; height:42px; object-fit:cover; '
-                        f'border-radius:4px; border:1px solid #E8E0D8; flex-shrink:0;" '
+                        f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
                         f'onerror="this.style.display=\'none\'">'
                     )
             elif src_image:
                 thumb_html = (
                     f'<img src="{src_image}" alt="" '
                     f'style="width:42px; height:42px; object-fit:cover; '
-                    f'border-radius:4px; border:1px solid #E8E0D8; flex-shrink:0;" '
+                    f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
                     f'onerror="this.style.display=\'none\'">'
                 )
             rows_html += (
-                f'<div style="display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0; border-bottom:1px solid #EDE5DC; font-size:0.92rem;">'
+                f'<div style="display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0; border-bottom:1px solid #EEEEEE; font-size:0.92rem;">'
                 f'{thumb_html}'
                 f'<span class="item-swatch" style="background:{swatch}"></span>'
                 f'<span style="font-weight:500; color:#1C1917;">{it.get("name","—")}</span>'
-                f'<span style="font-size:0.74rem; color:#9C8A7A; margin-left:auto; text-align:right;">'
+                f'<span style="font-size:0.74rem; color:#6E6E73; margin-left:auto; text-align:right;">'
                 f'{it.get("type","—")} · {it.get("formality","—")}<br>'
                 f'<span style="font-size:0.7rem;">{tags_label or "no tags"}</span></span>'
                 f'{avail_chip}'
@@ -2049,13 +2049,13 @@ def _render_wardrobe():
         st.markdown(
             f'<div style="margin-top:1.4rem;">'
             f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.2rem; color:#1C1917; line-height:1.2; margin-bottom:0.4rem;">Items you\'ve added</div>'
-            f'<div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.4rem 1.2rem;">'
+            f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.4rem 1.2rem;">'
             f'{rows_html}</div></div>',
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            '<div style="margin-top:1.2rem; font-size:0.82rem; color:#9C8A7A;">'
+            '<div style="margin-top:1.2rem; font-size:0.82rem; color:#6E6E73;">'
             "No items added yet. The seed wardrobe is already available to Wearly — adding pieces here grows the candidate pool."
             "</div>",
             unsafe_allow_html=True,
@@ -2063,13 +2063,13 @@ def _render_wardrobe():
 
     # ── Coming-soon roadmap chips (preserved from prior pass) ───
     st.markdown("""
-    <div style="margin-top:2rem; padding-top:1.05rem; border-top:1px solid #EDE5DC;">
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Coming soon</div>
+    <div style="margin-top:2rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Coming soon</div>
         <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
-            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Photo upload</span>
-            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Product link import</span>
-            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Wear history</span>
-            <span style="font-size:0.76rem; color:#7C6F64; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px;">Item editing</span>
+            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Photo upload</span>
+            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Product link import</span>
+            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Wear history</span>
+            <span style="font-size:0.76rem; color:#6E6E73; padding:0.36rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px;">Item editing</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -2105,7 +2105,7 @@ def _render_shop():
     st.markdown("""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Shop</div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">
             Favorite stores and a wishlist of pieces you want to acquire.
             Wearly uses both to make gap suggestions feel personal.
         </div>
@@ -2121,42 +2121,42 @@ def _render_shop():
 
         if wl:
             st.markdown(f"""
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
                 {len(wl)} item{'' if len(wl) == 1 else 's'} on your wishlist
             </div>
             """, unsafe_allow_html=True)
 
             for it in wl:
                 priority = (it.get("priority") or "medium").lower()
-                pri_color = {"high": "#9F5A36", "medium": "#C17F5A", "low": "#A8937E"}.get(priority, "#A8937E")
+                pri_color = {"high": "#111111", "medium": "#111111", "low": "#8E8E93"}.get(priority, "#8E8E93")
                 meta_bits = []
                 if it.get("category"): meta_bits.append(it["category"])
                 if it.get("preferred_store"): meta_bits.append(f"@ {it['preferred_store']}")
                 if it.get("tags"): meta_bits.append(", ".join(it["tags"]))
                 meta = " · ".join(meta_bits) or "—"
                 linked = (
-                    f'<span style="display:inline-block; font-size:0.66rem; color:#8A4A20; '
-                    f'background:#FDF3EE; border:1px solid #E8C4A8; padding:1px 7px; '
+                    f'<span style="display:inline-block; font-size:0.66rem; color:#111111; '
+                    f'background:#FAFAFA; border:1px solid #EEEEEE; padding:1px 7px; '
                     f'border-radius:99px; letter-spacing:0.06em; margin-left:0.5rem;">'
                     f'from a wardrobe gap · {it["linked_gap"]}</span>'
                 ) if it.get("linked_gap") else ""
                 source_link = (
-                    f' · <a href="{it["source_url"]}" target="_blank" style="color:#C17F5A;">link</a>'
+                    f' · <a href="{it["source_url"]}" target="_blank" style="color:#111111;">link</a>'
                 ) if it.get("source_url") else ""
                 notes_block = (
-                    f'<div style="font-size:0.8rem; color:#7C6F64; margin-top:0.3rem; font-style:italic;">{it["notes"]}</div>'
+                    f'<div style="font-size:0.8rem; color:#6E6E73; margin-top:0.3rem; font-style:italic;">{it["notes"]}</div>'
                 ) if it.get("notes") else ""
 
                 row_a, row_b = st.columns([5, 1], gap="small")
                 with row_a:
                     st.markdown(f"""
-                    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
+                    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
                         <div style="display:flex; align-items:baseline; gap:0.5rem; flex-wrap:wrap;">
                             <span style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{it.get('name','—')}</span>
                             <span style="font-size:0.66rem; color:{pri_color}; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;">{priority}</span>
                             {linked}
                         </div>
-                        <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.3rem;">{meta}{source_link}</div>
+                        <div style="font-size:0.78rem; color:#6E6E73; margin-top:0.3rem;">{meta}{source_link}</div>
                         {notes_block}
                     </div>
                     """, unsafe_allow_html=True)
@@ -2170,7 +2170,7 @@ def _render_shop():
                             st.error(rr.get("error", "Could not remove."))
         else:
             st.markdown(
-                '<div style="font-size:0.82rem; color:#9C8A7A; margin-bottom:1rem;">'
+                '<div style="font-size:0.82rem; color:#6E6E73; margin-bottom:1rem;">'
                 'No wishlist items yet. Add one below, or save a wardrobe-gap suggestion '
                 'from a recommended outfit.'
                 '</div>',
@@ -2236,7 +2236,7 @@ def _render_shop():
 
         if stores:
             st.markdown(f"""
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">
                 {len(stores)} favorite store{'' if len(stores) == 1 else 's'}
             </div>
             """, unsafe_allow_html=True)
@@ -2244,15 +2244,15 @@ def _render_shop():
                 name = s.get("name", "—")
                 url = s.get("url")
                 notes = s.get("notes")
-                link_block = f' · <a href="{url}" target="_blank" style="color:#C17F5A;">{url}</a>' if url else ""
-                notes_block = f'<div style="font-size:0.78rem; color:#7C6F64; margin-top:0.2rem; font-style:italic;">{notes}</div>' if notes else ""
+                link_block = f' · <a href="{url}" target="_blank" style="color:#111111;">{url}</a>' if url else ""
+                notes_block = f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.2rem; font-style:italic;">{notes}</div>' if notes else ""
 
                 row_a, row_b = st.columns([5, 1], gap="small")
                 with row_a:
                     st.markdown(f"""
-                    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
+                    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.85rem 1.05rem; margin-bottom:0.55rem;">
                         <div style="font-family:'DM Serif Display',serif; font-size:1.05rem; color:#1C1917;">{name}</div>
-                        <div style="font-size:0.78rem; color:#7C6F64; margin-top:0.2rem;">{url or "no link saved"}{link_block if False else ""}</div>
+                        <div style="font-size:0.78rem; color:#6E6E73; margin-top:0.2rem;">{url or "no link saved"}{link_block if False else ""}</div>
                         {notes_block}
                     </div>
                     """, unsafe_allow_html=True)
@@ -2266,7 +2266,7 @@ def _render_shop():
                             st.error(rr.get("error", "Could not remove."))
         else:
             st.markdown(
-                '<div style="font-size:0.82rem; color:#9C8A7A; margin-bottom:1rem;">'
+                '<div style="font-size:0.82rem; color:#6E6E73; margin-bottom:1rem;">'
                 "No favorite stores saved yet. Add a few below — Wearly will reference them "
                 "when it spots a wardrobe gap."
                 '</div>',
@@ -2294,9 +2294,9 @@ def _render_shop():
 
     # ── Prototype disclosure ──
     st.markdown("""
-    <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EDE5DC;">
-        <p style="font-size:0.74rem; color:#9C8A7A; line-height:1.6; margin:0;">
-            <strong style="color:#7C6F64; letter-spacing:0.04em;">Prototype.</strong>
+    <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
+        <p style="font-size:0.74rem; color:#6E6E73; line-height:1.6; margin:0;">
+            <strong style="color:#6E6E73; letter-spacing:0.04em;">Prototype.</strong>
             Wearly doesn't perform live retailer searches yet — favorite stores act as
             personalization hints in shopping suggestions, and the wishlist is a saved
             local list. Real product catalogs and price lookups are future production work.
@@ -2325,9 +2325,9 @@ def _render_profile():
     fit_v = profile.get("preferred_fit", "—")
     prefs = profile.get("style_preferences", []) or []
     prefs_html = "".join(
-        f'<span style="display:inline-block; font-size:0.78rem; color:#7C6F64; padding:0.34rem 0.85rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px; margin:0 0.35rem 0.45rem 0;">{x}</span>'
+        f'<span style="display:inline-block; font-size:0.78rem; color:#6E6E73; padding:0.34rem 0.85rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px; margin:0 0.35rem 0.45rem 0;">{x}</span>'
         for x in prefs
-    ) or '<span style="font-size:0.84rem; color:#9C8A7A;">No preferences saved yet.</span>'
+    ) or '<span style="font-size:0.84rem; color:#6E6E73;">No preferences saved yet.</span>'
 
     modesty   = profile.get("modesty_preference") or "—"
     comfort   = profile.get("comfort_needs", []) or []
@@ -2341,17 +2341,17 @@ def _render_profile():
     st.markdown(f"""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Profile</div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">Prototype profile · stored locally on this device.</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Prototype profile · stored locally on this device.</div>
     </div>
 
-    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.6rem 1.6rem 1.4rem; margin-bottom:1.1rem;">
+    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.6rem 1.6rem 1.4rem; margin-bottom:1.1rem;">
         <div style="display:flex; align-items:center; gap:1rem;">
-            <div style="width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, #D4956F 0%, #C17F5A 100%); color:#FDFAF7; display:flex; align-items:center; justify-content:center; font-family:'DM Serif Display',serif; font-size:1.6rem;">
+            <div style="width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, #2E2E2E 0%, #111111 100%); color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-family:'DM Serif Display',serif; font-size:1.6rem;">
                 {initial}
             </div>
             <div>
                 <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1.1;">{name}</div>
-                <div style="font-size:0.8rem; color:#9C8A7A; margin-top:0.25rem; letter-spacing:0.04em;">Wearly member · local prototype</div>
+                <div style="font-size:0.8rem; color:#6E6E73; margin-top:0.25rem; letter-spacing:0.04em;">Wearly member · local prototype</div>
             </div>
         </div>
     </div>
@@ -2360,51 +2360,51 @@ def _render_profile():
     # ── Read-only "what Wearly knows" card ──
     def _list_chips(values, empty="—"):
         if not values:
-            return f'<span style="font-size:0.86rem; color:#9C8A7A;">{empty}</span>'
+            return f'<span style="font-size:0.86rem; color:#6E6E73;">{empty}</span>'
         return "".join(
-            f'<span style="display:inline-block; font-size:0.78rem; color:#7C6F64; padding:0.32rem 0.8rem; background:#F5EDE3; border:1px solid #E8E0D8; border-radius:99px; margin:0 0.35rem 0.4rem 0;">{x}</span>'
+            f'<span style="display:inline-block; font-size:0.78rem; color:#6E6E73; padding:0.32rem 0.8rem; background:#F5EDE3; border:1px solid #E5E5E5; border-radius:99px; margin:0 0.35rem 0.4rem 0;">{x}</span>'
             for x in values
         )
 
     st.markdown(f"""
-    <div style="background:#FDFAF7; border:1px solid #E8E0D8; border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.9rem;">Style profile</div>
+    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.9rem;">Style profile</div>
         <div style="display:flex; flex-wrap:wrap; gap:1.4rem; row-gap:1rem;">
             <div style="flex:1; min-width:140px;">
-                <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Body shape</div>
+                <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Body shape</div>
                 <div style="font-size:0.95rem; color:#1C1917;">{(body or '—').title() if isinstance(body, str) else '—'}</div>
             </div>
             <div style="flex:1; min-width:140px;">
-                <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Skin tone</div>
+                <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Skin tone</div>
                 <div style="font-size:0.95rem; color:#1C1917;">{(skin or '—').title() if isinstance(skin, str) else '—'}</div>
             </div>
             <div style="flex:1; min-width:140px;">
-                <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Preferred fit</div>
+                <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Preferred fit</div>
                 <div style="font-size:0.95rem; color:#1C1917;">{(fit_v or '—').title() if isinstance(fit_v, str) else '—'}</div>
             </div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style preferences</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style preferences</div>
             <div>{prefs_html}</div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Modesty preference</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Modesty preference</div>
             <div style="font-size:0.9rem; color:#1C1917;">{(modesty or '—').title() if isinstance(modesty, str) else '—'}</div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Comfort needs</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Comfort needs</div>
             <div>{_list_chips(comfort)}</div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style goals</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Style goals</div>
             <div>{_list_chips(goals)}</div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to highlight</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to highlight</div>
             <div>{_list_chips(highlights)}</div>
         </div>
         <div style="margin-top:1.2rem;">
-            <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to balance</div>
+            <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.5rem;">Areas to balance</div>
             <div>{_list_chips(balances)}</div>
         </div>
     </div>
@@ -2413,9 +2413,9 @@ def _render_profile():
     # ── Edit form (overlay only — never touches seed wardrobe) ──
     with st.expander("Edit your fit & style preferences", expanded=False):
         st.markdown("""
-        <div style="font-size:0.82rem; color:#7C6F64; line-height:1.55; margin-bottom:0.8rem;">
+        <div style="font-size:0.82rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;">
             Every field is optional. Wearly applies a preference only when you've shared it.
-            <br><strong style="color:#9F5A36;">Body-positive language only.</strong>
+            <br><strong style="color:#111111;">Body-positive language only.</strong>
             Use words like <em>highlight, balance, support, improve, increase confidence</em>.
             Wearly rejects corrective language like "hide," "fix," or "minimize" by design.
         </div>
@@ -2486,14 +2486,14 @@ def _render_profile():
             pass
 
     st.markdown("""
-    <p style="font-size:0.74rem; color:#9C8A7A; line-height:1.55; margin-top:1rem;">
-        <strong style="color:#7C6F64; letter-spacing:0.04em;">Privacy.</strong>
+    <p style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin-top:1rem;">
+        <strong style="color:#6E6E73; letter-spacing:0.04em;">Privacy.</strong>
         Your profile is stored locally in this prototype. Real authentication and cloud sync are future work.
     </p>
-    <div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EDE5DC;">
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">Learn more</div>
-        <p style="font-size:0.82rem; color:#4A3D36; line-height:1.6;">
-            The <a href="https://eatedalsf.github.io/styling-agent/" target="_blank" style="color:#9F5A36; text-decoration:underline;">Wearly Intelligent Book</a>
+    <div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EEEEEE;">
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">Learn more</div>
+        <p style="font-size:0.82rem; color:#2E2E2E; line-height:1.6;">
+            The <a href="https://eatedalsf.github.io/styling-agent/" target="_blank" style="color:#111111; text-decoration:underline;">Wearly Intelligent Book</a>
             documents the agent's design principles, evidence categories, skill rules, knowledge graph, and architecture — all searchable in one place.
         </p>
     </div>
@@ -2508,7 +2508,7 @@ def _render_demo():
     st.markdown("""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Before &amp; After</div>
-        <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem;">What changes when a styling agent reasons through your day.</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">What changes when a styling agent reasons through your day.</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2553,7 +2553,7 @@ def _render_demo():
     if st.session_state.get("result"):
         st.markdown("<div style='height:1.4rem'></div>", unsafe_allow_html=True)
         st.markdown("""
-        <div style="font-size:0.66rem; color:#A8937E; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Live result</div>
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Live result</div>
         """, unsafe_allow_html=True)
         _render_outfit_result(st.session_state["result"])
 
@@ -2567,7 +2567,7 @@ def _render_demo():
     <div style="font-family:'DM Serif Display',serif; font-size:1.45rem; color:#1C1917; line-height:1.2;">
         How Wearly models your day
     </div>
-    <div style="font-size:0.86rem; color:#7C6F64; margin-top:0.3rem; margin-bottom:0.7rem; line-height:1.55;">
+    <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem; margin-bottom:0.7rem; line-height:1.55;">
         The knowledge graph below shows the entity types and relations Wearly
         reasons over. Every recommendation traces through this graph — the
         live-run graph inside an outfit result shows one specific traversal.

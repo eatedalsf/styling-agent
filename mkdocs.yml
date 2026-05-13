@@ -28,17 +28,18 @@ site_dir: "site"
 theme:
   name: material
   language: en
+  # Minimal white-on-white palette, inspired by altadaily.com — generous
+  # whitespace, sans-serif typography, single restrained black accent.
   palette:
-    # Light scheme tuned to Wearly's warm-ivory + terracotta brand.
     - scheme: default
-      primary: deep orange
-      accent: orange
+      primary: white
+      accent: black
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode
     - scheme: slate
-      primary: deep orange
-      accent: orange
+      primary: black
+      accent: white
       toggle:
         icon: material/brightness-4
         name: Switch to light mode
