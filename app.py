@@ -2683,6 +2683,64 @@ def _render_profile():
                 unsafe_allow_html=True,
             )
 
+        # ── Predicted size card ─────────────────────────────────
+        # Runs only when at least bust / waist / hips is present.
+        # Compared against The Sewing Revival's size-bundles chart.
+        # Brands vary — honestly framed as a prediction, not a label.
+        try:
+            from fit_tool import predict_size as _predict_size
+            _size = _predict_size(_meas)
+        except Exception:
+            _size = {}
+        if _size:
+            _conf_color = {"high": "#1D6033", "medium": "#7D5A00", "low": "#7A1D21"}.get(
+                _size.get("confidence", "low"), "#6E6E73"
+            )
+            _matched = ", ".join(_size.get("matched_on", []))
+            st.markdown(
+                f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; '
+                f'padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+                f'<div style="display:flex; justify-content:space-between; align-items:baseline; '
+                f'margin-bottom:0.9rem;">'
+                f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+                f'text-transform:uppercase; font-weight:600;">Predicted size</div>'
+                f'<div style="font-size:0.66rem; color:{_conf_color}; letter-spacing:0.1em; '
+                f'text-transform:uppercase; font-weight:600;">'
+                f'{_size.get("confidence", "—")} confidence</div>'
+                f'</div>'
+                f'<div style="display:flex; flex-wrap:wrap; gap:1.6rem; row-gap:0.8rem;">'
+                f'  <div style="flex:1; min-width:120px;">'
+                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                f'    text-transform:uppercase; margin-bottom:0.25rem;">Bundle</div>'
+                f'    <div style="font-family:\'DM Serif Display\',serif; font-size:1.6rem; color:#111111; line-height:1;">'
+                f'{_size["bundle"]}</div>'
+                f'  </div>'
+                f'  <div style="flex:1; min-width:90px;">'
+                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                f'    text-transform:uppercase; margin-bottom:0.25rem;">NZ / AU / UK</div>'
+                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["nz_au_uk"]}</div>'
+                f'  </div>'
+                f'  <div style="flex:1; min-width:90px;">'
+                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                f'    text-transform:uppercase; margin-bottom:0.25rem;">Europe</div>'
+                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["europe"]}</div>'
+                f'  </div>'
+                f'  <div style="flex:1; min-width:90px;">'
+                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                f'    text-transform:uppercase; margin-bottom:0.25rem;">USA</div>'
+                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["usa"]}</div>'
+                f'  </div>'
+                f'</div>'
+                f'<div style="font-size:0.74rem; color:#8E8E93; margin-top:1rem; line-height:1.55;">'
+                f"Matched on: {_matched}. Average deviation "
+                f"{_size.get('deviation_cm', '—')} cm. Reference chart: "
+                f"<a href='https://thesewingrevival.com/pages/choosing-your-size' "
+                f"target='_blank' style='color:#111111;'>The Sewing Revival</a>. "
+                f"Brands vary — use this as a starting point, not a definitive label."
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
+
     # ── Edit form (overlay only — never touches seed wardrobe) ──
     # First-time users land on a blank seed and can fill in everything;
     # returning users see their saved values pre-filled. Every field is

@@ -88,27 +88,39 @@ _EMPTY_OVERLAY = {
 
 
 # Canonical measurement fields. Each entry: key, label, how-to-measure tip.
-# Bust, waist, and hips tips are paraphrased from The Sewing Revival's
-# "Choosing your size" guide (thesewingrevival.com/pages/choosing-your-size).
-# The remaining tips are standard tailoring instruction — body-positive and
-# instructional, no judgmental language. Measurements are stored in inches
-# internally; the UI lets the user toggle inch ↔ cm at display time.
+# The 11 anatomical measurements correspond to the A–J labels in The Sewing
+# Revival's body-measurements diagram, plus an overall height. Tips for
+# bust, waist, and hips are paraphrased from their "Choosing your size"
+# guide (thesewingrevival.com/pages/choosing-your-size). The rest are
+# standard tailoring instruction — body-positive and instructional, no
+# judgmental language. Measurements are stored in inches internally; the
+# UI lets the user toggle inch ↔ cm at display time.
 MEASUREMENT_FIELDS = [
-    ("height",   "Height",
+    ("height",        "Height",
      "Stand against a wall in bare feet, look straight ahead. Mark the top of your head, then measure floor-to-mark."),
-    ("bust",     "Bust",
-     "Measure around the back, under the arms and across the fullest part of the bust. The tape should be flat against the figure, straight across the back and not too tight."),
-    ("waist",    "Natural waist",
-     "Measure around the waist with the tape flat against the figure, snug but not too tight. The narrowest part of the torso, usually just above the navel."),
-    ("hips",     "Hips",
-     "Measure over the fullest part of the hips, usually 21–23 cm / 8–9 in down from the waist. Tape parallel to the floor."),
-    ("inseam",   "Inseam",
+    ("bust",          "Bust (A)",
+     "Around the back, under the arms and across the fullest part of the bust. Tape flat against the figure, straight across the back and not too tight."),
+    ("waist",         "Natural waist (B)",
+     "Around the natural waist, tape flat against the figure, snug but not too tight. The narrowest part of the torso, usually just above the navel."),
+    ("hips",          "Hips (C)",
+     "Around the fullest part of the hips, usually 21–23 cm / 8–9 in down from the waist. Tape parallel to the floor."),
+    ("high_hips",     "High hips (D)",
+     "Around the body just below the natural waist — about 8 cm / 3 in down — where a low-rise waistband would sit."),
+    ("back_waist",    "Back waist length (E)",
+     "Down the spine from the bony bump at the base of the neck to the natural waistline."),
+    ("front_waist",   "Front waist length (F)",
+     "From the hollow above the collarbone, down the front of the body to the natural waist."),
+    ("inseam",        "Inseam (G)",
      "Inner-leg measurement from the top of the inner thigh down to where you want pants to break (usually the ankle bone)."),
-    ("shoulder", "Shoulder width",
-     "Across the back, from the bony point at one shoulder to the bony point at the other."),
-    ("arm",      "Arm length",
+    ("sleeve",        "Sleeve length (H)",
      "From the shoulder bone, down the outside of the arm with a slight bend at the elbow, to the wristbone."),
-    ("neck",     "Neck",
+    ("trouser_three_quarter", "3/4 trouser length (I)",
+     "Down the outside of the leg from the natural waist to mid-calf."),
+    ("trouser_full",  "Full trouser length (J)",
+     "Down the outside of the leg from the natural waist to the ankle (where you want pants to break)."),
+    ("shoulder",      "Shoulder width",
+     "Across the back, from the bony point at one shoulder to the bony point at the other."),
+    ("neck",          "Neck",
      "Wrap the tape around the base of the neck where a shirt collar would sit, with one finger of slack."),
 ]
 
@@ -116,6 +128,102 @@ MEASUREMENT_FIELDS = [
 # fly when the user picks centimeters. Round-trip preserves user intent
 # because save_fit_profile() normalizes back to inches.
 INCH_TO_CM = 2.54
+
+
+# Size chart reference — values transcribed from The Sewing Revival's
+# Size Bundles - Women chart. Measurements in centimeters; 10 columns
+# left-to-right covering NZ/AU/UK 6 through 24. The four size "bundles"
+# (Small / Medium / Large / X-Large) group consecutive columns.
+SIZE_CHART = {
+    "nz_au_uk": [6, 8, 10, 12, 14, 16, 18, 20, 22, 24],
+    "europe":   [35, 37, 39, 41, 43, 45, 47, 49, 51, 53],
+    "usa":      [2, 4, 6, 8, 10, 12, 14, 16, 18, 20],
+    "bust_cm":   [80,  85,  90,  95, 100, 105, 110, 115, 120, 125],
+    "waist_cm":  [66,  71,  76,  81,  86,  91,  96, 101, 106, 111],
+    "hip_cm":    [89,  94,  99, 104, 109, 114, 119, 124, 129, 134],
+    "height_cm": [169, 170, 171, 172, 173, 174, 175, 176, 177, 178],
+    # Bundle label per column index 0..9
+    "bundle":    ["Small", "Small",
+                  "Medium", "Medium", "Medium",
+                  "Large", "Large",
+                  "X-Large", "X-Large", "X-Large"],
+}
+
+
+def predict_size(measurements: dict) -> dict:
+    """
+    Given a measurements dict (values in inches, internal storage unit),
+    return the closest size on the Sewing Revival chart in each system.
+
+    The match is computed against bust + waist + hip totals because the
+    chart steps those three together. If only some of the three are
+    present, we match on whichever exist (still useful, less precise).
+    Returns {} when no usable input is provided.
+
+    Result shape::
+
+        {
+            "bundle":  "Medium",
+            "nz_au_uk": 12,
+            "europe":  41,
+            "usa":     8,
+            "confidence": "high" | "medium" | "low",
+            "matched_on": ["bust", "waist", "hip"],
+        }
+
+    Brands vary — the caller is expected to surface this as a *predicted*
+    size, not a definitive label.
+    """
+    if not isinstance(measurements, dict):
+        return {}
+
+    cm = INCH_TO_CM
+    bust_in  = measurements.get("bust")
+    waist_in = measurements.get("waist")
+    hip_in   = measurements.get("hips")
+
+    components = []
+    if isinstance(bust_in, (int, float)) and bust_in > 0:
+        components.append(("bust", bust_in * cm, SIZE_CHART["bust_cm"]))
+    if isinstance(waist_in, (int, float)) and waist_in > 0:
+        components.append(("waist", waist_in * cm, SIZE_CHART["waist_cm"]))
+    if isinstance(hip_in, (int, float)) and hip_in > 0:
+        components.append(("hip", hip_in * cm, SIZE_CHART["hip_cm"]))
+
+    if not components:
+        return {}
+
+    # For each of the 10 columns compute the average absolute deviation
+    # across the components the user provided. Pick the column with the
+    # smallest deviation.
+    best_col = 0
+    best_dev = float("inf")
+    for col in range(10):
+        total = 0.0
+        for _name, user_cm, chart_row in components:
+            total += abs(user_cm - chart_row[col])
+        avg = total / len(components)
+        if avg < best_dev:
+            best_dev = avg
+            best_col = col
+
+    # Confidence band — average deviation in cm.
+    if best_dev <= 2.0:
+        confidence = "high"
+    elif best_dev <= 5.0:
+        confidence = "medium"
+    else:
+        confidence = "low"
+
+    return {
+        "bundle":     SIZE_CHART["bundle"][best_col],
+        "nz_au_uk":   SIZE_CHART["nz_au_uk"][best_col],
+        "europe":     SIZE_CHART["europe"][best_col],
+        "usa":        SIZE_CHART["usa"][best_col],
+        "confidence": confidence,
+        "matched_on": [c[0] for c in components],
+        "deviation_cm": round(best_dev, 1),
+    }
 
 
 # ─────────────────────────────────────────────
@@ -144,6 +252,13 @@ def _load_overlay() -> dict:
     for k in overlay:
         if k in data:
             overlay[k] = data[k]
+    # Backward compatibility: the field formerly known as "arm" is now
+    # "sleeve" (the Sewing-Revival diagram's H label, same anatomical
+    # measurement). Copy across so existing users don't lose data.
+    _meas = overlay.get("measurements", {}) or {}
+    if isinstance(_meas, dict) and "arm" in _meas and "sleeve" not in _meas:
+        _meas["sleeve"] = _meas.pop("arm")
+        overlay["measurements"] = _meas
     return overlay
 
 
