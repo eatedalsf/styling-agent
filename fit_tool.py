@@ -84,6 +84,9 @@ _EMPTY_OVERLAY = {
     "balance_areas":      [],
     # Layer 3 — body measurements (optional, body-positive)
     "measurements":       {},
+    # Layer 4 — meta: provenance of auto-fills. "user" = explicitly set
+    # by the wearer; "auto" = predicted from measurements; None = unset.
+    "_body_shape_source": None,
 }
 
 
@@ -150,26 +153,54 @@ SIZE_CHART = {
 }
 
 
+def _closest_column(components: list) -> tuple:
+    """
+    Internal: given a list of (name, user_cm, chart_row_of_10_values),
+    pick the column index with the smallest average absolute deviation.
+    Returns (col_index, deviation_cm). Empty input → (0, inf).
+    """
+    if not components:
+        return 0, float("inf")
+    best_col, best_dev = 0, float("inf")
+    for col in range(10):
+        total = sum(abs(user_cm - chart_row[col])
+                    for _n, user_cm, chart_row in components)
+        avg = total / len(components)
+        if avg < best_dev:
+            best_dev, best_col = avg, col
+    return best_col, best_dev
+
+
+def _confidence_band(dev_cm: float) -> str:
+    """Map a centimeter deviation to a discrete confidence label."""
+    if dev_cm <= 2.0:
+        return "high"
+    if dev_cm <= 5.0:
+        return "medium"
+    return "low"
+
+
+def _size_record(col: int, dev_cm: float, matched: list) -> dict:
+    """Bundle one column lookup into the standard return shape."""
+    return {
+        "bundle":       SIZE_CHART["bundle"][col],
+        "nz_au_uk":     SIZE_CHART["nz_au_uk"][col],
+        "europe":       SIZE_CHART["europe"][col],
+        "usa":          SIZE_CHART["usa"][col],
+        "confidence":   _confidence_band(dev_cm),
+        "matched_on":   matched,
+        "deviation_cm": round(dev_cm, 1),
+    }
+
+
 def predict_size(measurements: dict) -> dict:
     """
-    Given a measurements dict (values in inches, internal storage unit),
-    return the closest size on the Sewing Revival chart in each system.
+    Overall closest size on the Sewing Revival chart.
 
     The match is computed against bust + waist + hip totals because the
     chart steps those three together. If only some of the three are
-    present, we match on whichever exist (still useful, less precise).
+    present, matches on whichever exist (still useful, less precise).
     Returns {} when no usable input is provided.
-
-    Result shape::
-
-        {
-            "bundle":  "Medium",
-            "nz_au_uk": 12,
-            "europe":  41,
-            "usa":     8,
-            "confidence": "high" | "medium" | "low",
-            "matched_on": ["bust", "waist", "hip"],
-        }
 
     Brands vary — the caller is expected to surface this as a *predicted*
     size, not a definitive label.
@@ -178,51 +209,184 @@ def predict_size(measurements: dict) -> dict:
         return {}
 
     cm = INCH_TO_CM
-    bust_in  = measurements.get("bust")
-    waist_in = measurements.get("waist")
-    hip_in   = measurements.get("hips")
-
     components = []
-    if isinstance(bust_in, (int, float)) and bust_in > 0:
-        components.append(("bust", bust_in * cm, SIZE_CHART["bust_cm"]))
-    if isinstance(waist_in, (int, float)) and waist_in > 0:
-        components.append(("waist", waist_in * cm, SIZE_CHART["waist_cm"]))
-    if isinstance(hip_in, (int, float)) and hip_in > 0:
-        components.append(("hip", hip_in * cm, SIZE_CHART["hip_cm"]))
+    for key, label, chart_key in (
+        ("bust",  "bust",  "bust_cm"),
+        ("waist", "waist", "waist_cm"),
+        ("hips",  "hip",   "hip_cm"),
+    ):
+        v = measurements.get(key)
+        if isinstance(v, (int, float)) and v > 0:
+            components.append((label, v * cm, SIZE_CHART[chart_key]))
 
     if not components:
         return {}
 
-    # For each of the 10 columns compute the average absolute deviation
-    # across the components the user provided. Pick the column with the
-    # smallest deviation.
-    best_col = 0
-    best_dev = float("inf")
-    for col in range(10):
-        total = 0.0
-        for _name, user_cm, chart_row in components:
-            total += abs(user_cm - chart_row[col])
-        avg = total / len(components)
-        if avg < best_dev:
-            best_dev = avg
-            best_col = col
+    col, dev = _closest_column(components)
+    return _size_record(col, dev, [c[0] for c in components])
 
-    # Confidence band — average deviation in cm.
-    if best_dev <= 2.0:
+
+def predict_sizes_by_category(measurements: dict) -> dict:
+    """
+    Per-garment-category size predictions.
+
+      top:    bust drives top size (chest circumference is the binding
+              dimension for shirts / blouses / jackets).
+      bottom: max(waist, hips) drives bottom size — sizing up to the
+              larger of the two prevents tight-on-hip pants.
+      dress:  max(bust, waist, hips) drives dress size — a dress must
+              clear the largest cross-section of the torso.
+
+    Returns a dict like::
+
+        {
+          "top":    {bundle, nz_au_uk, europe, usa, confidence,
+                     matched_on, deviation_cm},
+          "bottom": {...},
+          "dress":  {...},
+        }
+
+    Keys are omitted when the relevant input is missing — a caller can
+    iterate `result.items()` safely.
+    """
+    if not isinstance(measurements, dict):
+        return {}
+
+    cm = INCH_TO_CM
+    bust  = measurements.get("bust")
+    waist = measurements.get("waist")
+    hips  = measurements.get("hips")
+    by_cat: dict = {}
+
+    # TOP — driven by bust.
+    if isinstance(bust, (int, float)) and bust > 0:
+        col, dev = _closest_column([("bust", bust * cm, SIZE_CHART["bust_cm"])])
+        by_cat["top"] = _size_record(col, dev, ["bust"])
+
+    # BOTTOM — driven by whichever is larger of waist / hips.
+    bottom_components = []
+    if isinstance(waist, (int, float)) and waist > 0:
+        bottom_components.append(("waist", waist * cm, SIZE_CHART["waist_cm"]))
+    if isinstance(hips, (int, float)) and hips > 0:
+        bottom_components.append(("hip", hips * cm, SIZE_CHART["hip_cm"]))
+    if bottom_components:
+        # Bias toward the larger cross-section: find the column for each
+        # dimension separately, then take the larger column index. This
+        # produces "size up if the hips need it" behavior.
+        cols = []
+        for c in bottom_components:
+            col, _dev = _closest_column([c])
+            cols.append(col)
+        chosen = max(cols)
+        # Deviation reported is the avg deviation at the chosen column.
+        total_dev = sum(abs(c[1] - c[2][chosen]) for c in bottom_components)
+        avg_dev = total_dev / len(bottom_components)
+        by_cat["bottom"] = _size_record(chosen, avg_dev, [c[0] for c in bottom_components])
+
+    # DRESS — driven by max of bust / waist / hips.
+    dress_components = []
+    if isinstance(bust, (int, float)) and bust > 0:
+        dress_components.append(("bust",  bust  * cm, SIZE_CHART["bust_cm"]))
+    if isinstance(waist, (int, float)) and waist > 0:
+        dress_components.append(("waist", waist * cm, SIZE_CHART["waist_cm"]))
+    if isinstance(hips, (int, float)) and hips > 0:
+        dress_components.append(("hip",   hips  * cm, SIZE_CHART["hip_cm"]))
+    if dress_components:
+        cols = []
+        for c in dress_components:
+            col, _dev = _closest_column([c])
+            cols.append(col)
+        chosen = max(cols)
+        total_dev = sum(abs(c[1] - c[2][chosen]) for c in dress_components)
+        avg_dev = total_dev / len(dress_components)
+        by_cat["dress"] = _size_record(chosen, avg_dev, [c[0] for c in dress_components])
+
+    return by_cat
+
+
+def predict_body_shape(measurements: dict) -> dict:
+    """
+    Predict a body-shape category from bust / waist / hip ratios using
+    the well-known industry heuristic.
+
+    Important honesty disclosure (mirrors evidence-and-references §3.4
+    and §4): body-shape labels are **industry heuristic, not scientific
+    taxonomy**. Wearly surfaces a prediction here so first-time users
+    have a sensible default — but the value is always editable, and the
+    reasoning that produced it is shown to the user in plain English.
+
+    Heuristic boundaries:
+      hourglass:           |bust - hips| ≤ 2 in AND waist ≤ min(bust,hips) - 8 in
+      pear (triangle):     hips - bust ≥ 2 in AND waist < hips
+      inverted triangle:   bust - hips ≥ 2 in AND waist < bust
+      rectangle:           all three within ~2 in of each other AND
+                           waist > min(bust,hips) - 8 in (low definition)
+      athletic:            default when nothing else fires
+
+    Returns {} when bust, waist, or hips is missing. Otherwise::
+
+        {
+          "shape":      "hourglass" | "pear" | "inverted triangle" |
+                        "rectangle" | "athletic",
+          "confidence": "high" | "medium" | "low",
+          "reason":     short body-positive plain-English sentence,
+          "ratios":     {"bust", "waist", "hips", "bust_minus_hip",
+                         "waist_definition"}  (all in inches),
+        }
+    """
+    if not isinstance(measurements, dict):
+        return {}
+
+    bust  = measurements.get("bust")
+    waist = measurements.get("waist")
+    hips  = measurements.get("hips")
+    if not all(isinstance(v, (int, float)) and v > 0 for v in (bust, waist, hips)):
+        return {}
+
+    bust_minus_hip = bust - hips
+    waist_definition = min(bust, hips) - waist  # positive = nipped-in waist
+    avg_bh = (bust + hips) / 2.0
+
+    shape = "athletic"
+    confidence = "low"
+    reason = "Balanced proportions across bust, waist, and hips."
+
+    # Hourglass: bust ≈ hips, well-defined waist.
+    if abs(bust_minus_hip) <= 2 and waist_definition >= 8:
+        shape = "hourglass"
         confidence = "high"
-    elif best_dev <= 5.0:
+        reason = ("Bust and hips are within about an inch, with a clearly "
+                  "defined waist — the classic hourglass ratio.")
+    # Pear: hips notably larger than bust.
+    elif bust_minus_hip <= -2 and waist < hips:
+        shape = "pear"
+        confidence = "high" if abs(bust_minus_hip) >= 3 else "medium"
+        reason = ("Hips are larger than bust by about "
+                  f"{abs(bust_minus_hip):.1f} in — the pear / triangle ratio.")
+    # Inverted triangle: bust notably larger than hips.
+    elif bust_minus_hip >= 2 and waist < bust:
+        shape = "inverted triangle"
+        confidence = "high" if bust_minus_hip >= 3 else "medium"
+        reason = ("Bust is larger than hips by about "
+                  f"{bust_minus_hip:.1f} in — the inverted-triangle ratio.")
+    # Rectangle: similar bust / waist / hips with low waist definition.
+    elif abs(bust_minus_hip) <= 2 and waist_definition < 6:
+        shape = "rectangle"
         confidence = "medium"
-    else:
-        confidence = "low"
+        reason = ("Bust, waist, and hips are all within a couple of inches "
+                  "of each other — the rectangle / column ratio.")
 
     return {
-        "bundle":     SIZE_CHART["bundle"][best_col],
-        "nz_au_uk":   SIZE_CHART["nz_au_uk"][best_col],
-        "europe":     SIZE_CHART["europe"][best_col],
-        "usa":        SIZE_CHART["usa"][best_col],
+        "shape":      shape,
         "confidence": confidence,
-        "matched_on": [c[0] for c in components],
-        "deviation_cm": round(best_dev, 1),
+        "reason":     reason,
+        "ratios": {
+            "bust":             float(bust),
+            "waist":            float(waist),
+            "hips":             float(hips),
+            "bust_minus_hip":   round(bust_minus_hip, 1),
+            "waist_definition": round(waist_definition, 1),
+        },
     }
 
 
@@ -373,6 +537,30 @@ def save_fit_profile(updates: dict) -> dict:
             v = cleaned
 
         overlay[k] = v
+
+    # Auto-fill body_shape from measurements. The prediction is an
+    # industry heuristic — see predict_body_shape() docstring. Provenance
+    # of the value is tracked in _body_shape_source so the UI can show
+    # "Auto-filled" vs "Your choice".
+    #
+    # Logic:
+    #   - empty overlay AND we have a prediction → save prediction, src="auto"
+    #   - non-empty overlay matching the prediction → keep src as-is (or
+    #     default to "auto" if it was never set — user accepted the suggestion)
+    #   - non-empty overlay differing from the prediction → src="user"
+    _meas = overlay.get("measurements", {}) or {}
+    _pred = predict_body_shape(_meas)
+    _pred_shape = _pred.get("shape") if _pred else None
+    if not overlay.get("body_shape"):
+        if _pred_shape:
+            overlay["body_shape"] = _pred_shape
+            overlay["_body_shape_source"] = "auto"
+    else:
+        if _pred_shape and overlay["body_shape"] == _pred_shape:
+            if not overlay.get("_body_shape_source"):
+                overlay["_body_shape_source"] = "auto"
+        else:
+            overlay["_body_shape_source"] = "user"
 
     on_disk = {
         "_comment": "User fit / style profile overlay. See fit_tool.py.",

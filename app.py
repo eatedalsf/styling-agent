@@ -2683,61 +2683,106 @@ def _render_profile():
                 unsafe_allow_html=True,
             )
 
-        # ── Predicted size card ─────────────────────────────────
+        # ── Predicted sizes by category + body-shape suggestion ─────
         # Runs only when at least bust / waist / hips is present.
         # Compared against The Sewing Revival's size-bundles chart.
         # Brands vary — honestly framed as a prediction, not a label.
         try:
-            from fit_tool import predict_size as _predict_size
-            _size = _predict_size(_meas)
-        except Exception:
-            _size = {}
-        if _size:
-            _conf_color = {"high": "#1D6033", "medium": "#7D5A00", "low": "#7A1D21"}.get(
-                _size.get("confidence", "low"), "#6E6E73"
+            from fit_tool import (
+                predict_sizes_by_category as _predict_cat,
+                predict_body_shape as _predict_shape,
             )
-            _matched = ", ".join(_size.get("matched_on", []))
+            _sizes = _predict_cat(_meas)
+            _shape_pred = _predict_shape(_meas)
+        except Exception:
+            _sizes, _shape_pred = {}, {}
+
+        if _sizes:
+            # Render one row of three category cards.
+            _conf_color = lambda c: {"high": "#1D6033", "medium": "#7D5A00",
+                                      "low": "#7A1D21"}.get(c, "#6E6E73")
+
+            def _cat_block(label: str, rec: dict) -> str:
+                if not rec:
+                    return (
+                        '<div style="flex:1; min-width:160px; padding:1rem 1.1rem; '
+                        'background:#FAFAFA; border:1px solid #EEEEEE; border-radius:6px;">'
+                        f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                        f'text-transform:uppercase; margin-bottom:0.4rem;">{label}</div>'
+                        '<div style="font-size:0.84rem; color:#8E8E93;">Add the relevant '
+                        'measurement to see a size.</div></div>'
+                    )
+                return (
+                    '<div style="flex:1; min-width:160px; padding:1rem 1.1rem; '
+                    'background:#FFFFFF; border:1px solid #EEEEEE; border-radius:6px;">'
+                    f'<div style="display:flex; justify-content:space-between; align-items:baseline;">'
+                    f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                    f'text-transform:uppercase;">{label}</div>'
+                    f'<div style="font-size:0.6rem; color:{_conf_color(rec.get("confidence","low"))}; '
+                    f'letter-spacing:0.1em; text-transform:uppercase; font-weight:600;">'
+                    f'{rec.get("confidence","—")}</div>'
+                    f'</div>'
+                    f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.55rem; '
+                    f'color:#111111; line-height:1.1; margin:0.4rem 0;">{rec["bundle"]}</div>'
+                    f'<div style="font-size:0.78rem; color:#2E2E2E; line-height:1.5;">'
+                    f'NZ/AU/UK <strong>{rec["nz_au_uk"]}</strong>'
+                    f' &nbsp;·&nbsp; EU <strong>{rec["europe"]}</strong>'
+                    f' &nbsp;·&nbsp; US <strong>{rec["usa"]}</strong>'
+                    f'</div>'
+                    '</div>'
+                )
+
             st.markdown(
-                f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; '
-                f'padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
-                f'<div style="display:flex; justify-content:space-between; align-items:baseline; '
-                f'margin-bottom:0.9rem;">'
-                f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
-                f'text-transform:uppercase; font-weight:600;">Predicted size</div>'
-                f'<div style="font-size:0.66rem; color:{_conf_color}; letter-spacing:0.1em; '
-                f'text-transform:uppercase; font-weight:600;">'
-                f'{_size.get("confidence", "—")} confidence</div>'
-                f'</div>'
-                f'<div style="display:flex; flex-wrap:wrap; gap:1.6rem; row-gap:0.8rem;">'
-                f'  <div style="flex:1; min-width:120px;">'
-                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
-                f'    text-transform:uppercase; margin-bottom:0.25rem;">Bundle</div>'
-                f'    <div style="font-family:\'DM Serif Display\',serif; font-size:1.6rem; color:#111111; line-height:1;">'
-                f'{_size["bundle"]}</div>'
-                f'  </div>'
-                f'  <div style="flex:1; min-width:90px;">'
-                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
-                f'    text-transform:uppercase; margin-bottom:0.25rem;">NZ / AU / UK</div>'
-                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["nz_au_uk"]}</div>'
-                f'  </div>'
-                f'  <div style="flex:1; min-width:90px;">'
-                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
-                f'    text-transform:uppercase; margin-bottom:0.25rem;">Europe</div>'
-                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["europe"]}</div>'
-                f'  </div>'
-                f'  <div style="flex:1; min-width:90px;">'
-                f'    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
-                f'    text-transform:uppercase; margin-bottom:0.25rem;">USA</div>'
-                f'    <div style="font-size:1.4rem; color:#111111; font-weight:500;">{_size["usa"]}</div>'
-                f'  </div>'
-                f'</div>'
-                f'<div style="font-size:0.74rem; color:#8E8E93; margin-top:1rem; line-height:1.55;">'
-                f"Matched on: {_matched}. Average deviation "
-                f"{_size.get('deviation_cm', '—')} cm. Reference chart: "
-                f"<a href='https://thesewingrevival.com/pages/choosing-your-size' "
-                f"target='_blank' style='color:#111111;'>The Sewing Revival</a>. "
-                f"Brands vary — use this as a starting point, not a definitive label."
-                f'</div></div>',
+                '<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; '
+                'padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+                '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+                'text-transform:uppercase; font-weight:600; margin-bottom:0.9rem;">'
+                'Your sizes (predicted)</div>'
+                '<div style="display:flex; gap:1rem; flex-wrap:wrap;">'
+                + _cat_block("Tops",    _sizes.get("top"))
+                + _cat_block("Bottoms", _sizes.get("bottom"))
+                + _cat_block("Dresses", _sizes.get("dress"))
+                + '</div>'
+                '<div style="font-size:0.74rem; color:#8E8E93; margin-top:1rem; line-height:1.55;">'
+                "Tops are matched on bust; bottoms on whichever of waist or hips is larger "
+                "(sized up if needed); dresses on the largest of bust / waist / hips. "
+                "Reference chart: "
+                "<a href='https://thesewingrevival.com/pages/choosing-your-size' "
+                "target='_blank' style='color:#111111;'>The Sewing Revival</a>. "
+                "Brands vary — start here, then check the brand's own size guide."
+                '</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        # ── Body-shape suggestion ────────────────────────────────
+        # Surfaces the prediction even after the user has overridden it,
+        # so the reasoning is always visible. The form's selectbox is the
+        # field that actually drives the agent — this card is informative.
+        if _shape_pred:
+            _src = profile.get("_body_shape_source")
+            _user_locked = (_src == "user")
+            _shown_shape = (profile.get("body_shape") or _shape_pred["shape"]).title()
+            _badge = "Your choice" if _user_locked else "Auto-filled from measurements"
+            _badge_color = "#111111" if _user_locked else "#1D6033"
+            st.markdown(
+                '<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; '
+                'padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+                '<div style="display:flex; justify-content:space-between; align-items:baseline; '
+                'margin-bottom:0.6rem;">'
+                '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+                'text-transform:uppercase; font-weight:600;">Body shape</div>'
+                f'<div style="font-size:0.6rem; color:{_badge_color}; letter-spacing:0.1em; '
+                f'text-transform:uppercase; font-weight:600;">{_badge}</div>'
+                '</div>'
+                f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.6rem; '
+                f'color:#111111; line-height:1.1; margin-bottom:0.4rem;">{_shown_shape}</div>'
+                f'<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+                f'{_shape_pred["reason"]}</div>'
+                f'<div style="font-size:0.74rem; color:#8E8E93; margin-top:0.9rem; line-height:1.55;">'
+                "Body-shape labels are an <em>industry heuristic, not a scientific taxonomy</em> — "
+                "Wearly uses them only as a proxy for proportion-related styling suggestions, "
+                "never as a claim about your body. Override anytime in the editor below."
+                '</div></div>',
                 unsafe_allow_html=True,
             )
 
