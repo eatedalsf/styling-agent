@@ -87,18 +87,35 @@ _EMPTY_OVERLAY = {
 }
 
 
-# Canonical measurement fields. Each entry: key, label, unit, how-to-measure
-# tip. Tips are body-positive and instructional — no judgmental language.
+# Canonical measurement fields. Each entry: key, label, how-to-measure tip.
+# Bust, waist, and hips tips are paraphrased from The Sewing Revival's
+# "Choosing your size" guide (thesewingrevival.com/pages/choosing-your-size).
+# The remaining tips are standard tailoring instruction — body-positive and
+# instructional, no judgmental language. Measurements are stored in inches
+# internally; the UI lets the user toggle inch ↔ cm at display time.
 MEASUREMENT_FIELDS = [
-    ("height",   "Height",         "in", "Stand against a wall in bare feet, look straight ahead. Mark the top of your head, then measure floor-to-mark."),
-    ("bust",     "Bust",           "in", "Wrap the tape around the fullest part of your bust, keeping it parallel to the floor. Don't pull tight — just snug."),
-    ("waist",    "Natural waist",  "in", "Find the narrowest part of your torso, usually just above the navel. Wrap the tape level."),
-    ("hips",     "Hips",           "in", "Stand with feet together. Wrap the tape around the fullest part of your hips and seat, parallel to the floor."),
-    ("inseam",   "Inseam",         "in", "Inner-leg measurement from the top of the inner thigh down to where you want pants to break (usually the ankle bone)."),
-    ("shoulder", "Shoulder width", "in", "Across the back, from the bony point at one shoulder to the bony point at the other."),
-    ("arm",      "Arm length",     "in", "From the shoulder bone, down the outside of the arm with a slight bend at the elbow, to the wristbone."),
-    ("neck",     "Neck",           "in", "Wrap the tape around the base of the neck where a shirt collar would sit, with one finger of slack."),
+    ("height",   "Height",
+     "Stand against a wall in bare feet, look straight ahead. Mark the top of your head, then measure floor-to-mark."),
+    ("bust",     "Bust",
+     "Measure around the back, under the arms and across the fullest part of the bust. The tape should be flat against the figure, straight across the back and not too tight."),
+    ("waist",    "Natural waist",
+     "Measure around the waist with the tape flat against the figure, snug but not too tight. The narrowest part of the torso, usually just above the navel."),
+    ("hips",     "Hips",
+     "Measure over the fullest part of the hips, usually 21–23 cm / 8–9 in down from the waist. Tape parallel to the floor."),
+    ("inseam",   "Inseam",
+     "Inner-leg measurement from the top of the inner thigh down to where you want pants to break (usually the ankle bone)."),
+    ("shoulder", "Shoulder width",
+     "Across the back, from the bony point at one shoulder to the bony point at the other."),
+    ("arm",      "Arm length",
+     "From the shoulder bone, down the outside of the arm with a slight bend at the elbow, to the wristbone."),
+    ("neck",     "Neck",
+     "Wrap the tape around the base of the neck where a shirt collar would sit, with one finger of slack."),
 ]
+
+# Unit conversion. Internal storage is always inches; the UI converts on the
+# fly when the user picks centimeters. Round-trip preserves user intent
+# because save_fit_profile() normalizes back to inches.
+INCH_TO_CM = 2.54
 
 
 # ─────────────────────────────────────────────

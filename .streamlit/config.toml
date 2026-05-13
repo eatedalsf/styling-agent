@@ -1,18 +1,20 @@
-# Wearly AI — Streamlit configuration
+# Wearly — Streamlit configuration
 # Picked up automatically by `streamlit run app.py` and by Streamlit
 # Community Cloud on deployment.
 
 [theme]
-# Clean-luxury palette matching the in-app CSS:
-#   paper  = #F5F0EB (ivory)
-#   ink    = #1C1917 (deep charcoal)
-#   accent = #C17F5A (warm terracotta)
-#   warm   = #FDFAF7 (card surface)
+# Minimal white-on-white palette (Alta-inspired). Matches the in-app CSS:
+#   page bg   = #FFFFFF (pure white)
+#   cards     = #FFFFFF (pure white, separated by #EEEEEE rules)
+#   primary   = #111111 (matte black — used by form_submit buttons and
+#                        any Streamlit-themed primary action)
+#   text      = #111111
+#   secondary background (for chips, sidebar widgets, etc.) = #FAFAFA
 base = "light"
-primaryColor = "#C17F5A"
-backgroundColor = "#F5F0EB"
-secondaryBackgroundColor = "#FDFAF7"
-textColor = "#1C1917"
+primaryColor = "#111111"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#FAFAFA"
+textColor = "#111111"
 font = "sans serif"
 
 [server]
@@ -27,6 +29,4 @@ gatherUsageStats = false
 
 [client]
 # Hide the "Made with Streamlit" footer for a cleaner product feel.
-# (toolbarMode also affects the top-right hamburger; keep it visible
-# so reviewers can inspect / rerun.)
 toolbarMode = "minimal"

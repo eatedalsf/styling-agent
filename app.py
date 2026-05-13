@@ -2648,21 +2648,25 @@ def _render_profile():
     """, unsafe_allow_html=True)
 
     # ── Measurements card (renders only when at least one is saved) ──
+    # Display unit comes from session state ("measure_unit"), set by the
+    # toggle inside the edit form. Internal storage is always inches.
     _meas = profile.get("measurements", {}) or {}
     if any(_meas.values()):
         try:
-            from fit_tool import MEASUREMENT_FIELDS as _MF
+            from fit_tool import MEASUREMENT_FIELDS as _MF, INCH_TO_CM as _IN2CM
         except Exception:
-            _MF = []
+            _MF, _IN2CM = [], 2.54
+        _disp_unit = st.session_state.get("measure_unit", "in")
         _rows = ""
-        for _key, _label, _unit, _tip in _MF:
+        for _key, _label, _tip in _MF:
             _val = _meas.get(_key)
             if _val:
+                _shown = _val if _disp_unit == "in" else (_val * _IN2CM)
                 _rows += (
                     f'<div style="flex:1; min-width:120px;">'
                     f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
                     f'text-transform:uppercase; margin-bottom:0.25rem;">{_label}</div>'
-                    f'<div style="font-size:0.95rem; color:#1C1917;">{_val:g} {_unit}</div>'
+                    f'<div style="font-size:0.95rem; color:#1C1917;">{_shown:.1f} {_disp_unit}</div>'
                     f'</div>'
                 )
         if _rows:
@@ -2712,6 +2716,27 @@ def _render_profile():
                          "feel like myself", "look pulled together"]
         _AREA_OPTIONS = ["shoulders", "neckline", "waist", "hips", "legs",
                          "arms", "back", "collarbone"]
+
+        # Unit toggle for measurements. Lives OUTSIDE the form so flipping
+        # it re-renders the inputs immediately (st.form batches inputs and
+        # would only react on submit). Internal storage is always inches —
+        # we convert on save and on display.
+        _unit_cols = st.columns([2, 1], gap="medium")
+        with _unit_cols[0]:
+            st.markdown(
+                "<div style='font-size:0.78rem; color:#6E6E73; padding-top:0.4rem;'>"
+                "Measurement units</div>",
+                unsafe_allow_html=True,
+            )
+        with _unit_cols[1]:
+            _unit_choice = st.radio(
+                "Units",
+                options=["in", "cm"],
+                horizontal=True,
+                label_visibility="collapsed",
+                index=0 if st.session_state.get("measure_unit", "in") == "in" else 1,
+                key="measure_unit",
+            )
 
         with st.form("profile_edit_form"):
             # ── Section 1: Identity ──────────────────────────────
@@ -2802,23 +2827,30 @@ def _render_profile():
             st.markdown(
                 "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
                 "text-transform:uppercase; font-weight:600; margin:1.4rem 0 0.4rem;'>"
-                "Body measurements (optional)</div>", unsafe_allow_html=True,
+                "Body measurements</div>", unsafe_allow_html=True,
             )
             st.markdown(
                 "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
-                "All measurements are optional and stored locally. Each field has a small "
-                "<strong>?</strong> tip explaining how to measure. Use inches; round to the nearest "
-                "half-inch. Honest framing — these help Wearly suggest pieces that fit your "
-                "<em>actual</em> proportions, not category averages."
+                "Stored locally. Each field has a small <strong>?</strong> tip explaining how to "
+                "measure — bust, waist, and hips paraphrased from "
+                "<a href='https://thesewingrevival.com/pages/choosing-your-size' target='_blank' "
+                "style='color:#111111;'>The Sewing Revival</a>. Helps Wearly suggest pieces that fit "
+                "your <em>actual</em> proportions."
                 "</div>", unsafe_allow_html=True,
             )
 
             # Import the field definitions from fit_tool so the form and the
             # data model never drift.
             try:
-                from fit_tool import MEASUREMENT_FIELDS as _MEAS_FIELDS
+                from fit_tool import MEASUREMENT_FIELDS as _MEAS_FIELDS, INCH_TO_CM as _IN2CM
             except Exception:
-                _MEAS_FIELDS = []
+                _MEAS_FIELDS, _IN2CM = [], 2.54
+
+            # Unit-aware bounds. Internal storage is always inches; the
+            # input displays in the user-selected unit and we convert on save.
+            _use_cm = (_unit_choice == "cm")
+            _max_input = 120.0 * (_IN2CM if _use_cm else 1.0)
+            _step      = 1.0   if _use_cm else 0.5
 
             new_measurements = {}
             # 4 columns x N rows
@@ -2826,17 +2858,26 @@ def _render_profile():
             for _row_start in range(0, len(_MEAS_FIELDS), _per_row):
                 _row = _MEAS_FIELDS[_row_start:_row_start + _per_row]
                 _cols = st.columns(len(_row), gap="medium")
-                for _i, (_key, _label, _unit, _tip) in enumerate(_row):
+                for _i, (_key, _label, _tip) in enumerate(_row):
                     with _cols[_i]:
-                        _current = measurements.get(_key)
-                        new_measurements[_key] = st.number_input(
-                            f"{_label} ({_unit})",
+                        _current_in = measurements.get(_key)
+                        # The number_input displays whichever unit the user
+                        # picked; we convert from stored inches.
+                        _initial = 0.0
+                        if isinstance(_current_in, (int, float)) and _current_in:
+                            _initial = float(_current_in) * (_IN2CM if _use_cm else 1.0)
+                        _shown = st.number_input(
+                            f"{_label} ({_unit_choice})",
                             min_value=0.0,
-                            max_value=120.0,
-                            step=0.5,
-                            value=float(_current) if isinstance(_current, (int, float)) else 0.0,
+                            max_value=_max_input,
+                            step=_step,
+                            value=round(_initial, 1),
                             help=_tip,
                             key=f"measure_{_key}",
+                        )
+                        # Convert back to inches for storage.
+                        new_measurements[_key] = (
+                            _shown / _IN2CM if _use_cm else _shown
                         )
 
             # ── Save ─────────────────────────────────────────────
