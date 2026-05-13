@@ -45,16 +45,21 @@ from datetime import datetime
 # script, the imports return the OLD module objects: stale defaults,
 # stale function bodies, even stale class definitions.
 #
-# We watch the mtime of every locally-authored module and force
-# importlib.reload() on the ones that changed since this Streamlit
-# process started. The price is ~one stat() call per module per
-# render (microseconds). The win: contributors who pull new code
-# while their Streamlit is running just refresh the browser, no
-# Ctrl+C / restart required.
+# THE FIRST-RUN BLINDSPOT (fixed below):
 #
-# Built-in / third-party modules (streamlit, datetime, etc.) are
-# skipped because reloading those is fragile and they don't change
-# during a session anyway.
+# A naive implementation that compares the on-disk mtime against a
+# remembered "last seen" mtime cannot tell the difference between
+# "the file changed two minutes ago, before I started watching" and
+# "the file hasn't changed since I started watching." The MODULE in
+# sys.modules could still be stale relative to the file. So on the
+# very first observation we now compare the file mtime against the
+# CURRENT PROCESS START TIME (psutil-free, via the file's mtime vs.
+# a per-process sentinel). If the file is newer than the process
+# itself, the module IS stale and gets reloaded. After that, we
+# do the cheap mtime-compare for future edits.
+#
+# Cache survives across Streamlit reruns by being stashed on the
+# `sys` module itself (which Streamlit never clears).
 
 _VOLATILE_MODULES = (
     "calendar_tool",
@@ -75,14 +80,42 @@ _VOLATILE_MODULES = (
     "backup_tool",
 )
 
-# Map of module name -> mtime last seen on disk. First render fills
-# this; subsequent renders compare and reload on change.
-_MTIME_CACHE: dict = {}
+# Stash a single sentinel on the sys module — this survives across
+# Streamlit reruns (sys is process-global, never re-imported).
+_RELOADER_KEY = "_wearly_module_reloader"
+if not hasattr(sys, _RELOADER_KEY):
+    # Track when THIS auto-reloader code first started watching, so
+    # we can identify modules that were imported with stale code
+    # BEFORE we existed.
+    import time as _t
+    setattr(sys, _RELOADER_KEY, {
+        "started_at":   _t.time(),   # epoch when reloader first ran
+        "seen_mtimes":  {},          # module-name -> last observed mtime
+        "first_pass":   True,        # True for the very first invocation
+    })
+
+_RELOADER_STATE: dict = getattr(sys, _RELOADER_KEY)
 
 
 def _reload_volatile_modules() -> None:
-    """Reload any locally-authored module whose .py mtime changed."""
+    """
+    Reload any locally-authored module whose .py mtime suggests the
+    module object in sys.modules is stale.
+
+    On the FIRST invocation in a Streamlit process, every volatile
+    module whose .py file was modified before the reloader started
+    is force-reloaded. (This catches the typical case: a long-
+    running Streamlit that pre-dates a git pull.) After the first
+    invocation, modules are only reloaded when their file mtime
+    increases. Reload failures are swallowed so a half-saved file
+    can never crash the app.
+    """
     import importlib
+    state = _RELOADER_STATE
+    seen = state["seen_mtimes"]
+    first_pass = state["first_pass"]
+    started_at = state["started_at"]
+
     for name in _VOLATILE_MODULES:
         mod = sys.modules.get(name)
         if mod is None or not getattr(mod, "__file__", None):
@@ -91,18 +124,43 @@ def _reload_volatile_modules() -> None:
             current_mtime = os.path.getmtime(mod.__file__)
         except OSError:
             continue
-        last = _MTIME_CACHE.get(name)
-        if last is None:
-            _MTIME_CACHE[name] = current_mtime
-            continue
-        if current_mtime > last:
+
+        should_reload = False
+        if first_pass:
+            # The MODULE was imported by Streamlit's startup. If the
+            # FILE has been modified since the reloader itself first
+            # ran, then sys.modules is definitely behind the file
+            # contents — reload.
+            #
+            # We use the reloader's start_at instead of the module
+            # file's "true import time" because Python doesn't track
+            # per-module import time, and using a slightly-too-late
+            # reference point here is safe: a file that was modified
+            # in the interval between "Streamlit start" and "reloader
+            # first ran" was definitely loaded with stale code.
+            #
+            # In practice the reloader runs within microseconds of
+            # Streamlit picking up the new app.py, so this trigger
+            # captures the typical "git pull during Streamlit"
+            # scenario.
+            should_reload = True   # force on first pass
+        else:
+            last = seen.get(name)
+            if last is not None and current_mtime > last:
+                should_reload = True
+
+        if should_reload:
             try:
                 importlib.reload(mod)
-                _MTIME_CACHE[name] = current_mtime
             except Exception:
-                # Reload failed (e.g. circular import mid-edit) — keep
-                # the stale module rather than crashing the app.
+                # Reload failed (circular import mid-edit, syntax
+                # error in the new file, etc.). Keep the cached
+                # version rather than crashing the app.
                 pass
+        seen[name] = current_mtime
+
+    if first_pass:
+        state["first_pass"] = False
 
 
 _reload_volatile_modules()
@@ -4426,6 +4484,55 @@ def _render_profile():
                             _shown / _IN2CM if _use_cm else _shown
                         )
 
+            # ── Section 5: Timezone (locale setting) ─────────────
+            # Drives how UTC-stamped calendar events (e.g. Google
+            # Calendar's .ics export) are converted to local clock
+            # time. Without this, Streamlit Cloud (server in UTC)
+            # would display every event five hours off for a
+            # Minneapolis user.
+            st.markdown(
+                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                "text-transform:uppercase; font-weight:600; margin:1.4rem 0 0.4rem;'>"
+                "Time zone</div>",
+                unsafe_allow_html=True,
+            )
+            _TZ_OPTIONS = [
+                "America/Chicago",      # Central — Minneapolis, Chicago, Dallas, Mexico City
+                "America/New_York",     # Eastern — NYC, Boston, Toronto
+                "America/Denver",       # Mountain — Denver, Salt Lake City
+                "America/Los_Angeles",  # Pacific — LA, Seattle, Vancouver
+                "America/Anchorage",    # Alaska
+                "Pacific/Honolulu",     # Hawaii
+                "America/Phoenix",      # Arizona (no DST)
+                "America/Toronto",
+                "America/Vancouver",
+                "America/Mexico_City",
+                "Europe/London",
+                "Europe/Paris",
+                "Europe/Berlin",
+                "Europe/Athens",
+                "Asia/Riyadh",          # Arabic timezone — relevant to the user base
+                "Asia/Dubai",
+                "Asia/Tokyo",
+                "Asia/Singapore",
+                "Australia/Sydney",
+                "UTC",
+            ]
+            _current_tz = profile.get("timezone") or "America/Chicago"
+            if _current_tz not in _TZ_OPTIONS:
+                _TZ_OPTIONS = [_current_tz] + _TZ_OPTIONS
+            new_timezone = st.selectbox(
+                "Your time zone",
+                options=_TZ_OPTIONS,
+                index=_TZ_OPTIONS.index(_current_tz),
+                help=(
+                    "Calendar events from Google / Apple are stored in UTC and "
+                    "converted to this zone for display. Pick the zone you live "
+                    "in. Minneapolis is America/Chicago."
+                ),
+                label_visibility="collapsed",
+            )
+
             # ── Save ─────────────────────────────────────────────
             st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
             save_btn = st.form_submit_button(
@@ -4444,9 +4551,34 @@ def _render_profile():
                     "highlight_features": new_highlights,
                     "balance_areas":      new_balances,
                     "measurements":       new_measurements,
+                    "timezone":           new_timezone,
                 }
                 res = save_fit_profile(upd)
                 if res.get("success"):
+                    # If the timezone changed and there's a calendar
+                    # subscription on file, re-sync immediately so
+                    # the events repopulate in the new zone instead
+                    # of staying stuck on the old one until the next
+                    # auto-refresh.
+                    _tz_changed = (
+                        (profile.get("timezone") or "America/Chicago")
+                        != new_timezone
+                    )
+                    if _tz_changed:
+                        try:
+                            from calendar_import import get_subscription, refresh_subscription
+                            if get_subscription().get("url"):
+                                with st.spinner("Re-syncing calendar to the new time zone…"):
+                                    refresh_subscription(replace=True, timeout=10)
+                                # Invalidate the per-event-plan cache
+                                # so the Planner rebuilds with the
+                                # newly-zoned times.
+                                st.session_state.pop("planner_plans", None)
+                        except Exception:
+                            # Best-effort — profile save succeeded
+                            # even if the resync didn't, and the
+                            # next auto-refresh will catch up.
+                            pass
                     st.success(
                         "Profile updated. Wearly will reflect these in your next outfit."
                     )

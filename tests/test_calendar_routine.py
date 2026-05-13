@@ -49,17 +49,13 @@ class _DiskSnapshot:
 class TestICSParser(unittest.TestCase):
     """parse_ics_text handles the common subset of RFC 5545."""
 
-    def test_minimal_timed_event(self):
-        # A DTSTART ending in `Z` is a UTC timestamp by the iCalendar
-        # spec. The parser now converts it to the server's local
-        # timezone before storing — so the displayed event time
-        # matches what Google / Apple show the user, instead of raw
-        # UTC clock time. On CI (UTC runners) the expected output
-        # stays 09:00 / 2026-05-12; on a developer in UTC-5 it
-        # becomes 04:00 of the same day. Computing expectations via
-        # the same astimezone() the parser uses keeps this test
-        # correct on every timezone.
-        from datetime import datetime, timezone
+    def test_minimal_timed_event_utc_in_chicago(self):
+        # DTSTART ending in `Z` is UTC by RFC 5545. Wearly converts
+        # to the user's selected timezone (default America/Chicago).
+        # The conversion is now driven by user_tz, not by the server
+        # clock — so this test is deterministic on CI (UTC) AND on a
+        # developer's laptop. 09:00 UTC = 04:00 Central (CDT, May).
+        from zoneinfo import ZoneInfo
         from calendar_import import parse_ics_text
         ics = (
             "BEGIN:VCALENDAR\r\n"
@@ -71,20 +67,122 @@ class TestICSParser(unittest.TestCase):
             "END:VEVENT\r\n"
             "END:VCALENDAR\r\n"
         )
-        expected_local = datetime(
-            2026, 5, 12, 9, 0, tzinfo=timezone.utc
-        ).astimezone()
-
-        events = parse_ics_text(ics)
+        events = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))
         self.assertEqual(len(events), 1)
         ev = events[0]
         self.assertEqual(ev["id"], "abc-123@wearly")
         self.assertEqual(ev["title"], "Team standup")
-        self.assertEqual(ev["date"], expected_local.strftime("%Y-%m-%d"))
-        self.assertEqual(ev["time"], expected_local.strftime("%H:%M"))
-        self.assertEqual(ev["type"], "work")        # "standup" keyword
+        self.assertEqual(ev["date"], "2026-05-12")
+        self.assertEqual(ev["time"], "04:00")   # 09:00 UTC -> 04:00 CDT
+        self.assertEqual(ev["type"], "work")    # "standup" keyword
         self.assertEqual(ev["formality"], "business")
         self.assertEqual(ev["source"], "ics")
+
+    # ── User-tz aware parsing — the bug-fix coverage ─────────────
+
+    def test_utc_event_converted_to_chicago(self):
+        """The lunch case the user reported: 1pm Central in Google
+        is encoded as 18:00 UTC. Wearly must display 13:00."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:lunch-1@google.com\n"
+            "SUMMARY:lunch\n"
+            "DTSTART:20260513T180000Z\n"
+            "END:VEVENT\n"
+        )
+        ev = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))[0]
+        self.assertEqual(ev["date"], "2026-05-13")
+        self.assertEqual(ev["time"], "13:00")
+
+    def test_floating_time_not_shifted(self):
+        """No `Z`, no TZID → the spec says interpret as local clock
+        time of the viewer. We must NOT shift it."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:floating-1\n"
+            "SUMMARY:Floating meeting\n"
+            "DTSTART:20260513T130000\n"
+            "END:VEVENT\n"
+        )
+        # Same DTSTART should produce the same wall-clock time on
+        # every machine, regardless of user_tz.
+        for tz_name in ("America/Chicago", "America/New_York", "UTC"):
+            ev = parse_ics_text(ics, user_tz=ZoneInfo(tz_name))[0]
+            self.assertEqual(ev["date"], "2026-05-13",
+                             f"floating date shifted in {tz_name}")
+            self.assertEqual(ev["time"], "13:00",
+                             f"floating time shifted in {tz_name}")
+
+    def test_tzid_event_converted_to_user_zone(self):
+        """TZID names a source zone. The event is converted from
+        there to the user's zone. 10:00 in LA = 12:00 in Chicago."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:tzid-1\n"
+            "SUMMARY:LA meeting\n"
+            "DTSTART;TZID=America/Los_Angeles:20260513T100000\n"
+            "END:VEVENT\n"
+        )
+        ev = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))[0]
+        self.assertEqual(ev["date"], "2026-05-13")
+        self.assertEqual(ev["time"], "12:00")
+
+    def test_utc_event_crosses_midnight_to_previous_local_day(self):
+        """User's 'Dinner' encoded as T034500Z (3:45 AM UTC May 13)
+        is actually Tue May 12 10:45 PM in Chicago. The date field
+        must roll back to the previous local day."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:dinner-1@google.com\n"
+            "SUMMARY:Dinner\n"
+            "DTSTART:20260513T034500Z\n"
+            "END:VEVENT\n"
+        )
+        ev = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))[0]
+        self.assertEqual(ev["date"], "2026-05-12")
+        self.assertEqual(ev["time"], "22:45")
+
+    def test_utc_midnight_crosses_to_previous_local_evening(self):
+        """T000000Z (midnight UTC May 24) is 7:00 PM May 23 Central.
+        Both the date and the time must shift."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:wedding-1@google.com\n"
+            "SUMMARY:friend's wedding\n"
+            "DTSTART:20260524T000000Z\n"
+            "END:VEVENT\n"
+        )
+        ev = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))[0]
+        self.assertEqual(ev["date"], "2026-05-23")
+        self.assertEqual(ev["time"], "19:00")
+
+    def test_user_tz_is_respected_not_server_tz(self):
+        """Same UTC event displayed differently for two user zones."""
+        from zoneinfo import ZoneInfo
+        from calendar_import import parse_ics_text
+        ics = (
+            "BEGIN:VEVENT\n"
+            "UID:multi-tz-1\n"
+            "SUMMARY:Standup\n"
+            "DTSTART:20260513T150000Z\n"
+            "END:VEVENT\n"
+        )
+        ev_chi = parse_ics_text(ics, user_tz=ZoneInfo("America/Chicago"))[0]
+        ev_nyc = parse_ics_text(ics, user_tz=ZoneInfo("America/New_York"))[0]
+        ev_utc = parse_ics_text(ics, user_tz=ZoneInfo("UTC"))[0]
+        self.assertEqual(ev_chi["time"], "10:00")   # CDT = UTC-5
+        self.assertEqual(ev_nyc["time"], "11:00")   # EDT = UTC-4
+        self.assertEqual(ev_utc["time"], "15:00")
 
     def test_all_day_event(self):
         from calendar_import import parse_ics_text
@@ -133,6 +231,50 @@ class TestICSParser(unittest.TestCase):
         from calendar_import import parse_ics_text
         self.assertEqual(parse_ics_text(""), [])
         self.assertEqual(parse_ics_text("this is not an ics file"), [])
+
+    def test_get_user_tz_reads_from_profile(self):
+        """get_user_tz() should honor the user_profile.json setting."""
+        import tempfile, json as _json
+        from zoneinfo import ZoneInfo
+        from calendar_import import _resolve_tz, _read_user_timezone_name, USER_PROFILE_PATH
+        # Snapshot existing profile, swap in a test one, restore.
+        backup = None
+        if os.path.exists(USER_PROFILE_PATH):
+            with open(USER_PROFILE_PATH, "r", encoding="utf-8") as f:
+                backup = f.read()
+        try:
+            with open(USER_PROFILE_PATH, "w", encoding="utf-8") as f:
+                _json.dump({"timezone": "Europe/Athens"}, f)
+            self.assertEqual(_read_user_timezone_name(), "Europe/Athens")
+            self.assertEqual(_resolve_tz("Europe/Athens").key, "Europe/Athens")
+        finally:
+            if backup is not None:
+                with open(USER_PROFILE_PATH, "w", encoding="utf-8") as f:
+                    f.write(backup)
+            elif os.path.exists(USER_PROFILE_PATH):
+                os.remove(USER_PROFILE_PATH)
+
+    def test_get_user_tz_defaults_to_chicago_when_unset(self):
+        """Missing/empty profile → America/Chicago (Minneapolis)."""
+        import json as _json
+        from calendar_import import _read_user_timezone_name, USER_PROFILE_PATH
+        backup = None
+        if os.path.exists(USER_PROFILE_PATH):
+            with open(USER_PROFILE_PATH, "r", encoding="utf-8") as f:
+                backup = f.read()
+        try:
+            if os.path.exists(USER_PROFILE_PATH):
+                os.remove(USER_PROFILE_PATH)
+            self.assertEqual(_read_user_timezone_name(), "America/Chicago")
+            with open(USER_PROFILE_PATH, "w", encoding="utf-8") as f:
+                _json.dump({"timezone": None}, f)
+            self.assertEqual(_read_user_timezone_name(), "America/Chicago")
+        finally:
+            if backup is not None:
+                with open(USER_PROFILE_PATH, "w", encoding="utf-8") as f:
+                    f.write(backup)
+            elif os.path.exists(USER_PROFILE_PATH):
+                os.remove(USER_PROFILE_PATH)
 
 
 class TestICSImport(_DiskSnapshot, unittest.TestCase):

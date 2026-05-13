@@ -35,8 +35,15 @@ import json
 import os
 import re
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Optional
+
+try:
+    # Python 3.9+ — stdlib, ships zoneinfo without an external dep.
+    from zoneinfo import ZoneInfo, ZoneInfoNotFoundError  # type: ignore
+except ImportError:  # pragma: no cover — Wearly requires 3.10+
+    ZoneInfo = None  # type: ignore
+    ZoneInfoNotFoundError = Exception  # type: ignore
 
 
 def _find_data_file(filename: str) -> str:
@@ -54,6 +61,67 @@ def _find_data_file(filename: str) -> str:
 
 CALENDAR_PATH = _find_data_file("calendar_events.json")
 SUBSCRIPTION_PATH = _find_data_file("calendar_subscription.json")
+USER_PROFILE_PATH = _find_data_file("user_profile.json")
+
+
+# ─────────────────────────────────────────────
+# USER TIMEZONE RESOLUTION
+# ─────────────────────────────────────────────
+
+# Default timezone used when the user hasn't set one. Minneapolis is in
+# America/Chicago; making this the default means the live demo Just
+# Works for the project owner without forcing them through a settings
+# step on first run. Reviewers anywhere else only need to set their
+# own zone in Profile to get correct local times.
+_DEFAULT_TZ_NAME = "America/Chicago"
+
+
+def _read_user_timezone_name() -> str:
+    """
+    Read the user-selected IANA timezone from user_profile.json.
+
+    Falls back to America/Chicago when:
+      - the file doesn't exist
+      - the "timezone" key is missing or null
+      - the value isn't a string
+
+    No exception is ever raised — calendar parsing must keep working
+    even with a corrupt profile file.
+    """
+    if not os.path.exists(USER_PROFILE_PATH):
+        return _DEFAULT_TZ_NAME
+    try:
+        with open(USER_PROFILE_PATH, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        name = data.get("timezone")
+        if isinstance(name, str) and name.strip():
+            return name.strip()
+    except Exception:
+        pass
+    return _DEFAULT_TZ_NAME
+
+
+def _resolve_tz(name: Optional[str]) -> "ZoneInfo":
+    """
+    Resolve an IANA tz name to a ZoneInfo. Falls back to UTC when the
+    name is invalid (instead of crashing the importer).
+    """
+    if ZoneInfo is None:
+        return timezone.utc  # type: ignore[return-value]
+    try:
+        return ZoneInfo(name) if name else ZoneInfo(_DEFAULT_TZ_NAME)
+    except ZoneInfoNotFoundError:
+        # Bad name in profile or in the .ics TZID — fall back to UTC
+        # so the event still loads, just in raw UTC. Documented in tests.
+        try:
+            return ZoneInfo(_DEFAULT_TZ_NAME)
+        except ZoneInfoNotFoundError:
+            return timezone.utc  # type: ignore[return-value]
+
+
+def get_user_tz() -> "ZoneInfo":
+    """Public accessor: ZoneInfo for the user's selected timezone."""
+    return _resolve_tz(_read_user_timezone_name())
 
 
 # Canonical occasion tags Wearly's agent recognizes. When the ICS title
@@ -124,60 +192,99 @@ def _unescape(value: str) -> str:
     )
 
 
-def _parse_dtstart(raw: str) -> Optional[Dict[str, str]]:
+def _parse_dtstart(raw: str, user_tz: Optional["ZoneInfo"] = None) -> Optional[Dict[str, str]]:
     """
     Parse a DTSTART value. Returns {"date": "YYYY-MM-DD", "time": "HH:MM"}
     on success, or None on parse failure. Time is "" for all-day events.
 
-    Accepts forms:
-      VALUE=DATE:20260512                 -> all-day
-      :20260512T100000                    -> floating timed (no conversion)
-      :20260512T100000Z                   -> UTC timed (CONVERTED to local)
-      ;TZID=America/Los_Angeles:20260512T100000   -> tz-aware timed
-                                                     (treated as floating)
+    `user_tz` is the IANA zone the user lives in (resolved via
+    get_user_tz() when not supplied). Output dates and times are
+    expressed in that zone.
 
-    The previous version stripped the trailing UTC `Z` and displayed
-    the raw UTC clock time. For a user in US Central, that turned a
-    9:45 PM local "Dinner" (encoded as 034500Z next day) into "03:45"
-    on screen. The fix: when the DTSTART carries a UTC marker,
-    convert to the server's local timezone before formatting. On a
-    developer's machine that's the user's actual local time. On
-    Streamlit Cloud (server is UTC) we still produce UTC, but the
-    timestamp at least matches what Google's web UI shows the user
-    under a UTC display setting — and a future "user timezone"
-    preference can override this in one place.
+    Accepts the four DTSTART forms RFC 5545 allows:
+
+      VALUE=DATE:20260512                  -> all-day (no time, no
+                                              zone conversion)
+      :20260512T100000                     -> floating (no zone info
+                                              attached; stored as-is)
+      :20260512T100000Z                    -> UTC (converted to
+                                              user_tz before storing)
+      ;TZID=America/Los_Angeles:20260512T100000
+                                           -> zone-aware (parsed in
+                                              the named zone, then
+                                              converted to user_tz)
+
+    Date crossings are handled automatically because every conversion
+    flows through aware-datetime arithmetic. E.g. 03:00 UTC May 13
+    becomes 22:00 LOCAL May 12 in Chicago, with the date correctly
+    rolled back to the previous day.
+
+    If user_tz is unspecified the function reads it from
+    user_profile.json. The result of the previous Python-process's
+    .astimezone() (which depended on the SERVER's local zone — wrong
+    on Streamlit Cloud) is no longer relied on anywhere.
     """
     raw = (raw or "").strip()
     if not raw:
         return None
 
-    # Split out the params (everything before ':') from the value.
+    if user_tz is None:
+        user_tz = get_user_tz()
+
+    # Split params (everything before the first ':') from the value.
     if ":" in raw:
         params, value = raw.split(":", 1)
     else:
         params, value = "", raw
 
-    is_all_day = "VALUE=DATE" in params.upper()
-    is_utc = value.strip().endswith("Z")
-    value = value.strip().rstrip("Z")
+    params_upper = params.upper()
+    is_all_day = "VALUE=DATE" in params_upper
+    value = value.strip()
+    is_utc = value.endswith("Z")
+    if is_utc:
+        value = value[:-1]
+
+    # Extract TZID=... if present, e.g. ;TZID=America/Los_Angeles
+    tzid_match = re.search(r"TZID=([^;:]+)", params, flags=re.IGNORECASE)
+    tzid_name = tzid_match.group(1).strip() if tzid_match else None
 
     try:
         if is_all_day or "T" not in value:
-            # YYYYMMDD
+            # All-day: YYYYMMDD, no time component, no zone conversion.
             dt = datetime.strptime(value[:8], "%Y%m%d")
             return {"date": dt.strftime("%Y-%m-%d"), "time": ""}
-        # YYYYMMDDTHHMMSS or YYYYMMDDTHHMM
+
+        # Timed: YYYYMMDDTHHMMSS or YYYYMMDDTHHMM (pad seconds if missing)
         date_part, time_part = value.split("T", 1)
-        dt = datetime.strptime(date_part + "T" + time_part[:6].ljust(6, "0"),
-                               "%Y%m%dT%H%M%S")
+        dt = datetime.strptime(
+            date_part + "T" + time_part[:6].ljust(6, "0"),
+            "%Y%m%dT%H%M%S",
+        )
+
         if is_utc:
-            # Mark as UTC, then convert to the server's local TZ.
-            # datetime.astimezone() with no argument resolves to the
-            # local zone via the OS — works on Windows / macOS / Linux.
-            from datetime import timezone as _tz
-            dt = dt.replace(tzinfo=_tz.utc).astimezone()
-        return {"date": dt.strftime("%Y-%m-%d"),
-                "time": dt.strftime("%H:%M")}
+            # Attach UTC tzinfo, then convert to the user's zone.
+            dt_aware = dt.replace(tzinfo=timezone.utc).astimezone(user_tz)
+        elif tzid_name:
+            # Parse in the declared zone, then convert to the user's
+            # zone. If we can't resolve TZID (rare, unknown name),
+            # fall back to treating the time as floating.
+            source_tz = _resolve_tz(tzid_name)
+            try:
+                dt_aware = dt.replace(tzinfo=source_tz).astimezone(user_tz)
+            except Exception:
+                dt_aware = dt   # treat as floating
+        else:
+            # Floating: by spec, this is interpreted as the LOCAL time
+            # of whoever is reading. We store it as-is (no conversion,
+            # no zone attached) so it displays the same wall-clock
+            # number on every machine — matching Google Calendar's
+            # behavior for events without an explicit TZ.
+            dt_aware = dt
+
+        return {
+            "date": dt_aware.strftime("%Y-%m-%d"),
+            "time": dt_aware.strftime("%H:%M"),
+        }
     except (ValueError, IndexError):
         return None
 
@@ -185,7 +292,7 @@ def _parse_dtstart(raw: str) -> Optional[Dict[str, str]]:
 _PROP_RE = re.compile(r"^([A-Z][A-Z0-9-]*)((?:;[^:]*)?)(?::(.*))?$", re.IGNORECASE)
 
 
-def parse_ics_text(text: str) -> List[Dict[str, str]]:
+def parse_ics_text(text: str, user_tz: Optional["ZoneInfo"] = None) -> List[Dict[str, str]]:
     """
     Parse an .ics blob and return a list of Wearly-shaped events::
 
@@ -200,8 +307,15 @@ def parse_ics_text(text: str) -> List[Dict[str, str]]:
           "source":     "ics",
         }
 
+    `user_tz` controls the timezone used to express dates and times.
+    When omitted, the user's profile setting is honored (default
+    America/Chicago). Tests pass an explicit zone for determinism.
+
     Unparseable events are skipped silently. The function never raises.
     """
+    if user_tz is None:
+        user_tz = get_user_tz()
+
     out: List[Dict[str, str]] = []
     in_event = False
     cur: Dict[str, str] = {}
@@ -215,7 +329,7 @@ def parse_ics_text(text: str) -> List[Dict[str, str]]:
         if upper.startswith("END:VEVENT"):
             in_event = False
             if cur.get("_dtstart"):
-                dt = _parse_dtstart(cur["_dtstart"])
+                dt = _parse_dtstart(cur["_dtstart"], user_tz=user_tz)
                 if dt:
                     title = cur.get("summary", "Untitled event")
                     notes_bits = []

@@ -87,6 +87,13 @@ _EMPTY_OVERLAY = {
     # Layer 4 — meta: provenance of auto-fills. "user" = explicitly set
     # by the wearer; "auto" = predicted from measurements; None = unset.
     "_body_shape_source": None,
+    # Layer 5 — locale settings. The IANA timezone the user lives in.
+    # Used by the .ics calendar importer to convert UTC-timestamped
+    # events to local clock time, so a 6 PM event in Google Calendar
+    # shows as 6 PM here too — regardless of whether the server is
+    # the user's laptop (often Central) or Streamlit Cloud (always
+    # UTC). Default America/Chicago (Minneapolis is in that zone).
+    "timezone":           "America/Chicago",
 }
 
 
@@ -497,6 +504,7 @@ def save_fit_profile(updates: dict) -> dict:
         "modesty_preference", "comfort_needs", "style_goals",
         "highlight_features", "balance_areas",
         "measurements",
+        "timezone",
     )
     for k in accepted:
         if k not in updates:
