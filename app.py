@@ -134,67 +134,51 @@ html, body, [class*="css"] {
     display: flex; align-items: center; gap: 0.6rem;
 }
 /* ───── Profile popover (top-right chip dropdown) ─────
-   The trigger is a real Streamlit popover whose button is styled to
-   look like the old chip: pill shape, thin grey border, small avatar
-   initial on the left, "Hi, <name>" text in the middle, chevron at
-   the end. Hover + focus states keep the affordance obvious.
-   We scope every rule via `.profile-popover-slot` so we don't
-   accidentally restyle any other popovers in the app. */
-.profile-popover-slot { display: flex; justify-content: flex-end; }
-
-/* Nuke every layer between the column and the actual <button> so no
-   wrapping element shows a halo behind the chip. Targets the column
-   itself, every nested div, every Streamlit element container, every
-   markdown wrapper, every popover wrapper. background:transparent so
-   it inherits the page's white and nothing draws on its own. */
-.profile-popover-slot,
-.profile-popover-slot *,
-.profile-popover-slot div,
-.profile-popover-slot [data-testid],
-.profile-popover-slot [class*="st-"],
-.profile-popover-slot [data-testid="stPopover"],
-.profile-popover-slot [data-testid="stElementContainer"],
-.profile-popover-slot [data-testid="stVerticalBlock"] {
-    background: transparent !important;
-    background-color: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-}
-
-/* The column that hosts the popover slot itself — same treatment, in
-   case the chip is rendered inside a column wrapper one level above. */
-[data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.profile-popover-slot),
-[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.profile-popover-slot) {
+   The trigger is a real Streamlit popover styled as a pill: thin grey
+   border, "Hi, <name>" label, built-in chevron. Hover + focus states
+   keep the affordance obvious. Targeted via the global
+   [data-testid="stPopover"] selector because this is the only popover
+   in the app — see the comment in the app-bar render code below. */
+/* Style the profile popover trigger (the only popover in the app, so
+   we can target [data-testid="stPopover"] globally without affecting
+   anything else). Nuke any background on every ancestor so the warm
+   page tint doesn't bleed through, then re-assert pure white on the
+   button itself. */
+[data-testid="stPopover"],
+[data-testid="stPopover"] > div,
+[data-testid="stPopover"] > div > div {
     background: transparent !important;
     background-color: transparent !important;
 }
 
-.profile-popover-slot [data-testid="stPopover"] > div > button,
-.profile-popover-slot button[kind="secondary"],
-.profile-popover-slot button {
+[data-testid="stPopover"] button,
+[data-testid="stPopover"] > div > button {
     background: #FFFFFF !important;
     background-color: #FFFFFF !important;
     color: #111111 !important;
     border: 1px solid #E5E5E5 !important;
     border-radius: 99px !important;
-    padding: 0.32rem 0.85rem !important;
+    padding: 0.32rem 0.95rem !important;
     min-height: 40px !important;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 0.82rem !important;
     font-weight: 500 !important;
     letter-spacing: 0 !important;
     box-shadow: none !important;
-    transition: background 0.15s ease, border-color 0.15s ease !important;
-    text-align: left !important;
+    transition: background-color 0.15s ease, border-color 0.15s ease !important;
     white-space: nowrap !important;
 }
-.profile-popover-slot [data-testid="stPopover"] > div > button:hover,
-.profile-popover-slot button[kind="secondary"]:hover,
-.profile-popover-slot button:hover {
+[data-testid="stPopover"] button:hover,
+[data-testid="stPopover"] > div > button:hover {
     background: #FAFAFA !important;
     background-color: #FAFAFA !important;
     border-color: #111111 !important;
     color: #111111 !important;
+}
+[data-testid="stPopover"] button:focus,
+[data-testid="stPopover"] button:focus-visible {
+    outline: 2px solid #111111 !important;
+    outline-offset: 2px !important;
 }
 
 /* The popover panel — compact white card. Streamlit's popover renders
@@ -846,10 +830,12 @@ with _bar_left:
     """, unsafe_allow_html=True)
 
 with _bar_right:
-    # The popover's trigger label appears on the button. We mark the
-    # surrounding column so we can style only this specific popover via
-    # CSS without affecting any other popovers elsewhere in the app.
-    st.markdown('<div class="profile-popover-slot">', unsafe_allow_html=True)
+    # The popover's trigger button is the only popover in the whole app,
+    # so we style it via the global [data-testid="stPopover"] selector
+    # (see CSS block above). Earlier attempts used a .profile-popover-slot
+    # wrapper div, but Streamlit renders each st.markdown call as a
+    # SIBLING block, never wrapping the popover — so that scoping never
+    # took effect. The global selector works and is safe.
     with st.popover(
         f"Hi, {_name}",
         use_container_width=True,
@@ -888,8 +874,6 @@ with _bar_right:
         )
         if st.button("Sign out", key="menu_signout_btn", use_container_width=True):
             _sign_out()
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
 # Visual divider under the app bar — matches the old single-row look.
 st.markdown(
