@@ -3470,6 +3470,7 @@ def _render_wardrobe():
 
         suggested_color_default = ""
         image_bytes_for_save = None
+        _photo_inferred = None
 
         if uploaded is not None:
             image_bytes_for_save = uploaded.getvalue()
@@ -3477,11 +3478,54 @@ def _render_wardrobe():
             with prev_col:
                 st.image(uploaded, caption=None, use_container_width=True)
             with info_col:
-                with st.spinner("Reading colors…"):
+                # Goal 1: combine pixel color extraction with filename-
+                # keyword inference so the user doesn't re-type fields
+                # the filename already implies.
+                with st.spinner("Reading image…"):
+                    try:
+                        from wardrobe_tool import infer_item_from_photo
+                        _photo_inferred = infer_item_from_photo(
+                            image_bytes_for_save,
+                            filename=getattr(uploaded, "name", "") or "",
+                        )
+                    except Exception:
+                        _photo_inferred = None
                     sugg = suggest_colors_from_image(image_bytes_for_save, top_n=3)
+
+                if _photo_inferred:
+                    if _photo_inferred.get("color"):
+                        suggested_color_default = _photo_inferred["color"]
+                    # Tell the user what we inferred, so the pre-fills aren't surprising.
+                    bits: list = []
+                    if _photo_inferred.get("category"):
+                        bits.append(f"category <strong>{_photo_inferred['category']}</strong>")
+                    if _photo_inferred.get("color"):
+                        bits.append(f"color <strong>{_photo_inferred['color']}</strong>")
+                    if _photo_inferred.get("formality"):
+                        bits.append(f"formality <strong>{_photo_inferred['formality']}</strong>")
+                    if _photo_inferred.get("season"):
+                        bits.append(
+                            f"season <strong>{', '.join(_photo_inferred['season'])}</strong>"
+                        )
+                    if _photo_inferred.get("tags"):
+                        bits.append(f"tags <strong>{', '.join(_photo_inferred['tags'])}</strong>")
+                    if bits:
+                        st.markdown(
+                            "<div style='font-size:0.66rem; color:#8E8E93; "
+                            "letter-spacing:0.14em; text-transform:uppercase; "
+                            "font-weight:600; margin-bottom:0.3rem;'>"
+                            "What Wearly inferred"
+                            "</div>"
+                            f"<div style='font-size:0.84rem; color:#2E2E2E; "
+                            f"line-height:1.55;'>{'; '.join(bits)}. "
+                            f"<em style='color:#6E6E73;'>Review and adjust below.</em>"
+                            "</div>",
+                            unsafe_allow_html=True,
+                        )
+
                 if sugg.get("success") and sugg["suggestions"]:
-                    top = sugg["suggestions"][0]
-                    suggested_color_default = top["name"]
+                    if not suggested_color_default:
+                        suggested_color_default = sugg["suggestions"][0]["name"]
                     chips = ""
                     for s in sugg["suggestions"]:
                         pct = round(s["weight"] * 100)
@@ -3494,40 +3538,64 @@ def _render_wardrobe():
                             f'{s["name"]} · {pct}%</div>'
                         )
                     st.markdown(f"""
-                    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">
-                        Suggested colors
+                    <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin:0.55rem 0 0.3rem;">
+                        Pixel-level color palette
                     </div>
                     <div style="margin-bottom:0.6rem;">{chips}</div>
-                    <div style="font-size:0.76rem; color:#6E6E73; line-height:1.5;">
-                        The top suggestion is pre-filled below. You can keep it, pick one of the others,
-                        or type in any color.
-                    </div>
                     """, unsafe_allow_html=True)
-                else:
+                elif not _photo_inferred:
                     st.warning(
-                        f"Couldn't read colors from this image — fill in the color field manually. "
+                        f"Couldn't read this image — fill in the fields manually. "
                         f"{sugg.get('error','')}"
                     )
+
+        # Helpers to pre-select options the inference suggested.
+        def _safe_index(options, value, default=0):
+            try:
+                return options.index(value) if value in options else default
+            except Exception:
+                return default
+
+        _inf_cat       = (_photo_inferred or {}).get("category") or "top"
+        _inf_formality = (_photo_inferred or {}).get("formality") or "casual"
+        _inf_seasons   = (_photo_inferred or {}).get("season") or ["all"]
+        _inf_tags      = (_photo_inferred or {}).get("tags") or []
+        _inf_name      = (_photo_inferred or {}).get("name") or ""
 
         with st.form("wardrobe_add_form_photo", clear_on_submit=True):
             col_a, col_b = st.columns([3, 2], gap="small")
             with col_a:
-                p_name = st.text_input("Name", placeholder="e.g. Cream Linen Blazer", key="p_name")
+                p_name = st.text_input("Name", value=_inf_name,
+                                       placeholder="e.g. Cream Linen Blazer", key="p_name")
             with col_b:
                 p_color = st.text_input("Color", value=suggested_color_default, key="p_color")
 
             col_c, col_d = st.columns([1, 1], gap="small")
             with col_c:
-                p_category = st.selectbox("Category", options=_CATEGORY_OPTIONS, key="p_category")
+                p_category = st.selectbox(
+                    "Category", options=_CATEGORY_OPTIONS,
+                    index=_safe_index(_CATEGORY_OPTIONS, _inf_cat),
+                    key="p_category",
+                )
             with col_d:
-                p_formality = st.selectbox("Formality", options=_FORMALITY_OPTIONS, key="p_formality")
+                p_formality = st.selectbox(
+                    "Formality", options=_FORMALITY_OPTIONS,
+                    index=_safe_index(_FORMALITY_OPTIONS, _inf_formality),
+                    key="p_formality",
+                )
 
+            # Pre-select inferred seasons (only the ones that are in the option list).
+            _default_seasons = [s for s in _inf_seasons if s in _SEASON_OPTIONS] or ["all"]
             p_seasons = st.multiselect(
                 "Seasons (leave empty to mean year-round)",
-                options=_SEASON_OPTIONS, default=["all"], key="p_seasons",
+                options=_SEASON_OPTIONS, default=_default_seasons, key="p_seasons",
             )
+            _default_tags = [t for t in _inf_tags if t in _OCCASION_TAG_OPTIONS]
             p_tags = st.multiselect(
-                "Suitable for these occasions", options=_OCCASION_TAG_OPTIONS, default=[], key="p_tags",
+                "Suitable for these occasions",
+                options=_OCCASION_TAG_OPTIONS,
+                default=_default_tags,
+                key="p_tags",
             )
             p_submit = st.form_submit_button(
                 ("Save photo & add to wardrobe" if image_bytes_for_save else "Add to wardrobe (no photo attached)"),

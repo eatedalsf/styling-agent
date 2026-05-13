@@ -187,6 +187,191 @@ def suggest_colors_from_image(image_bytes: bytes, top_n: int = 3) -> dict:
     return {"success": True, "suggestions": ranked[:top_n], "error": None}
 
 
+# ─────────────────────────────────────────────
+# SMART PHOTO INFERENCE  (Goal 1)
+# ─────────────────────────────────────────────
+
+# Filename-keyword vocabulary. A typical phone screenshot or store-saved
+# image is named things like "blush-blouse.png", "IMG_aritzia_dress.jpeg",
+# "camel-trench-coat.png". When that's present we extract the category,
+# color, and occasion tags from the filename — no ML required.
+_FILENAME_CATEGORY_KEYWORDS = {
+    "dress": "dress", "gown": "dress", "tunic": "dress",
+    "blouse": "top", "shirt": "top", "tee": "top", "tank": "top",
+    "sweater": "top", "turtleneck": "top", "cardigan": "top",
+    "polo": "top", "camisole": "top",
+    "trousers": "bottom", "pants": "bottom", "jeans": "bottom",
+    "skirt": "bottom", "shorts": "bottom",
+    "blazer": "outerwear", "coat": "outerwear", "jacket": "outerwear",
+    "trench": "outerwear", "parka": "outerwear", "puffer": "outerwear",
+    "leggings": "activewear", "athleisure": "activewear",
+    "activewear": "activewear", "yoga": "activewear",
+    "heels": "shoes", "boots": "shoes", "sneakers": "shoes",
+    "loafers": "shoes", "flats": "shoes", "pumps": "shoes",
+    "sandals": "shoes", "mules": "shoes", "shoes": "shoes",
+    "earrings": "accessory", "necklace": "accessory", "scarf": "accessory",
+    "handbag": "accessory", "tote": "accessory", "clutch": "accessory",
+    "bag": "accessory", "belt": "accessory", "sunglasses": "accessory",
+}
+
+_FILENAME_COLOR_KEYWORDS = (
+    "black", "white", "ivory", "cream", "beige", "grey", "gray",
+    "navy", "blue", "olive", "camel", "tan", "nude", "blush", "pink",
+    "burgundy", "red", "rust", "terracotta", "gold", "silver",
+    "brown", "green", "khaki", "charcoal", "sage",
+)
+
+_FILENAME_TAG_KEYWORDS = {
+    "work":   ["work", "office", "business", "professional"],
+    "formal": ["formal", "gala", "blacktie", "black-tie", "cocktail"],
+    "evening":["evening", "nightout"],
+    "casual": ["casual", "weekend", "everyday"],
+    "gym":    ["gym", "workout", "athletic", "sport", "running"],
+    "travel": ["travel", "vacation", "resort"],
+    "dinner": ["dinner"],
+    "date":   ["datenight"],
+}
+
+
+def _infer_from_filename(filename: str) -> dict:
+    """Pull category, color, tags from a filename like
+    'blush-floral-blouse.png' or 'IMG_camel_trench_coat.jpeg'."""
+    out = {"category": None, "color": None, "tags": []}
+    if not filename:
+        return out
+    name = filename.lower()
+    # Strip extension and split on common separators.
+    name = __import__("re").sub(r"\.[a-z0-9]{2,5}$", "", name)
+    tokens = set(__import__("re").split(r"[\s\-_./]+", name))
+    # Category — first match wins, prefer specific terms.
+    for kw, target in _FILENAME_CATEGORY_KEYWORDS.items():
+        if kw in tokens or kw in name:
+            out["category"] = target
+            break
+    # Color — first match wins (filename usually has just one).
+    for col in _FILENAME_COLOR_KEYWORDS:
+        if col in tokens or col in name:
+            out["color"] = col
+            break
+    # Tags — collect all hits.
+    found_tags: list = []
+    for canonical, kws in _FILENAME_TAG_KEYWORDS.items():
+        for w in kws:
+            if w in tokens or w in name:
+                if canonical not in found_tags:
+                    found_tags.append(canonical)
+                break
+    out["tags"] = found_tags
+    return out
+
+
+def _infer_season_from_color(color_name: str) -> list:
+    """Heuristic: a color's apparent warmth/saturation suggests
+    the season(s) the item is best suited to. Used as a fallback
+    when neither filename nor explicit user input provides a season.
+    """
+    if not color_name:
+        return ["all"]
+    c = color_name.lower()
+    if any(k in c for k in ("burgundy", "rust", "olive", "camel",
+                            "brown", "charcoal", "navy", "forest", "wine")):
+        return ["fall", "winter"]
+    if any(k in c for k in ("blush", "sage", "pastel", "mint",
+                            "lavender", "peach", "ivory")):
+        return ["spring"]
+    if any(k in c for k in ("white", "cream", "tan", "nude", "linen")):
+        return ["spring", "summer"]
+    return ["all"]
+
+
+def infer_item_from_photo(image_bytes: bytes, filename: str = "") -> dict:
+    """
+    Combine pixel-level color extraction with filename-keyword
+    inference to fill in as many wardrobe fields as we can BEFORE
+    the user has to type anything. Returns:
+
+        {
+          "name":      str | None,    # cleaned from filename
+          "category":  str | None,    # from filename keywords
+          "color":     str | None,    # from filename OR top pixel cluster
+          "tags":      [str, ...],    # from filename keywords
+          "season":    [str, ...],    # from filename, color, or default
+          "formality": str | None,    # from category + tags
+          "color_palette": [...]      # full ranked palette for review
+        }
+
+    The user remains the final reviewer of every field. This is
+    inference, not a contract.
+
+    Goal 1: photo upload should feel low-effort. The user shouldn't
+    re-type "this is a dress" when the filename already says
+    "balloon_sleeve_dress.png". The image just clusters colors;
+    the filename — when present — does the rest.
+    """
+    import re as _re
+
+    # 1. Filename-driven inference.
+    from_filename = _infer_from_filename(filename)
+
+    # 2. Pixel-driven color palette.
+    palette_result = suggest_colors_from_image(image_bytes, top_n=3)
+    palette = palette_result.get("suggestions") or []
+    pixel_color = palette[0].get("name") if palette else None
+
+    # 3. Decide which color wins. Filename color is generally more
+    #    trustworthy because background pixels often dominate a
+    #    palette. We prefer filename when both exist.
+    color = from_filename["color"] or pixel_color
+
+    # 4. Clean up filename → name.
+    name = filename or ""
+    name = _re.sub(r"\.[a-z0-9]{2,5}$", "", name, flags=_re.IGNORECASE)
+    name = _re.sub(r"[\-_]+", " ", name)
+    name = _re.sub(r"\s+", " ", name).strip()
+    # Strip noise prefixes like "IMG", "DSC", date-like tokens.
+    tokens = name.split()
+    NOISE = {"img", "dsc", "photo", "pic", "image", "screenshot",
+             "untitled", "scan"}
+    tokens = [t for t in tokens
+              if t.lower() not in NOISE and not _re.fullmatch(r"\d{4,}", t)]
+    name = " ".join(t.capitalize() for t in tokens)
+    if not name and color:
+        name = f"{color.title()} item"
+
+    # 5. Season — filename → color heuristic → all.
+    season = []
+    # Filename tag hints (no explicit season tokens here, just inferred).
+    color_season = _infer_season_from_color(color or "")
+    season = color_season
+
+    # 6. Formality — rule-based mapping from category + tags.
+    category = from_filename["category"]
+    tag_set = set(from_filename["tags"])
+    formality = None
+    if "formal" in tag_set or category == "dress":
+        formality = "smart_casual"
+    elif "work" in tag_set:
+        formality = "business"
+    elif category == "activewear" or "gym" in tag_set:
+        formality = "athletic"
+    elif category in ("outerwear", "top", "bottom"):
+        formality = "casual"
+    elif category == "shoes":
+        formality = "casual"
+    if not formality:
+        formality = "casual"
+
+    return {
+        "name":          name or None,
+        "category":      category,
+        "color":         color,
+        "tags":          from_filename["tags"],
+        "season":        season,
+        "formality":     formality,
+        "color_palette": palette,
+    }
+
+
 def _compose_on_white(pil_image):
     """If image has alpha, composite onto white background; else return RGB."""
     from PIL import Image  # local import — keeps CLI path PIL-free
