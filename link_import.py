@@ -320,15 +320,138 @@ def _find_meta(html: str, attr_value: str) -> str | None:
     return None
 
 
+def _extract_jsonld_product(html: str) -> dict:
+    """
+    Many retailers embed Schema.org Product JSON-LD inside
+    <script type="application/ld+json"> ... </script>. When present
+    it's the cleanest signal: name, brand, color, category, image,
+    and sometimes price. We pluck just those fields and stay
+    schema-tolerant — Schema.org allows nesting under @graph and
+    array-valued types.
+
+    Returns {"name", "brand", "color", "category", "image",
+    "description"} with None for anything we couldn't find.
+    Failures are silent — this layer is best-effort.
+    """
+    out = {"name": None, "brand": None, "color": None,
+           "category": None, "image": None, "description": None}
+    try:
+        import json as _json
+    except Exception:
+        return out
+
+    blocks = re.findall(
+        r'<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>',
+        html, flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    def _walk(node) -> None:
+        # Recursively descend the JSON-LD structure, collecting the
+        # first Product-shaped record we can find.
+        if isinstance(node, list):
+            for item in node:
+                _walk(item)
+            return
+        if not isinstance(node, dict):
+            return
+        types = node.get("@type")
+        type_set: set = set()
+        if isinstance(types, str):
+            type_set.add(types.lower())
+        elif isinstance(types, list):
+            for t in types:
+                if isinstance(t, str):
+                    type_set.add(t.lower())
+        if "product" in type_set:
+            if out["name"] is None:
+                v = node.get("name")
+                if isinstance(v, str) and v.strip():
+                    out["name"] = _html.unescape(v.strip())
+            if out["description"] is None:
+                v = node.get("description")
+                if isinstance(v, str) and v.strip():
+                    out["description"] = _html.unescape(v.strip())
+            if out["brand"] is None:
+                b = node.get("brand")
+                if isinstance(b, str):
+                    out["brand"] = b.strip() or None
+                elif isinstance(b, dict):
+                    out["brand"] = (b.get("name") or "").strip() or None
+            if out["color"] is None:
+                v = node.get("color")
+                if isinstance(v, str) and v.strip():
+                    out["color"] = v.strip().lower()
+            if out["category"] is None:
+                v = node.get("category")
+                if isinstance(v, str) and v.strip():
+                    out["category"] = v.strip()
+                elif isinstance(v, list) and v:
+                    if isinstance(v[0], str):
+                        out["category"] = v[0]
+            if out["image"] is None:
+                img = node.get("image")
+                if isinstance(img, str) and img.strip():
+                    out["image"] = img.strip()
+                elif isinstance(img, list) and img:
+                    first = img[0]
+                    if isinstance(first, str):
+                        out["image"] = first.strip()
+                    elif isinstance(first, dict):
+                        out["image"] = (first.get("url") or "").strip() or None
+                elif isinstance(img, dict):
+                    out["image"] = (img.get("url") or "").strip() or None
+        # Schema.org @graph node — keep walking.
+        for k in ("@graph", "mainEntity", "isPartOf"):
+            if k in node:
+                _walk(node[k])
+
+    for block in blocks:
+        block = block.strip()
+        if not block:
+            continue
+        try:
+            parsed = _json.loads(block)
+        except Exception:
+            # Some retailers emit JSON-LD with trailing commas or
+            # other non-strict syntax. Try a tolerant fallback by
+            # stripping line comments. If even that fails, skip.
+            try:
+                cleaned = re.sub(r",\s*([}\]])", r"\1", block)
+                parsed = _json.loads(cleaned)
+            except Exception:
+                continue
+        _walk(parsed)
+
+    return out
+
+
 def extract_metadata_from_html(html: str) -> dict:
-    """Return {title, og_title, og_image, description}, any of which can be None."""
-    out = {"title": None, "og_title": None, "og_image": None, "description": None}
+    """
+    Return all useful metadata signals from a product page:
+      {title, og_title, og_image, og_description, description,
+       jsonld_product: {name, brand, color, category, image,
+                        description}}
+
+    Any field can be None. JSON-LD Product schema is the cleanest
+    signal when present (retailers like Aritzia, Nordstrom, ASOS,
+    Madewell, Net-a-Porter, Zalando all emit it). OpenGraph is the
+    common fallback. Plain <title> is the last resort.
+    """
+    out = {
+        "title":          None,
+        "og_title":       None,
+        "og_image":       None,
+        "og_description": None,
+        "description":    None,
+        "jsonld_product": _extract_jsonld_product(html),
+    }
     m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.IGNORECASE)
     if m:
         out["title"] = _html.unescape(m.group(1).strip())
-    out["og_title"]    = _find_meta(html, "og:title")
-    out["og_image"]    = _find_meta(html, "og:image")
-    out["description"] = _find_meta(html, "description")
+    out["og_title"]       = _find_meta(html, "og:title")
+    out["og_image"]       = _find_meta(html, "og:image")
+    out["og_description"] = _find_meta(html, "og:description")
+    out["description"]    = _find_meta(html, "description")
     return out
 
 
@@ -451,8 +574,11 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
     if not url or not isinstance(url, str):
         return {
             "url": url, "source_store": "", "source_image_url": None,
-            "inferred": {"name": "", "category": None, "color": None, "tags": []},
-            "metadata": {"title": None, "og_title": None, "og_image": None, "description": None},
+            "inferred": {"name": "", "category": None, "color": None, "tags": [],
+                         "formality": None, "season": None},
+            "metadata": {"title": None, "og_title": None, "og_image": None,
+                         "og_description": None, "description": None,
+                         "jsonld_product": {}},
             "fetched": False, "fetch_error": "Empty or invalid URL.",
         }
 
@@ -464,45 +590,122 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
         fetch_result = fetch_url_metadata(url)
 
     meta = fetch_result.get("extracted") or {
-        "title": None, "og_title": None, "og_image": None, "description": None,
+        "title": None, "og_title": None, "og_image": None,
+        "og_description": None, "description": None, "jsonld_product": {},
     }
 
-    # Combine all text we have for keyword inference.
+    jsonld = meta.get("jsonld_product") or {}
+
+    # Combine all text we have for keyword inference, INCLUDING the
+    # Schema.org JSON-LD fields. This makes the inferred tags, color,
+    # and category respect retailer-provided structured data.
     text_pool = " ".join(filter(None, [
         url,
         slug_name,
         meta.get("og_title") or "",
         meta.get("title") or "",
+        meta.get("og_description") or "",
         meta.get("description") or "",
+        jsonld.get("name") or "",
+        jsonld.get("description") or "",
+        jsonld.get("category") or "",
+        jsonld.get("color") or "",
+        jsonld.get("brand") or "",
     ]))
 
     inferred = infer_fields_from_text(text_pool)
 
-    # Prefer og:title for the item name when present and informative.
-    name = (meta.get("og_title") or "").strip()
+    # Override with JSON-LD when more specific.
+    if jsonld.get("color") and not inferred.get("color"):
+        inferred["color"] = jsonld["color"].lower()
+    if jsonld.get("category"):
+        # JSON-LD categories are often retailer-specific strings like
+        # "Women > Dresses > Maxi Dresses". Map down to a Wearly category.
+        cat_text = jsonld["category"].lower()
+        for keyword, target in CATEGORY_KEYWORDS.items():
+            if keyword in cat_text:
+                inferred["category"] = target
+                break
+
+    # ── Formality inference ─────────────────────────────────────────
+    # Look at category + tags + name keywords to pick one of:
+    #   formal | business | smart_casual | casual | athletic
+    text_low = text_pool.lower()
+    cat = (inferred.get("category") or "").lower()
+    tag_set = set(inferred.get("tags") or [])
+    formality = None
+    if "formal" in tag_set or any(w in text_low for w in
+            ("gown", "tuxedo", "black tie", "black-tie", "blacktie", "cocktail")):
+        formality = "formal"
+    elif "work" in tag_set or any(w in text_low for w in
+            ("blazer", "suit", "professional", "office")):
+        formality = "business"
+    elif cat == "activewear" or "gym" in tag_set:
+        formality = "athletic"
+    elif "evening" in tag_set or "dinner" in tag_set or "date" in tag_set:
+        formality = "smart_casual"
+    elif "casual" in tag_set or "weekend" in tag_set:
+        formality = "casual"
+    # Sensible default by category:
+    if formality is None:
+        if cat in ("dress",):
+            formality = "smart_casual"
+        elif cat in ("activewear",):
+            formality = "athletic"
+        else:
+            formality = "casual"
+
+    # ── Season inference ───────────────────────────────────────────
+    # Look for explicit season tokens; otherwise infer from fabric /
+    # weight keywords. Returns a list (the wardrobe schema accepts
+    # multi-season items).
+    season_hits: list = []
+    spring_kw = ("spring", "linen", "cotton", "chambray", "poplin",
+                 "seersucker", "midi", "lightweight")
+    summer_kw = ("summer", "linen", "cotton", "muslin", "sundress",
+                 "swim", "shorts", "tank", "camisole", "sleeveless")
+    fall_kw   = ("fall", "autumn", "knit", "cardigan", "wool blend",
+                 "long sleeve", "long-sleeve", "merino")
+    winter_kw = ("winter", "wool", "cashmere", "puffer", "parka",
+                 "heavyweight", "thermal", "shearling", "fleece")
+    def _hits(words):
+        return any(re.search(rf"\b{re.escape(w)}\b", text_low) for w in words)
+    if _hits(spring_kw): season_hits.append("spring")
+    if _hits(summer_kw): season_hits.append("summer")
+    if _hits(fall_kw):   season_hits.append("fall")
+    if _hits(winter_kw): season_hits.append("winter")
+    # If nothing matched, default to all-year.
+    season = season_hits if season_hits else ["all"]
+
+    # Prefer JSON-LD name, then og:title, then plain <title>, then slug.
+    name = (jsonld.get("name") or "").strip()
+    if not name:
+        name = (meta.get("og_title") or "").strip()
     if not name:
         title = (meta.get("title") or "").strip()
-        # Page titles often contain " | StoreName" suffixes — strip the suffix.
         if title:
             title = re.split(r"\s+[|·—–-]\s+", title, maxsplit=1)[0].strip()
         name = title
     if not name:
-        name = slug_name  # may itself be "" — that's OK
-    # Final guard: if the candidate name collapses to a single noise token
-    # (e.g. "Productpage"), drop it. Better empty than misleading.
+        name = slug_name
     _name_tokens = [t for t in re.split(r"\s+", name) if t]
     if _name_tokens and all(t.lower() in _NOISE_SEGMENT_WORDS for t in _name_tokens):
         name = ""
 
+    # Prefer JSON-LD image when present (usually higher quality than og:image).
+    image_url = jsonld.get("image") or meta.get("og_image")
+
     return {
         "url":              url,
         "source_store":     store,
-        "source_image_url": meta.get("og_image"),
+        "source_image_url": image_url,
         "inferred": {
-            "name":     name,
-            "category": inferred["category"],
-            "color":    inferred["color"],
-            "tags":     inferred["tags"],
+            "name":      name,
+            "category":  inferred["category"],
+            "color":     inferred["color"],
+            "tags":      inferred["tags"],
+            "formality": formality,
+            "season":    season,
         },
         "metadata":     meta,
         "fetched":      fetch_result.get("success", False),
