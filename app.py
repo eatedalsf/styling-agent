@@ -2917,18 +2917,47 @@ def _render_planner():
     month_plans = [p for p in plans if (_ev_date(p) and today_d <= _ev_date(p) <= end_month)]
     all_plans   = [p for p in plans if (_ev_date(p) and _ev_date(p) >= today_d)]
 
+    # Week / month / all digest narrative — Goal 7. One small line per
+    # tab telling the user "what does my plan look like at a glance"
+    # so they don't have to scroll every card to understand.
+    try:
+        from styling_agent import plan_summary as _plan_summary
+        _summaries = {
+            "week":  _plan_summary(week_plans),
+            "month": _plan_summary(month_plans),
+            "all":   _plan_summary(all_plans),
+        }
+    except Exception:
+        _summaries = {"week": {}, "month": {}, "all": {}}
+
+    def _render_summary_pill(summary: dict) -> None:
+        text = (summary or {}).get("narrative") or ""
+        if not text:
+            return
+        st.markdown(
+            "<div style='background:#FAFAFA; border:1px solid #EEEEEE; "
+            "border-radius:6px; padding:0.7rem 0.9rem; margin-bottom:0.7rem; "
+            "font-size:0.84rem; color:#2E2E2E; line-height:1.45;'>"
+            f"<strong style='color:#111111;'>Week at a glance —</strong> {text}"
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
     _tab_week, _tab_month, _tab_all = st.tabs([
         f"This week ({len(week_plans)})",
         f"This month ({len(month_plans)})",
         f"All upcoming ({len(all_plans)})",
     ])
     with _tab_week:
+        _render_summary_pill(_summaries["week"])
         _render_planner_card_list(week_plans, scope_label="this week",
                                   scope_key="week")
     with _tab_month:
+        _render_summary_pill(_summaries["month"])
         _render_planner_card_list(month_plans, scope_label="this month",
                                   scope_key="month")
     with _tab_all:
+        _render_summary_pill(_summaries["all"])
         _render_planner_card_list(all_plans, scope_label="upcoming",
                                   scope_key="all")
 

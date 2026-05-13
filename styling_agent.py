@@ -832,25 +832,24 @@ def run_agent(
 # ──────────────────────────────────────────────────────────────────────────────
 
 def plan_upcoming_events(limit: int = 5, days_ahead: int = 14,
-                         seed_fallback: bool = False) -> list:
+                         seed_fallback: bool = False,
+                         rotate: bool = True) -> list:
     """
     Pre-plan an outfit for each of the user's next `limit` calendar
     events within `days_ahead` days. Returns a list of `result` dicts —
     one per event, in chronological order. Each result has the same
     shape as a single run_agent() call.
 
-    Calling this is a convenience wrapper for the Planner screen and
-    the "Coming up this week" panel. The full agent runs once per
-    event, so weather + color scoring + rule citations are all
-    populated per outfit. The list is short by design (default 5) —
-    Wearly is a planner, not a forecaster, and weather data degrades
-    past ~7 days anyway.
+    `rotate=True` (default) — Goal 7: cross-event awareness. Items
+    already assigned to an event within the previous 2 days are
+    marked rejected for the next event, so the agent picks a fresh
+    main piece instead of repeating the same blouse for three work
+    events in the same week. Shoes and accessories are NOT rotated
+    out (those legitimately repeat across outfits and would force
+    weird substitutions if hard-blocked). Outerwear is also kept
+    because matching outerwear options are usually scarce.
 
-    Defaults to `seed_fallback=False`: the Planner is a real-calendar-
-    only surface. When the user has no .ics/URL import yet, this
-    returns [] and the UI shows a "Connect your calendar" empty state
-    instead of fabricated events. The Today / everyday flows still
-    use the seed via run_agent's own calendar tool call.
+    `seed_fallback=False` (default) — Planner is real-calendar-only.
 
     Errors during individual event runs are caught — that one event
     gets an `error`-stamped result, and the rest still plan.
@@ -865,11 +864,57 @@ def plan_upcoming_events(limit: int = 5, days_ahead: int = 14,
 
     events = cal_result["events"][: max(0, int(limit))]
     plans = []
-    for ev in events:
+
+    # Cross-event rotation tracking. Keyed by event date string so we
+    # can compute proximity between consecutive picks. Only top /
+    # bottom / dress / activewear are tracked — see docstring.
+    _ROTATABLE_TYPES = {"top", "bottom", "dress", "activewear"}
+    prior_picks: list = []   # list of (date_str, item_id, type)
+
+    from datetime import datetime as _dt
+
+    def _close_to_any(this_date: str, ids_iter) -> set:
+        """Return the set of item ids that were used within 2 days of
+        `this_date` in `prior_picks`. Items beyond that window are
+        considered re-pickable."""
         try:
-            r = run_agent(mode="calendar",
-                          target_event_id=ev.get("id"))
+            d1 = _dt.strptime(this_date, "%Y-%m-%d").date()
+        except Exception:
+            return set()
+        recent: set = set()
+        for d_str, iid, _t in prior_picks:
+            try:
+                d0 = _dt.strptime(d_str, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if abs((d1 - d0).days) <= 2:
+                recent.add(iid)
+        return recent
+
+    for ev in events:
+        ev_date = ev.get("date", "")
+        try:
+            rejected = sorted(_close_to_any(ev_date, prior_picks)) if rotate else []
+            r = run_agent(
+                mode="calendar",
+                target_event_id=ev.get("id"),
+                rejected_ids=rejected if rejected else None,
+            )
+            if rotate and rejected and r.get("recommendation"):
+                # Friendly trail line so the user can SEE rotation in action.
+                r.setdefault("reasoning", []).append(
+                    f"Rotation: avoiding "
+                    f"{', '.join(rejected[:3])}"
+                    f"{' and others' if len(rejected) > 3 else ''} "
+                    "because the same items were already assigned to "
+                    "another event within 2 days."
+                )
             plans.append(r)
+            # Record the rotatable picks for the next iteration.
+            if rotate:
+                for it in (r.get("recommendation") or []):
+                    if it.get("type") in _ROTATABLE_TYPES and it.get("id"):
+                        prior_picks.append((ev_date, it["id"], it.get("type")))
         except Exception as e:
             plans.append({
                 "event": ev,
@@ -882,3 +927,99 @@ def plan_upcoming_events(limit: int = 5, days_ahead: int = 14,
                 "steps": [],
             })
     return plans
+
+
+def plan_summary(plans: list) -> dict:
+    """
+    Goal 7: a tiny rule-based digest over a list of plans returned by
+    plan_upcoming_events(). The Planner UI surfaces this above the
+    per-event cards so the user gets a "what's the week look like?"
+    glance without scrolling every card.
+
+    Returns:
+      {
+        "total":            int,
+        "by_occasion":      {"work": 3, "dinner": 1, ...},
+        "any_gaps":         bool,
+        "unique_gap_types": [...],          # ordered, deduped
+        "preferred_stores": ["Aritzia", ...] # stores worth checking
+        "narrative":        "You have 5 events this week — 3 work, 1
+                             dinner, 1 weekend. Two are missing
+                             outerwear; Aritzia is a good first
+                             check based on your wishlist."
+      }
+
+    Errors are swallowed; an empty input returns an empty digest.
+    """
+    if not plans:
+        return {
+            "total": 0, "by_occasion": {}, "any_gaps": False,
+            "unique_gap_types": [], "preferred_stores": [],
+            "narrative": "",
+        }
+    by_occ: dict = {}
+    gap_types: list = []
+    for p in plans:
+        ev = p.get("event") or {}
+        occ = (ev.get("type") or "casual").lower()
+        by_occ[occ] = by_occ.get(occ, 0) + 1
+        for g in (p.get("gaps") or []):
+            g_low = (g or "").lower()
+            if g_low and g_low not in gap_types:
+                gap_types.append(g_low)
+
+    # Stores worth checking — favorite-store ranking is gap-aware
+    # already inside store_aware_suggestions; here we just surface
+    # the top names as a digest-friendly hint.
+    pref_stores: list = []
+    try:
+        from shopping_tool import get_favorite_stores, get_wishlist
+        favs = [s.get("name") for s in (get_favorite_stores().get("stores") or [])
+                if s.get("name")]
+        wishlist_stores = [
+            w.get("preferred_store") for w in (get_wishlist().get("items") or [])
+            if w.get("preferred_store")
+        ]
+        seen: set = set()
+        for name in wishlist_stores + favs:   # wishlist matches lead
+            if name and name.lower() not in seen:
+                seen.add(name.lower())
+                pref_stores.append(name)
+    except Exception:
+        pref_stores = []
+
+    parts: list = []
+    parts.append(
+        f"You have {len(plans)} event{'s' if len(plans) != 1 else ''} "
+        "in the planning window"
+    )
+    if by_occ:
+        parts.append(
+            " — " + ", ".join(
+                f"{n} {occ}" for occ, n in
+                sorted(by_occ.items(), key=lambda kv: -kv[1])
+            )
+        )
+    if gap_types:
+        parts.append(
+            f". {len(gap_types)} gap type"
+            f"{'s' if len(gap_types) != 1 else ''} to address: "
+            + ", ".join(gap_types[:3])
+        )
+        if pref_stores:
+            parts.append(
+                f". Worth checking {pref_stores[0]}"
+                + (f" or {pref_stores[1]}" if len(pref_stores) > 1 else "")
+                + " first"
+            )
+    parts.append(".")
+    narrative = "".join(parts)
+
+    return {
+        "total": len(plans),
+        "by_occasion": by_occ,
+        "any_gaps": bool(gap_types),
+        "unique_gap_types": gap_types,
+        "preferred_stores": pref_stores,
+        "narrative": narrative,
+    }
