@@ -106,6 +106,27 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
     # drops into the in-book vis-network viewer without translation.
     add_relation(user_id, fit_id, "has_fit_profile")
 
+    # Context source — "today" / "planner" / "everyday". When the
+    # result came from the Planner's "Plan in detail" button it's
+    # planning a FUTURE event; saying "Today's outfit" in the
+    # exported KG (or the screen header) is incorrect. We use the
+    # event title + date to build context-honest labels.
+    _source = (result.get("source") or "").lower()
+    _event_meta = result.get("event") or {}
+    _ev_title = _event_meta.get("title") or ""
+    _ev_date  = _event_meta.get("date") or ""
+    if _source == "planner" and _ev_title:
+        _outfit_label_prefix  = f"Outfit for {_ev_title}"
+        _weather_label_prefix = f"Weather for {_ev_title}"
+        _outfit_id_suffix = re.sub(
+            r"[^a-zA-Z0-9_-]", "_",
+            (_ev_date or _ev_title).lower()
+        )[:32] or "planner"
+    else:
+        _outfit_label_prefix  = "Today's outfit"
+        _weather_label_prefix = "Today's weather"
+        _outfit_id_suffix = "today"
+
     # --- CalendarEvent / occasion ------------------------------------
     event = result.get("event") or {}
     if event:
@@ -123,8 +144,8 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
     # --- WeatherSnapshot ---------------------------------------------
     weather = result.get("weather") or {}
     if weather:
-        wid = "weather:today"
-        add_entity(wid, "WeatherSnapshot", "Today's weather",
+        wid = "weather:" + _outfit_id_suffix
+        add_entity(wid, "WeatherSnapshot", _weather_label_prefix,
                    temperature_f=weather.get("temperature"),
                    conditions=weather.get("conditions"),
                    season=weather.get("season"))
@@ -135,10 +156,10 @@ def build_compact_kg(result: dict, user_name: Optional[str] = None) -> dict:
     # --- OutfitRecommendation ----------------------------------------
     rec = result.get("recommendation") or []
     if rec:
-        rid = "outfit:today"
+        rid = "outfit:" + _outfit_id_suffix
         labels = [i.get("name", "?") for i in rec]
         add_entity(rid, "OutfitRecommendation",
-                   "Today's outfit: " + ", ".join(labels)[:80],
+                   _outfit_label_prefix + ": " + ", ".join(labels)[:80],
                    piece_count=len(rec),
                    color_score=(result.get("color_score") or {}).get("score"))
         add_relation(user_id, rid, "received")

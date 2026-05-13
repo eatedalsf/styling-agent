@@ -1008,18 +1008,25 @@ def _auto_refresh_subscription_if_needed(max_age_seconds: int = 300) -> None:
 
 def _run_and_store(mode: str, everyday_request: str = None,
                    rejected_ids=None, rejection_reasons=None,
-                   todays_context: str = None) -> dict:
+                   todays_context: str = None,
+                   target_event_id: str = None,
+                   source: str = "today") -> dict:
     """Wrapper: runs the agent, stores result + the invocation params so
     a later 'Regenerate' can replay the same mode with rejection context.
-    Auto-refreshes the calendar subscription (if any) before the run so
-    new events the user added in Google/Apple are picked up automatically.
-    todays_context is a free-text "what's going on right now" field — a
-    pattern borrowed from a classmate's dream-journal project where adding
-    real-life context made the AI's reasoning feel grounded."""
-    # Calendar-mode plans always start from the freshest possible event
-    # list. Everyday-mode runs don't depend on the calendar, but we still
-    # refresh because the "Coming up this week" panel rendered alongside
-    # the result needs current events too.
+
+    `target_event_id` — when supplied, the agent pulls THAT specific
+    calendar event instead of the chronologically-next one. This is
+    how a Planner "Plan in detail" click preserves which event it's
+    planning for, even across Replan/Regenerate.
+
+    `source` — "today" | "planner" | "everyday". Stamps the result
+    so the renderer can pick the right page title ("Today's outfit"
+    vs "Outfit for <event>") and so derived surfaces (compact KG
+    export, reasoning header) know which context to use.
+
+    Auto-refreshes the calendar subscription (if any) before the run.
+    todays_context is a free-text "what's going on right now" field
+    — a pattern borrowed from a classmate's dream-journal project."""
     _auto_refresh_subscription_if_needed()
 
     ctx = todays_context if todays_context is not None else st.session_state.get("todays_context", "")
@@ -1029,12 +1036,21 @@ def _run_and_store(mode: str, everyday_request: str = None,
         rejected_ids=rejected_ids,
         rejection_reasons=rejection_reasons,
         todays_context=ctx,
+        target_event_id=target_event_id,
     )
+    # Stamp the source so the renderer can branch on it without
+    # re-deriving from event dates.
+    if isinstance(res, dict):
+        res["source"] = source
+        if target_event_id:
+            res["target_event_id"] = target_event_id
     st.session_state["result"] = res
     st.session_state["last_run"] = {
-        "mode": mode,
-        "everyday_request": everyday_request,
-        "todays_context": ctx,
+        "mode":              mode,
+        "everyday_request":  everyday_request,
+        "todays_context":    ctx,
+        "target_event_id":   target_event_id,
+        "source":            source,
     }
     return res
 
@@ -1850,13 +1866,22 @@ def _render_outfit_result(result: dict):
             st.session_state["rejected_ids"] = list({*prior_ids, *new_ids})
             st.session_state["rejection_reasons"] = prior_reasons + new_reasons
 
-            last = st.session_state.get("last_run", {"mode": "calendar", "everyday_request": None})
+            last = st.session_state.get(
+                "last_run",
+                {"mode": "calendar", "everyday_request": None,
+                 "target_event_id": None, "source": "today"},
+            )
             with st.spinner("Re-reading your context · applying your feedback…"):
+                # Preserve target_event_id + source so reject-and-
+                # regenerate on a Planner-sourced result still plans
+                # for the SAME future event, with the SAME page title.
                 _run_and_store(
-                    last.get("mode", "calendar"),
-                    last.get("everyday_request"),
+                    mode=last.get("mode", "calendar"),
+                    everyday_request=last.get("everyday_request"),
                     rejected_ids=st.session_state["rejected_ids"],
                     rejection_reasons=st.session_state["rejection_reasons"],
+                    target_event_id=last.get("target_event_id"),
+                    source=last.get("source") or "today",
                 )
             st.rerun()
 
@@ -2404,11 +2429,21 @@ def _render_coming_up_this_week() -> None:
             key=f"plan_in_detail_{ev.get('id','')}",
             use_container_width=False,
         ):
-            st.session_state["result"] = p
+            # Stamp source so the result page renders "Outfit for X"
+            # instead of "Today's outfit" — this plan is for a future
+            # event, not today. target_event_id is preserved so a
+            # later Replan/Regenerate re-runs against THIS event,
+            # not whatever's next on the calendar at click-time.
+            p_stamped = dict(p)
+            p_stamped["source"] = "planner"
+            if ev.get("id"):
+                p_stamped["target_event_id"] = ev.get("id")
+            st.session_state["result"] = p_stamped
             st.session_state["last_run"] = {
-                "mode": "calendar",
+                "mode":            "calendar",
                 "everyday_request": None,
-                "target_event_id": ev.get("id"),
+                "target_event_id":  ev.get("id"),
+                "source":           "planner",
             }
             st.rerun()
 
@@ -2783,20 +2818,77 @@ def _render_today():
                 st.toast(f"Calendar auto-refresh: {_ar.get('error', 'failed')}")
 
     if res:
-        st.markdown("""
-        <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
-            <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today's outfit</div>
-            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
-        </div>
-        """, unsafe_allow_html=True)
+        # Context-aware page title. A result that came from the Planner
+        # "Plan in detail" button is FOR A FUTURE EVENT — saying "Today's
+        # outfit" there is incorrect and confusing. We branch on the
+        # `source` flag the producer stamps onto every result.
+        _source = (res.get("source") or "").lower()
+        _event  = res.get("event") or {}
+        if _source == "planner" and _event:
+            ev_title = _event.get("title", "Untitled event")
+            ev_date  = _event.get("date", "")
+            ev_time_raw = _event.get("time", "")
+            ev_time_str = _format_time_12h(ev_time_raw) if ev_time_raw else ""
+            # Pretty date — "Fri May 15" style if parseable.
+            # Building the format manually avoids the cross-platform
+            # %-d / %#d footgun.
+            try:
+                from datetime import datetime as _dt
+                if ev_date:
+                    _d = _dt.strptime(ev_date, "%Y-%m-%d")
+                    pretty_date = _d.strftime("%a %b ") + str(_d.day)
+                else:
+                    pretty_date = ""
+            except (ValueError, TypeError):
+                pretty_date = ev_date
+            meta_bits = [bit for bit in (pretty_date, ev_time_str) if bit]
+            meta_line = " · ".join(meta_bits)
+            st.markdown(
+                "<div style='margin-top:0.2rem; margin-bottom:1.1rem;'>"
+                "<div style='font-size:0.66rem; color:#8E8E93; "
+                "letter-spacing:0.14em; text-transform:uppercase; "
+                "font-weight:600; margin-bottom:0.3rem;'>Planned outfit</div>"
+                f"<div style='font-family:\"DM Serif Display\",serif; "
+                f"font-size:1.9rem; color:#1C1917; line-height:1.1;'>"
+                f"Outfit for {ev_title}</div>"
+                + (f"<div style='font-size:0.86rem; color:#6E6E73; "
+                   f"margin-top:0.35rem;'>{meta_line} · "
+                   f"planned from your Planner.</div>" if meta_line else
+                   "<div style='font-size:0.86rem; color:#6E6E73; "
+                   "margin-top:0.35rem;'>Planned from your Planner.</div>")
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+        else:
+            st.markdown("""
+            <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
+                <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today's outfit</div>
+                <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
+            </div>
+            """, unsafe_allow_html=True)
         _render_outfit_result(res)
         st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
-        if st.button("Replan from scratch", key="replan_today", use_container_width=False):
+
+        # Replan label depends on context — "Replan this event" reads
+        # right for a planner-sourced result.
+        _replan_label = (
+            "Replan this event" if _source == "planner" else "Replan from scratch"
+        )
+        if st.button(_replan_label, key="replan_today", use_container_width=False):
             st.session_state["rejected_ids"] = []
             st.session_state["rejection_reasons"] = []
-            last = st.session_state.get("last_run", {"mode": "calendar", "everyday_request": None})
+            last = st.session_state.get(
+                "last_run",
+                {"mode": "calendar", "everyday_request": None,
+                 "target_event_id": None, "source": "today"},
+            )
             with st.spinner("Re-running the agent…"):
-                _run_and_store(last.get("mode", "calendar"), last.get("everyday_request"))
+                _run_and_store(
+                    mode=last.get("mode", "calendar"),
+                    everyday_request=last.get("everyday_request"),
+                    target_event_id=last.get("target_event_id"),
+                    source=last.get("source") or "today",
+                )
             st.rerun()
 
         # The week-ahead view used to live here. It now has its own
@@ -3226,11 +3318,18 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
             key=f"planner_detail_{scope_key}_{ev.get('id','x')}",
             use_container_width=True,
         ):
-            st.session_state["result"] = p
+            # Stamp source + target_event_id so the result screen
+            # renders "Outfit for <event>" instead of "Today's outfit".
+            p_stamped = dict(p)
+            p_stamped["source"] = "planner"
+            if ev.get("id"):
+                p_stamped["target_event_id"] = ev.get("id")
+            st.session_state["result"] = p_stamped
             st.session_state["last_run"] = {
-                "mode": "calendar",
+                "mode":            "calendar",
                 "everyday_request": None,
-                "target_event_id": ev.get("id"),
+                "target_event_id":  ev.get("id"),
+                "source":           "planner",
             }
             st.session_state["section"] = "today"
             st.rerun()
