@@ -140,15 +140,29 @@ html, body, [class*="css"] {
    the end. Hover + focus states keep the affordance obvious.
    We scope every rule via `.profile-popover-slot` so we don't
    accidentally restyle any other popovers in the app. */
-.profile-popover-slot { display: flex; justify-content: flex-end; }
+.profile-popover-slot { display: flex; justify-content: flex-end; background: transparent !important; }
+
+/* Force pure white on every layer the popover trigger renders inside —
+   Streamlit's column wrapper, the popover container, the button element
+   itself, and any inner span. Without this the warm-ivory app background
+   shows through the rounded corners as a soft cream tint. */
+.profile-popover-slot,
+.profile-popover-slot > div,
+.profile-popover-slot [data-testid="stPopover"],
+.profile-popover-slot [data-testid="stPopover"] > div,
+.profile-popover-slot [data-testid="stPopover"] > div > button,
+.profile-popover-slot button {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+}
 
 .profile-popover-slot [data-testid="stPopover"] > div > button,
-.profile-popover-slot button[kind="secondary"] {
-    background: #FFFFFF !important;
+.profile-popover-slot button[kind="secondary"],
+.profile-popover-slot button {
     color: #111111 !important;
     border: 1px solid #E5E5E5 !important;
     border-radius: 99px !important;
-    padding: 0.32rem 0.85rem 0.32rem 0.5rem !important;
+    padding: 0.32rem 0.85rem !important;
     min-height: 40px !important;
     font-family: 'DM Sans', sans-serif !important;
     font-size: 0.82rem !important;
@@ -160,8 +174,10 @@ html, body, [class*="css"] {
     white-space: nowrap !important;
 }
 .profile-popover-slot [data-testid="stPopover"] > div > button:hover,
-.profile-popover-slot button[kind="secondary"]:hover {
+.profile-popover-slot button[kind="secondary"]:hover,
+.profile-popover-slot button:hover {
     background: #FAFAFA !important;
+    background-color: #FAFAFA !important;
     border-color: #111111 !important;
     color: #111111 !important;
 }
@@ -820,7 +836,7 @@ with _bar_right:
     # CSS without affecting any other popovers elsewhere in the app.
     st.markdown('<div class="profile-popover-slot">', unsafe_allow_html=True)
     with st.popover(
-        f"Hi, {_name}  ▾",
+        f"Hi, {_name}",
         use_container_width=True,
         help="Wearly has no accounts — your data stays local on this device.",
     ):
