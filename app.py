@@ -1427,10 +1427,20 @@ _SECTIONS = [
 ]
 _active = st.session_state["section"]
 
+# Sub-routes that should still highlight their originating top-nav
+# pill. event_detail is reached from Planner or Routine "Plan in
+# detail" clicks; the originating tab stays lit so the user always
+# knows where they are.
+if _active == "event_detail":
+    _src = (st.session_state.get("result") or {}).get("source", "")
+    _nav_active = "routine" if str(_src).lower() == "routine" else "planner"
+else:
+    _nav_active = _active
+
 _nav_cols = st.columns(len(_SECTIONS), gap="small")
 for _col, (_key, _label) in zip(_nav_cols, _SECTIONS):
     with _col:
-        _btn_type = "primary" if _key == _active else "secondary"
+        _btn_type = "primary" if _key == _nav_active else "secondary"
         if st.button(_label, key=f"nav_{_key}", type=_btn_type, use_container_width=True):
             if _key != _active:
                 _goto(_key)
@@ -2880,6 +2890,157 @@ def _render_routine_editor() -> None:
                 st.error(res.get("error", "Could not save."))
 
 
+def _render_event_detail():
+    """
+    Dedicated route for Planner- and Routine-sourced results.
+
+    This is the page the user sees when they click "Plan in detail"
+    on a Planner card (a future calendar event) or a Routine card (a
+    recurring weekly rhythm). It is NOT Today. The previous design
+    re-skinned Today's header, which left the top-nav "Today" pill
+    highlighted and the URL on `?section=today` — confusing because
+    the outfit is for a future event, not today.
+
+    Behavior:
+      - Eyebrow says "Planned outfit" (planner) or "Routine outfit"
+        (routine), with a clear "← Back to <Planner|Routine>" link.
+      - Title is "Outfit for <event title>".
+      - Subtitle carries date, time, occasion, location (routine
+        only), and the source.
+      - The shared `_render_outfit_result(res)` renders the body
+        (reasoning, items, gaps, graph, KG export) — same component
+        Today uses, so all derivatives stay tied to THIS result.
+      - Replan / Reject-and-regenerate buttons preserve the
+        target_event_id and source so a regenerate stays scoped to
+        this event, never falls back to "today's next event".
+      - Top-nav highlights the originating pill (Planner / Routine).
+        See the _nav_active computation alongside _SECTIONS.
+    """
+    res = st.session_state.get("result")
+    if not res:
+        # No result in session state — bounce the user back to Planner
+        # so they can pick an event. Avoids a blank page if they typed
+        # the URL directly.
+        st.warning(
+            "No event selected yet. Open the Planner and click "
+            "**Plan in detail** on any upcoming event."
+        )
+        if st.button("← Go to Planner", key="event_detail_no_res_back",
+                     use_container_width=False):
+            st.session_state["section"] = "planner"
+            st.rerun()
+        return
+
+    _source = (res.get("source") or "").lower()
+    _event  = res.get("event") or {}
+    is_routine = _source == "routine"
+
+    # ── Back link + eyebrow ─────────────────────────────────────
+    back_target = "routine" if is_routine else "planner"
+    back_label  = "Routine" if is_routine else "Planner"
+    back_cols = st.columns([1, 5], gap="small")
+    with back_cols[0]:
+        if st.button(f"← Back", key=f"event_detail_back",
+                     use_container_width=True,
+                     help=f"Return to the {back_label} list."):
+            st.session_state["section"] = back_target
+            st.rerun()
+    with back_cols[1]:
+        st.markdown(
+            "<div style='font-size:0.78rem; color:#6E6E73; padding-top:0.45rem;'>"
+            f"Showing one event from <strong>{back_label}</strong>. "
+            f"This is not today's outfit."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    # ── Event header ───────────────────────────────────────────
+    ev_title = _event.get("title", "Untitled event") or "Untitled event"
+    ev_date  = _event.get("date", "") or ""
+    ev_time  = _event.get("time", "") or ""
+    ev_time_str = _format_time_12h(ev_time) if ev_time else ""
+    ev_type  = (_event.get("type") or "casual").lower()
+    ev_loc   = (_event.get("location") or "").strip()
+
+    try:
+        from datetime import datetime as _dt
+        if ev_date and "-" in ev_date:
+            _d = _dt.strptime(ev_date, "%Y-%m-%d")
+            pretty_date = _d.strftime("%a %b ") + str(_d.day) + ", " + str(_d.year)
+        else:
+            pretty_date = ev_date
+    except (ValueError, TypeError):
+        pretty_date = ev_date
+
+    subtitle_bits = [b for b in (pretty_date, ev_time_str, ev_type.title()) if b]
+    if ev_loc:
+        subtitle_bits.append(f"location: {ev_loc}")
+    subtitle = " · ".join(subtitle_bits)
+
+    eyebrow_text = "Routine outfit" if is_routine else "Planned outfit"
+    source_note = (
+        f"Planned from your <strong>{back_label}</strong>. "
+        "Reasoning, graph, and exports below all refer to this event "
+        "— not today."
+    )
+
+    st.markdown(
+        "<div style='margin-top:0.6rem; margin-bottom:1.2rem;'>"
+        "<div style='font-size:0.66rem; color:#8E8E93; "
+        "letter-spacing:0.14em; text-transform:uppercase; "
+        "font-weight:600; margin-bottom:0.35rem;'>"
+        f"{eyebrow_text}</div>"
+        f"<div style='font-family:\"DM Serif Display\",serif; "
+        f"font-size:1.9rem; color:#1C1917; line-height:1.1;'>"
+        f"Outfit for {ev_title}</div>"
+        + (f"<div style='font-size:0.86rem; color:#6E6E73; "
+           f"margin-top:0.35rem;'>{subtitle}</div>" if subtitle else "")
+        + f"<div style='font-size:0.8rem; color:#6E6E73; "
+        f"margin-top:0.5rem; line-height:1.55;'>{source_note}</div>"
+        + "</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Shared outfit body (reasoning, items, gaps, graph, KG export) ──
+    _render_outfit_result(res)
+
+    st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
+
+    # ── Replan THIS event (not today's next event) ─────────────
+    if st.button("Replan this event", key="replan_event_detail",
+                 use_container_width=False,
+                 help=(f"Re-run the agent against {ev_title!r} only. "
+                       "Clears any rejection feedback first.")):
+        st.session_state["rejected_ids"] = []
+        st.session_state["rejection_reasons"] = []
+        last = st.session_state.get(
+            "last_run",
+            {"mode": "calendar", "everyday_request": None,
+             "target_event_id": None, "source": _source or "planner"},
+        )
+        with st.spinner(f"Re-planning '{ev_title}'…"):
+            _run_and_store(
+                mode=last.get("mode", "calendar"),
+                everyday_request=last.get("everyday_request"),
+                target_event_id=last.get("target_event_id"),
+                source=last.get("source") or _source or "planner",
+            )
+        # Stay on the event_detail route after replanning.
+        st.session_state["section"] = "event_detail"
+        st.rerun()
+
+    # Footer hint pointing back where they came from.
+    st.markdown(
+        "<div style='margin:1.4rem 0 0; padding-top:1rem; "
+        "border-top:1px solid #EEEEEE; font-size:0.84rem; color:#6E6E73;'>"
+        f"Browsing more events? Open <a href='?section={back_target}' "
+        f"target='_self' style='color:#111111; font-weight:500;'>"
+        f"{back_label}</a> for the full list."
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
 def _render_today():
     res = st.session_state.get("result")
 
@@ -2898,64 +3059,31 @@ def _render_today():
             if "subscribed" not in (_ar.get("error", "") or "").lower():
                 st.toast(f"Calendar auto-refresh: {_ar.get('error', 'failed')}")
 
+    # SAFETY HATCH: if the current result was produced by the Planner
+    # or Routine "Plan in detail" buttons, redirect to the event-detail
+    # route instead of rendering as Today. This catches users who land
+    # on /?section=today with a planner-sourced result still in
+    # session state (e.g. from a bookmark / browser-back) and keeps
+    # the contract clean: Today = today, planner-sourced results live
+    # at event_detail.
     if res:
-        # Context-aware page title. A result that came from the Planner
-        # "Plan in detail" button is FOR A FUTURE EVENT — saying "Today's
-        # outfit" there is incorrect and confusing. We branch on the
-        # `source` flag the producer stamps onto every result.
         _source = (res.get("source") or "").lower()
-        _event  = res.get("event") or {}
-        if _source == "planner" and _event:
-            ev_title = _event.get("title", "Untitled event")
-            ev_date  = _event.get("date", "")
-            ev_time_raw = _event.get("time", "")
-            ev_time_str = _format_time_12h(ev_time_raw) if ev_time_raw else ""
-            # Pretty date — "Fri May 15" style if parseable.
-            # Building the format manually avoids the cross-platform
-            # %-d / %#d footgun.
-            try:
-                from datetime import datetime as _dt
-                if ev_date:
-                    _d = _dt.strptime(ev_date, "%Y-%m-%d")
-                    pretty_date = _d.strftime("%a %b ") + str(_d.day)
-                else:
-                    pretty_date = ""
-            except (ValueError, TypeError):
-                pretty_date = ev_date
-            meta_bits = [bit for bit in (pretty_date, ev_time_str) if bit]
-            meta_line = " · ".join(meta_bits)
-            st.markdown(
-                "<div style='margin-top:0.2rem; margin-bottom:1.1rem;'>"
-                "<div style='font-size:0.66rem; color:#8E8E93; "
-                "letter-spacing:0.14em; text-transform:uppercase; "
-                "font-weight:600; margin-bottom:0.3rem;'>Planned outfit</div>"
-                f"<div style='font-family:\"DM Serif Display\",serif; "
-                f"font-size:1.9rem; color:#1C1917; line-height:1.1;'>"
-                f"Outfit for {ev_title}</div>"
-                + (f"<div style='font-size:0.86rem; color:#6E6E73; "
-                   f"margin-top:0.35rem;'>{meta_line} · "
-                   f"planned from your Planner.</div>" if meta_line else
-                   "<div style='font-size:0.86rem; color:#6E6E73; "
-                   "margin-top:0.35rem;'>Planned from your Planner.</div>")
-                + "</div>",
-                unsafe_allow_html=True,
-            )
-        else:
-            st.markdown("""
-            <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
-                <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today's outfit</div>
-                <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
-            </div>
-            """, unsafe_allow_html=True)
+        if _source in ("planner", "routine"):
+            st.session_state["section"] = "event_detail"
+            st.rerun()
+
+    if res:
+        st.markdown("""
+        <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
+            <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Today's outfit</div>
+            <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
+        </div>
+        """, unsafe_allow_html=True)
         _render_outfit_result(res)
         st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
 
-        # Replan label depends on context — "Replan this event" reads
-        # right for a planner-sourced result.
-        _replan_label = (
-            "Replan this event" if _source == "planner" else "Replan from scratch"
-        )
-        if st.button(_replan_label, key="replan_today", use_container_width=False):
+        if st.button("Replan from scratch", key="replan_today",
+                     use_container_width=False):
             st.session_state["rejected_ids"] = []
             st.session_state["rejection_reasons"] = []
             last = st.session_state.get(
@@ -3364,19 +3492,21 @@ def _render_routine_week() -> None:
                 key=f"routine_detail_{weekday}",
                 use_container_width=True,
             ):
-                # Same context-aware pattern Planner uses: stamp source
-                # so the result page reads "Outfit for <activity>"
-                # instead of "Today's outfit".
+                # Stamp source="routine" so the dedicated event_detail
+                # route knows the back-link should go to Routine (not
+                # Planner) and the eyebrow reads "Routine outfit".
                 p_stamped = dict(p)
-                p_stamped["source"] = "planner"   # reuse the "planned" framing
+                p_stamped["source"] = "routine"
                 st.session_state["result"]   = p_stamped
                 st.session_state["last_run"] = {
                     "mode":            "everyday",
                     "everyday_request": ev.get("title") or ev.get("type") or "casual",
-                    "source":          "planner",
+                    "source":          "routine",
                     "todays_context":  ev.get("note") or "",
                 }
-                st.session_state["section"] = "today"
+                # NEW: dedicated route — Today stays for today, this
+                # is a routine-driven recurring outfit.
+                st.session_state["section"] = "event_detail"
                 st.rerun()
 
 
@@ -3544,8 +3674,9 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
             key=f"planner_detail_{scope_key}_{ev.get('id','x')}",
             use_container_width=True,
         ):
-            # Stamp source + target_event_id so the result screen
-            # renders "Outfit for <event>" instead of "Today's outfit".
+            # Stamp source + target_event_id so the dedicated
+            # event_detail route renders "Outfit for <event>" with a
+            # "← Back to Planner" link, NOT a re-skinned Today page.
             p_stamped = dict(p)
             p_stamped["source"] = "planner"
             if ev.get("id"):
@@ -3557,7 +3688,9 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
                 "target_event_id":  ev.get("id"),
                 "source":           "planner",
             }
-            st.session_state["section"] = "today"
+            # NEW: dedicated route. Top-nav highlights stay on
+            # "Planner" (handled by _nav_active near _SECTIONS).
+            st.session_state["section"] = "event_detail"
             st.rerun()
 
 
@@ -5246,13 +5379,17 @@ def _render_demo():
 # ─────────────────────────────────────────────
 
 _router = {
-    "home":     _render_home,
-    "today":    _render_today,
-    "planner":  _render_planner,
-    "routine":  _render_routine_week,
-    "wardrobe": _render_wardrobe,
-    "shop":     _render_shop,
-    "profile":  _render_profile,
-    "demo":     _render_demo,
+    "home":         _render_home,
+    "today":        _render_today,
+    "planner":      _render_planner,
+    "routine":      _render_routine_week,
+    # Sub-route used by Planner / Routine "Plan in detail" buttons.
+    # NOT in the top-nav list — the originating Planner or Routine
+    # pill stays highlighted (see _nav_active above _SECTIONS).
+    "event_detail": _render_event_detail,
+    "wardrobe":     _render_wardrobe,
+    "shop":         _render_shop,
+    "profile":      _render_profile,
+    "demo":         _render_demo,
 }
 _router.get(st.session_state["section"], _render_home)()
