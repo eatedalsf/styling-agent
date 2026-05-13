@@ -448,6 +448,144 @@ def save_user_item(category: str, item_fields: dict,
     return {"success": True, "item": item, "error": None}
 
 
+def _find_item_in_overlay(overlay: dict, item_id: str) -> tuple:
+    """Locate (section_name, index, item_dict) for a given user-added id.
+
+    Returns (None, -1, None) when not found. Read-only — does not mutate
+    the overlay.
+    """
+    for section in ("clothing", "shoes", "accessories"):
+        for i, it in enumerate(overlay.get(section, [])):
+            if it.get("id") == item_id:
+                return section, i, it
+    return None, -1, None
+
+
+def update_user_item(item_id: str, item_fields: dict,
+                     image_bytes: bytes = None,
+                     link_metadata: dict = None) -> dict:
+    """
+    Update a user-added wardrobe item in place by id. Only items in the
+    user overlay (user_wardrobe.json) can be edited — seed items in
+    wardrobe.json are immutable and never touched.
+
+    item_fields keys that are honored (each optional in an update):
+        name, color, formality, season, tags, availability, type
+
+    If `type` changes (e.g. user reclassifies a saved "top" as "dress")
+    the item moves between sections of the overlay; its id is regenerated
+    to match the new section's prefix so the id format stays consistent.
+
+    image_bytes — when present, replaces the image_path. Falsy → no change.
+    link_metadata — when present, REPLACES (not merges) the three source_*
+    keys to match save_user_item's behavior. Pass {} to clear them.
+
+    Returns {success, item, error}.
+    """
+    if not item_id:
+        return {"success": False, "item": None, "error": "item_id is required."}
+
+    overlay = get_user_wardrobe()["user_wardrobe"]
+    section, idx, item = _find_item_in_overlay(overlay, item_id)
+    if item is None:
+        return {"success": False, "item": None,
+                "error": f"Item '{item_id}' is not in your overlay — seed items can't be edited."}
+
+    # Apply field updates. Empty strings clear text fields (caller's choice).
+    upd = dict(item_fields or {})
+    new_type = (upd.get("type") or item.get("type", "")).lower().strip()
+
+    if "name" in upd:
+        item["name"] = (upd["name"] or "").strip() or item["name"]
+    if "color" in upd:
+        item["color"] = (upd["color"] or "").strip() or item["color"]
+    if "formality" in upd:
+        item["formality"] = (upd["formality"] or "casual").lower()
+    if "season" in upd:
+        season_list = upd["season"] or ["all"]
+        item["season"] = [s.lower() for s in season_list] or ["all"]
+    if "tags" in upd:
+        tag_list = upd["tags"] or []
+        item["tags"] = [t.lower() for t in tag_list] or item["tags"]
+    if "availability" in upd:
+        item["availability"] = (upd["availability"] or "available").lower()
+
+    # Handle a category move (e.g. "top" → "dress").
+    if new_type and new_type != item.get("type"):
+        if new_type not in _SECTION_BY_CATEGORY:
+            return {"success": False, "item": item,
+                    "error": f"Unknown category '{new_type}'."}
+        new_section = _SECTION_BY_CATEGORY[new_type]
+        item["type"] = new_type
+        if new_section != section:
+            # Remove from old section, append to new, regenerate id.
+            overlay[section].pop(idx)
+            new_id = _next_user_id(overlay, new_section)
+            item["id"] = new_id
+            overlay[new_section].append(item)
+            section, idx = new_section, len(overlay[new_section]) - 1
+
+    # Optional fresh image.
+    if image_bytes:
+        try:
+            item["image_path"] = _save_image_for_item(item["id"], image_bytes)
+            item.pop("_image_error", None)
+        except Exception as e:
+            item.setdefault("_image_error", str(e))
+
+    # Link metadata: replace (not merge) when caller supplies a dict.
+    if link_metadata is not None:
+        for k in ("source_url", "source_store", "source_image_url"):
+            item.pop(k, None)
+        if link_metadata.get("source_url"):
+            item["source_url"] = str(link_metadata["source_url"])
+        if link_metadata.get("source_store"):
+            item["source_store"] = str(link_metadata["source_store"])
+        if link_metadata.get("source_image_url"):
+            item["source_image_url"] = str(link_metadata["source_image_url"])
+
+    # Persist.
+    on_disk = {
+        "_comment": "User-added wardrobe items. Created and maintained by the Wardrobe Builder. Items here are MERGED with wardrobe.json at read time by wardrobe_tool.get_wardrobe().",
+        "clothing":    overlay["clothing"],
+        "shoes":       overlay["shoes"],
+        "accessories": overlay["accessories"],
+    }
+    try:
+        _atomic_write_json(USER_DATA_PATH, on_disk)
+    except Exception as e:
+        return {"success": False, "item": item, "error": f"Failed to save: {e}"}
+    return {"success": True, "item": item, "error": None}
+
+
+def delete_user_item(item_id: str) -> dict:
+    """
+    Remove a user-added item from the overlay. Seed items are immutable
+    and silently ignored. Returns {success, removed_id, error}.
+    """
+    if not item_id:
+        return {"success": False, "removed_id": None, "error": "item_id is required."}
+
+    overlay = get_user_wardrobe()["user_wardrobe"]
+    section, idx, item = _find_item_in_overlay(overlay, item_id)
+    if item is None:
+        return {"success": False, "removed_id": None,
+                "error": f"Item '{item_id}' is not in your overlay."}
+
+    overlay[section].pop(idx)
+    on_disk = {
+        "_comment": "User-added wardrobe items. Created and maintained by the Wardrobe Builder. Items here are MERGED with wardrobe.json at read time by wardrobe_tool.get_wardrobe().",
+        "clothing":    overlay["clothing"],
+        "shoes":       overlay["shoes"],
+        "accessories": overlay["accessories"],
+    }
+    try:
+        _atomic_write_json(USER_DATA_PATH, on_disk)
+    except Exception as e:
+        return {"success": False, "removed_id": None, "error": f"Failed to save: {e}"}
+    return {"success": True, "removed_id": item_id, "error": None}
+
+
 # ─────────────────────────────────────────────
 # FILTER + GAPS (unchanged behavior, now over merged wardrobe)
 # ─────────────────────────────────────────────

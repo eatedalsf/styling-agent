@@ -778,6 +778,186 @@ def _run_and_store(mode: str, everyday_request: str = None,
     return res
 
 
+def _render_user_items_list(items: list) -> None:
+    """
+    Render the user's saved wardrobe items with per-item Edit + Delete
+    controls. The Edit button opens an inline form in an expander
+    pre-filled with the item's current values; saving calls
+    `update_user_item()`. Delete removes the item via
+    `delete_user_item()` and reruns to reflect the change.
+
+    Seed wardrobe items are NEVER editable — only items in the user
+    overlay (id starts with "U") reach this function.
+    """
+    try:
+        from wardrobe_tool import update_user_item, delete_user_item
+    except Exception as _e:
+        st.error(f"Edit/delete unavailable: {_e}")
+        return
+
+    # Same constraints used by the Add forms — keep the dropdowns aligned.
+    _CAT_OPTIONS = ["top", "bottom", "dress", "outerwear",
+                    "activewear", "shoes", "accessory"]
+    _FORM_OPTIONS = ["casual", "smart_casual", "business", "formal", "athletic"]
+    _SEAS_OPTIONS = ["all", "spring", "summer", "fall", "winter"]
+    _TAG_OPTIONS  = ["work", "gym", "dinner", "formal",
+                     "casual", "weekend", "date", "travel"]
+
+    for it in items:
+        item_id = it.get("id", "—")
+        swatch = color_to_swatch(it.get("color", ""))
+
+        # Image — preserve the same priority order as elsewhere:
+        # local image_path → remote source_image_url → none.
+        thumb_html = ""
+        ipath = it.get("image_path")
+        src_image = it.get("source_image_url")
+        if ipath:
+            data_uri = _image_to_data_uri(ipath)
+            if data_uri:
+                thumb_html = (
+                    f'<img src="{data_uri}" alt="" '
+                    f'style="width:42px; height:42px; object-fit:cover; '
+                    f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
+                    f'onerror="this.style.display=\'none\'">'
+                )
+        if not thumb_html and src_image:
+            thumb_html = (
+                f'<img src="{src_image}" alt="" '
+                f'style="width:42px; height:42px; object-fit:cover; '
+                f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
+                f'onerror="this.style.display=\'none\'">'
+            )
+        if not thumb_html:
+            # Calm "no image" placeholder so the row alignment stays clean.
+            thumb_html = (
+                '<div style="width:42px; height:42px; background:#FAFAFA; '
+                'border:1px dashed #E5E5E5; border-radius:4px; flex-shrink:0; '
+                'display:flex; align-items:center; justify-content:center; '
+                'font-size:0.7rem; color:#8E8E93;">img</div>'
+            )
+
+        # Row container — markdown for the visual, Streamlit columns for buttons.
+        st.markdown(
+            f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+            f'border-radius:6px; padding:0.7rem 1rem; margin-bottom:0.6rem; '
+            f'display:flex; align-items:center; gap:0.7rem;">'
+            f'{thumb_html}'
+            f'<span class="item-swatch" style="background:{swatch}"></span>'
+            f'<span style="font-weight:500; color:#1C1917;">{it.get("name","—")}</span>'
+            f'<span style="font-size:0.74rem; color:#6E6E73; margin-left:auto; text-align:right;">'
+            f'{it.get("type","—")} · {it.get("formality","—")}'
+            f'</span>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
+        # Action row — two buttons under each item card.
+        col_e, col_d, col_pad = st.columns([1, 1, 6], gap="small")
+        with col_e:
+            edit_open = st.toggle(
+                "Edit", key=f"item_edit_toggle_{item_id}", value=False,
+            )
+        with col_d:
+            if st.button("Delete", key=f"item_delete_{item_id}",
+                         use_container_width=True):
+                res = delete_user_item(item_id)
+                if res.get("success"):
+                    st.toast(f"Removed {it.get('name','item')}.")
+                    st.rerun()
+                else:
+                    st.error(f"Could not delete: {res.get('error','unknown error')}")
+
+        # Inline editor — only renders when the toggle is on for THIS item.
+        if edit_open:
+            with st.form(f"item_edit_form_{item_id}", clear_on_submit=False):
+                col_a, col_b = st.columns(2, gap="small")
+                with col_a:
+                    e_name = st.text_input(
+                        "Name", value=it.get("name", ""),
+                        key=f"e_name_{item_id}",
+                    )
+                    cur_cat = it.get("type", "top")
+                    e_cat = st.selectbox(
+                        "Category",
+                        options=_CAT_OPTIONS,
+                        index=_CAT_OPTIONS.index(cur_cat) if cur_cat in _CAT_OPTIONS else 0,
+                        key=f"e_cat_{item_id}",
+                    )
+                    cur_form = it.get("formality", "casual")
+                    e_form = st.selectbox(
+                        "Formality",
+                        options=_FORM_OPTIONS,
+                        index=_FORM_OPTIONS.index(cur_form) if cur_form in _FORM_OPTIONS else 0,
+                        key=f"e_form_{item_id}",
+                    )
+                with col_b:
+                    e_color = st.text_input(
+                        "Color", value=it.get("color", ""),
+                        key=f"e_color_{item_id}",
+                    )
+                    e_seasons = st.multiselect(
+                        "Seasons",
+                        options=_SEAS_OPTIONS,
+                        default=[s for s in (it.get("season") or []) if s in _SEAS_OPTIONS] or ["all"],
+                        key=f"e_seas_{item_id}",
+                    )
+                    e_tags = st.multiselect(
+                        "Occasion tags",
+                        options=_TAG_OPTIONS,
+                        default=[t for t in (it.get("tags") or []) if t in _TAG_OPTIONS],
+                        key=f"e_tags_{item_id}",
+                    )
+
+                # Replace the photo? Optional file uploader.
+                e_new_image = st.file_uploader(
+                    "Replace the photo (optional)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    key=f"e_img_{item_id}",
+                    label_visibility="visible",
+                )
+
+                e_url = st.text_input(
+                    "Image URL (optional)",
+                    value=it.get("source_image_url", ""),
+                    key=f"e_image_url_{item_id}",
+                    placeholder="Paste a product image URL — overrides the uploaded photo.",
+                )
+
+                save_edit = st.form_submit_button(
+                    "Save changes", type="primary", use_container_width=True,
+                )
+                if save_edit:
+                    img_bytes = e_new_image.read() if e_new_image else None
+                    link_meta = None
+                    cleaned_url = (e_url or "").strip()
+                    if cleaned_url != (it.get("source_image_url") or ""):
+                        link_meta = {
+                            "source_url":       it.get("source_url"),
+                            "source_store":     it.get("source_store"),
+                            "source_image_url": cleaned_url or None,
+                        }
+                    res = update_user_item(
+                        item_id=item_id,
+                        item_fields={
+                            "name":      e_name,
+                            "color":     e_color,
+                            "type":      e_cat,
+                            "formality": e_form,
+                            "season":    e_seasons or ["all"],
+                            "tags":      e_tags,
+                        },
+                        image_bytes=img_bytes,
+                        link_metadata=link_meta,
+                    )
+                    if res.get("success"):
+                        st.toast(f"Updated {res['item'].get('name','item')}.")
+                        # Collapse the editor and refresh.
+                        st.session_state.pop(f"item_edit_toggle_{item_id}", None)
+                        st.rerun()
+                    else:
+                        st.error(f"Could not save: {res.get('error','unknown error')}")
+
+
 def _measurement_diagram_svg() -> str:
     """
     Clear, body-positive HTML legend explaining what each measurement
@@ -2294,7 +2474,7 @@ def _render_wardrobe():
                 unsafe_allow_html=True,
             )
 
-    # ── Items you've added ──────────────────────────────────────
+    # ── Items you've added (with edit + delete) ─────────────────
     overlay = get_user_wardrobe().get("user_wardrobe", {"clothing": [], "shoes": [], "accessories": []})
     user_rows = []
     for section in ("clothing", "shoes", "accessories"):
@@ -2302,59 +2482,13 @@ def _render_wardrobe():
             user_rows.append(it)
 
     if user_rows:
-        rows_html = ""
-        for it in user_rows:
-            swatch = color_to_swatch(it.get("color", ""))
-            tags_label = ", ".join(it.get("tags", []) or [])
-            avail = it.get("availability", "available")
-            avail_chip = ""
-            if avail != "available":
-                avail_chip = (
-                    f'<span style="margin-left:0.5rem; font-size:0.66rem; color:#111111; '
-                    f'background:#FAFAFA; border:1px solid #EEEEEE; padding:1px 7px; '
-                    f'border-radius:99px; letter-spacing:0.06em;">{avail}</span>'
-                )
-            # Optional inline thumbnail. Priority:
-            #   1. Local image_path (from the Photo tab) — embedded as data URI.
-            #   2. Remote source_image_url (from the Link tab) — direct img src.
-            # `onerror` hides the element if the remote image fails to load.
-            thumb_html = ""
-            ipath = it.get("image_path")
-            src_image = it.get("source_image_url")
-            if ipath:
-                data_uri = _image_to_data_uri(ipath)
-                if data_uri:
-                    thumb_html = (
-                        f'<img src="{data_uri}" alt="" '
-                        f'style="width:42px; height:42px; object-fit:cover; '
-                        f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
-                        f'onerror="this.style.display=\'none\'">'
-                    )
-            elif src_image:
-                thumb_html = (
-                    f'<img src="{src_image}" alt="" '
-                    f'style="width:42px; height:42px; object-fit:cover; '
-                    f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
-                    f'onerror="this.style.display=\'none\'">'
-                )
-            rows_html += (
-                f'<div style="display:flex; align-items:center; gap:0.7rem; padding:0.6rem 0; border-bottom:1px solid #EEEEEE; font-size:0.92rem;">'
-                f'{thumb_html}'
-                f'<span class="item-swatch" style="background:{swatch}"></span>'
-                f'<span style="font-weight:500; color:#1C1917;">{it.get("name","—")}</span>'
-                f'<span style="font-size:0.74rem; color:#6E6E73; margin-left:auto; text-align:right;">'
-                f'{it.get("type","—")} · {it.get("formality","—")}<br>'
-                f'<span style="font-size:0.7rem;">{tags_label or "no tags"}</span></span>'
-                f'{avail_chip}'
-                f'</div>'
-            )
         st.markdown(
-            f'<div style="margin-top:1.4rem;">'
-            f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.2rem; color:#1C1917; line-height:1.2; margin-bottom:0.4rem;">Items you\'ve added</div>'
-            f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:0.4rem 1.2rem;">'
-            f'{rows_html}</div></div>',
+            '<div style="margin-top:1.4rem; margin-bottom:0.4rem; '
+            'font-family:\'DM Serif Display\',serif; font-size:1.2rem; '
+            'color:#1C1917; line-height:1.2;">Items you\'ve added</div>',
             unsafe_allow_html=True,
         )
+        _render_user_items_list(user_rows)
     else:
         st.markdown(
             '<div style="margin-top:1.2rem; font-size:0.82rem; color:#6E6E73;">'
