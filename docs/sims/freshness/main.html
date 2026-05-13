@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wearly — Freshness micro-sim</title>
+
+  <!--
+    Wearly Freshness micro-sim.
+
+    Renders the exact formula in history_tool.get_freshness:
+
+        score = 1.0
+              − 0.25 × min(worn_count, 4) / 4
+              − 0.25 if days_since_last < 3
+              clamped to [0.40, 1.00]
+
+    Two sliders drive the inputs; the score updates live with a
+    layered breakdown so the reader can see EACH penalty applied
+    independently. Bar visualisation marks the [0.40, 1.00] floor /
+    ceiling and the band the current score sits in.
+
+    Self-contained (one HTML file, no external libs). Pattern follows
+    dmccreary/intelligent-textbooks `docs/sims/<sim>/main.html`.
+  -->
+
+  <style>
+    :root {
+      --paper:       #F8F4ED;
+      --card:        #FDFAF7;
+      --ink:         #1C1917;
+      --body:        #4A3D36;
+      --secondary:   #7C6F64;
+      --border:      #E8E0D8;
+      --accent:      #C17F5A;
+      --accent-deep: #9F5A36;
+      --warn:        #C24E4E;
+      --ok:          #4F8A66;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--paper);
+      color: var(--body);
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .wrap {
+      max-width: 880px;
+      margin: 0 auto;
+      padding: 1.4rem 1.2rem 2rem;
+    }
+    h1 {
+      font-family: "DM Serif Display", Georgia, serif;
+      color: var(--ink); margin: 0 0 0.35rem;
+      font-size: 1.55rem; font-weight: 400;
+    }
+    .subtitle {
+      color: var(--secondary); font-size: 0.86rem; line-height: 1.55;
+      margin-bottom: 1.5rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.3rem 1.4rem;
+    }
+    .controls { display: grid; grid-template-columns: 1fr; gap: 1.1rem; }
+    @media (min-width: 640px) {
+      .controls { grid-template-columns: 1fr 1fr; }
+    }
+    .field label {
+      display: flex; justify-content: space-between;
+      font-size: 0.84rem; color: var(--ink);
+      margin-bottom: 0.4rem;
+    }
+    .field input[type="range"] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .help {
+      font-size: 0.74rem; color: var(--secondary);
+      margin-top: 0.25rem; line-height: 1.5;
+    }
+
+    .scorewrap { margin-top: 1.6rem; }
+    .score-num {
+      font-family: "DM Serif Display", Georgia, serif;
+      color: var(--ink);
+      font-size: 3rem; line-height: 1;
+      letter-spacing: -0.01em;
+    }
+    .score-caption {
+      color: var(--secondary); font-size: 0.84rem;
+      margin-top: 0.25rem; line-height: 1.55;
+    }
+
+    /* The score bar — visualises the [0.40, 1.00] domain so the
+       reader can SEE the floor catching the math, not just trust
+       the prose. */
+    .bar {
+      position: relative;
+      height: 18px;
+      background: linear-gradient(
+        to right,
+        #E5C4B3 0%,            /* low end — heavily-worn floor */
+        #E5C4B3 33%,           /* same colour up to 0.60 */
+        #C8B8A8 33%,           /* mid */
+        #C8B8A8 66%,
+        #B5C8B5 66%,           /* fresh */
+        #B5C8B5 100%
+      );
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      margin-top: 1.1rem;
+      overflow: hidden;
+    }
+    .bar-marker {
+      position: absolute; top: -3px; bottom: -3px;
+      width: 4px; background: var(--ink);
+      border-radius: 2px;
+      box-shadow: 0 0 0 2px var(--card);
+      transition: left 0.2s ease;
+    }
+    .bar-floor {
+      position: absolute; top: 0; bottom: 0;
+      left: 0; width: 40%;
+      border-right: 2px dashed var(--secondary);
+      pointer-events: none;
+    }
+    .bar-legend {
+      display: flex; justify-content: space-between;
+      font-size: 0.72rem; color: var(--secondary);
+      margin-top: 0.35rem;
+      font-family: "DM Mono", monospace;
+    }
+
+    .breakdown {
+      margin-top: 1.4rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+    .breakdown h3 {
+      margin: 0 0 0.55rem;
+      font-size: 0.66rem; color: var(--secondary);
+      letter-spacing: 0.14em; text-transform: uppercase;
+      font-weight: 600;
+    }
+    .step {
+      display: flex; justify-content: space-between;
+      align-items: baseline;
+      font-size: 0.86rem;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #F3ECE3;
+    }
+    .step:last-child { border-bottom: none; }
+    .step-label { color: var(--body); }
+    .step-value {
+      font-family: "DM Mono", monospace; color: var(--ink);
+    }
+    .step-value.add { color: var(--ok); }
+    .step-value.sub { color: var(--warn); }
+    .step-value.clamp { color: var(--accent-deep); font-weight: 600; }
+
+    .notes {
+      margin-top: 1.4rem; font-size: 0.8rem;
+      color: var(--secondary); line-height: 1.6;
+    }
+    .notes code {
+      background: var(--paper);
+      padding: 1px 6px; border-radius: 3px;
+      font-size: 0.82em;
+    }
+
+    .surface {
+      display: flex; gap: 0.6rem; align-items: center;
+      margin-top: 1rem;
+      font-size: 0.82rem;
+    }
+    .pill {
+      padding: 0.25rem 0.7rem;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      font-family: "DM Mono", monospace;
+      font-size: 0.78rem; color: var(--ink);
+    }
+    .verdict-tag {
+      display: inline-block;
+      padding: 0.2rem 0.7rem; border-radius: 99px;
+      font-size: 0.74rem; font-weight: 600;
+      letter-spacing: 0.05em;
+    }
+    .verdict-fresh { background: #DBE9D9; color: #2E5B41; }
+    .verdict-mid   { background: #F1E4D1; color: #7C5A22; }
+    .verdict-tired { background: #F4DBDB; color: #8A2C2C; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Wear-history freshness</h1>
+    <div class="subtitle">
+      Live calculator for the freshness tie-breaker in
+      <code>history_tool.get_freshness</code>. Move the sliders.
+      The score, the breakdown, and the verdict all update from
+      the same formula the agent uses internally.
+    </div>
+
+    <div class="card">
+      <div class="controls">
+        <div class="field">
+          <label>
+            <span>Wear count</span>
+            <span class="pill" id="wcVal">0 times</span>
+          </label>
+          <input type="range" id="wc" min="0" max="20" step="1" value="0">
+          <div class="help">
+            Times the agent has confirmed wearing this piece. After
+            <strong>worn_count = 4</strong> the frequency penalty
+            stops getting worse — the much-loved blouse never gets
+            punished forever.
+          </div>
+        </div>
+
+        <div class="field">
+          <label>
+            <span>Days since last worn</span>
+            <span class="pill" id="dsVal">never</span>
+          </label>
+          <input type="range" id="ds" min="-1" max="60" step="1" value="-1">
+          <div class="help">
+            Slide left to “never worn” (−1). The recency penalty
+            only fires inside the <strong>3-day window</strong> —
+            past day 3, items climb back up.
+          </div>
+        </div>
+      </div>
+
+      <div class="scorewrap">
+        <div class="score-num" id="score">1.00</div>
+        <div class="score-caption">
+          <span id="verdict" class="verdict-tag verdict-fresh">FRESH</span>
+          <span id="caption" style="margin-left:0.6rem;">
+            Never worn — first pick when items tie.
+          </span>
+        </div>
+
+        <div class="bar">
+          <div class="bar-floor" title="The 0.40 floor — even the most-worn piece is still eligible."></div>
+          <div class="bar-marker" id="marker" style="left: 100%;"></div>
+        </div>
+        <div class="bar-legend">
+          <span>0.40 (floor)</span>
+          <span>0.70</span>
+          <span>1.00 (never worn)</span>
+        </div>
+      </div>
+
+      <div class="breakdown">
+        <h3>How the score is computed</h3>
+        <div class="step">
+          <span class="step-label">Start at 1.00 (never worn)</span>
+          <span class="step-value">+1.00</span>
+        </div>
+        <div class="step">
+          <span class="step-label" id="freqLabel">Frequency penalty (worn_count = 0)</span>
+          <span class="step-value sub" id="freqVal">−0.00</span>
+        </div>
+        <div class="step">
+          <span class="step-label" id="recLabel">Recency penalty (—)</span>
+          <span class="step-value sub" id="recVal">−0.00</span>
+        </div>
+        <div class="step">
+          <span class="step-label" id="clampLabel">Clamp to [0.40, 1.00]</span>
+          <span class="step-value clamp" id="clampVal">no change</span>
+        </div>
+        <div class="step" style="font-weight:600;">
+          <span class="step-label">Final freshness score</span>
+          <span class="step-value" id="finalVal">1.00</span>
+        </div>
+      </div>
+
+      <div class="surface">
+        <span class="pill" id="agentUses">In a tie between two equally-eligible items, the higher freshness wins.</span>
+      </div>
+
+      <div class="notes">
+        <strong>Why this matters.</strong> Freshness contributes <code>0.4 × score</code> to the agent's
+        candidate scoring (<code>_score_main_piece</code> in <code>styling_agent.py</code>). That weighting
+        is small enough never to override a formality mismatch, but
+        big enough to break a tie. The 0.40 floor means a heavily-
+        loved piece is never made ineligible — only outranked.
+        See <code>skills/wearly-styling-agent/wear-history-rules.md</code> for the
+        rule pack and <code>tests/test_wear_history.py</code> for the unit-test
+        contract this sim is the visual companion to.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Single source of truth — exactly mirrors history_tool.get_freshness.
+    function freshness(worn_count, days_since_last) {
+      let s = 1.0;
+      let freqPen = 0.0;
+      let recPen  = 0.0;
+      if (worn_count >= 1) {
+        freqPen = 0.25 * Math.min(worn_count, 4) / 4;
+        s -= freqPen;
+      }
+      if (days_since_last !== null && days_since_last >= 0 && days_since_last < 3) {
+        recPen = 0.25;
+        s -= recPen;
+      }
+      const beforeClamp = s;
+      s = Math.max(0.40, Math.min(1.00, s));
+      const clamped = (s !== beforeClamp);
+      return {score: s, freqPen, recPen, beforeClamp, clamped};
+    }
+
+    function verdictTag(score) {
+      if (score >= 0.85) return ["FRESH",          "verdict-fresh"];
+      if (score >= 0.60) return ["IN ROTATION",    "verdict-mid"];
+      return                   ["RECENTLY WORN",   "verdict-tired"];
+    }
+
+    function captionFor(worn, days, result) {
+      const s = result.score;
+      if (worn === 0) {
+        return "Never worn — first pick when items tie.";
+      }
+      if (days !== null && days >= 0 && days < 3) {
+        return `Worn ${days === 0 ? "today" : (days + " day" + (days === 1 ? "" : "s") + " ago")} — recency penalty active.`;
+      }
+      if (days !== null && days >= 30 && worn >= 1) {
+        return `Worn ${worn} time${worn === 1 ? "" : "s"} but unseen for ${days} days — agent may bring it back.`;
+      }
+      if (result.clamped) {
+        return `Score would be ${result.beforeClamp.toFixed(2)} — the 0.40 floor catches it. Item stays eligible.`;
+      }
+      return `Worn ${worn} time${worn === 1 ? "" : "s"}, last seen ${days} day${days === 1 ? "" : "s"} ago.`;
+    }
+
+    function update() {
+      const worn  = parseInt(document.getElementById("wc").value, 10);
+      const dsRaw = parseInt(document.getElementById("ds").value, 10);
+      const days  = (dsRaw < 0) ? null : dsRaw;
+
+      const result = freshness(worn, days);
+
+      // Pills + slider labels.
+      document.getElementById("wcVal").textContent =
+        worn === 0 ? "never" : (worn + " time" + (worn === 1 ? "" : "s"));
+      document.getElementById("dsVal").textContent =
+        days === null ? "never" :
+        days === 0    ? "today" :
+                        (days + " day" + (days === 1 ? "" : "s") + " ago");
+
+      // Big score + verdict.
+      document.getElementById("score").textContent = result.score.toFixed(2);
+      const [vText, vClass] = verdictTag(result.score);
+      const vEl = document.getElementById("verdict");
+      vEl.textContent = vText;
+      vEl.className = "verdict-tag " + vClass;
+      document.getElementById("caption").textContent = captionFor(worn, days, result);
+
+      // Bar marker — map [0.40, 1.00] linearly to [0%, 100%].
+      const pct = Math.max(0, Math.min(100, ((result.score - 0.40) / 0.60) * 100));
+      document.getElementById("marker").style.left = pct + "%";
+
+      // Breakdown.
+      document.getElementById("freqLabel").textContent =
+        `Frequency penalty (worn_count = ${worn}${worn >= 4 ? ", capped at 4" : ""})`;
+      document.getElementById("freqVal").textContent =
+        "−" + result.freqPen.toFixed(2);
+
+      document.getElementById("recLabel").textContent =
+        days === null
+          ? "Recency penalty (never worn — none)"
+          : days < 3
+            ? `Recency penalty (last worn ${days === 0 ? "today" : days + " day" + (days===1?"":"s") + " ago"})`
+            : `Recency penalty (last worn ${days} days ago — outside 3-day window)`;
+      document.getElementById("recVal").textContent =
+        "−" + result.recPen.toFixed(2);
+
+      const clampEl = document.getElementById("clampVal");
+      if (result.clamped) {
+        clampEl.textContent = `+${(result.score - result.beforeClamp).toFixed(2)} (lifted to floor)`;
+      } else if (result.beforeClamp > 1.00) {
+        clampEl.textContent = "lowered to 1.00";
+      } else {
+        clampEl.textContent = "no change";
+      }
+
+      document.getElementById("finalVal").textContent = result.score.toFixed(2);
+    }
+
+    document.getElementById("wc").addEventListener("input", update);
+    document.getElementById("ds").addEventListener("input", update);
+    update();
+  </script>
+</body>
+</html>

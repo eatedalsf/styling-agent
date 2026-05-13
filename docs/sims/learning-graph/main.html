@@ -190,9 +190,14 @@
         <label for="layoutSel">Layout</label>
         <select id="layoutSel">
           <option value="physics">Physics (force-directed)</option>
-          <option value="hierarchical">Hierarchical (top → bottom)</option>
+          <option value="hierarchical-ud">Hierarchical (top → bottom)</option>
+          <option value="hierarchical-lr">Hierarchical (left → right)</option>
         </select>
-        <button id="resetBtn">Reset view</button>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-top:0.4rem;">
+          <button id="fitBtn" title="Re-center and zoom to show every visible node.">Fit to view</button>
+          <button id="physicsBtn" title="Pause / resume the force-directed simulation. Useful for grabbing a node and pinning it where you want.">Pause physics</button>
+        </div>
+        <button id="resetBtn" style="margin-top:0.4rem;">Reset everything</button>
       </div>
 
       <h3>Categories</h3>
@@ -279,22 +284,74 @@
     return {nodes, edges};
   }
 
-  function showSelected(node, baseUrl) {
+  function showSelected(node, baseUrl, nodesById, edges) {
     const el = document.getElementById("selected");
     if (!node) {
-      el.innerHTML = `<div class="empty-state">Click a node to see its summary, Bloom level, and a link to the relevant book chapter.</div>`;
+      el.innerHTML = `<div class="empty-state">Click a node to see its summary, Bloom level, dependencies (prerequisites), dependents (what it unlocks), and a link to the book.</div>`;
       return;
     }
     const c = node._concept;
     const linkHref = baseUrl + "/" + c.url.replace(/\.md$/i, "/");
+
+    // Compute dependencies (predecessors) and dependents (successors).
+    // Adds the "what comes before / after this concept" view the
+    // classmate's graph-viewer.html surfaces in its node-info panel.
+    const deps  = [];
+    const dpnts = [];
+    for (const e of (edges || [])) {
+      if (e.to === c.id   && nodesById[e.from]) deps.push(nodesById[e.from]);
+      if (e.from === c.id && nodesById[e.to])   dpnts.push(nodesById[e.to]);
+    }
+
+    function chipList(list) {
+      if (!list.length) return `<span style="color:var(--secondary); font-size:0.8rem;">—</span>`;
+      return list.map(n => `
+        <button type="button" class="dep-chip" data-id="${n.id}"
+          style="font: inherit; font-size:0.74rem; color:var(--ink);
+                 background:var(--paper); border:1px solid var(--border);
+                 padding:1px 8px; border-radius:99px;
+                 margin:0 0.25rem 0.25rem 0; cursor:pointer;"
+          title="${(n._concept.summary || '').replace(/"/g, '&quot;')}">${n.label}</button>
+      `).join("");
+    }
+
     el.innerHTML = `
       <div class="selected-node">
         <div class="selected-node-label">${c.label}</div>
         <div class="selected-node-summary">${c.summary || ""}</div>
         ${bloomBadge(c.bloom)}
+        <div style="margin-top:0.7rem;">
+          <div style="font-size:0.66rem; color:var(--secondary);
+                      letter-spacing:0.12em; text-transform:uppercase;
+                      font-weight:600; margin-bottom:0.2rem;">
+            Dependencies (${deps.length}) — read first
+          </div>
+          <div style="line-height:1.7;">${chipList(deps)}</div>
+        </div>
+        <div style="margin-top:0.55rem;">
+          <div style="font-size:0.66rem; color:var(--secondary);
+                      letter-spacing:0.12em; text-transform:uppercase;
+                      font-weight:600; margin-bottom:0.2rem;">
+            Dependents (${dpnts.length}) — what this unlocks
+          </div>
+          <div style="line-height:1.7;">${chipList(dpnts)}</div>
+        </div>
         <a class="selected-node-link" href="${linkHref}" target="_top">Open in the book →</a>
       </div>
     `;
+
+    // Wire dependency-chip clicks so the user can hop along the chain
+    // by clicking through deps / dependents directly from the panel.
+    el.querySelectorAll(".dep-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        if (window._wearlyNetwork && id) {
+          window._wearlyNetwork.selectNodes([id]);
+          window._wearlyNetwork.focus(id, {animation: true, scale: 1.1});
+          showSelected(nodesById[id], baseUrl, nodesById, edges);
+        }
+      });
+    });
   }
 
   // Try to detect the book base URL so the "Open in book" link works
@@ -348,14 +405,24 @@
         interaction: {hover: true, tooltipDelay: 100, navigationButtons: false},
       }
     );
+    // Expose the network so dependency-chip clicks in the selection
+    // panel can call .selectNodes() and .focus() on it.
+    window._wearlyNetwork = network;
+
+    // Index nodes by id so showSelected can resolve deps + dependents
+    // without re-scanning the whole array on every click.
+    const nodesById = Object.fromEntries(nodes.map(n => [n.id, n]));
+    const rawEdges = data.edges.map(([from, to, label]) => ({from, to, label}));
 
     // Wire interactions
     network.on("selectNode", function (params) {
       const id = params.nodes[0];
-      const node = nodes.find(n => n.id === id);
-      showSelected(node, baseUrl);
+      const node = nodesById[id];
+      showSelected(node, baseUrl, nodesById, rawEdges);
     });
-    network.on("deselectNode", function () { showSelected(null, baseUrl); });
+    network.on("deselectNode", function () {
+      showSelected(null, baseUrl, nodesById, rawEdges);
+    });
     network.on("doubleClick", function (params) {
       if (params.nodes && params.nodes.length) {
         network.focus(params.nodes[0], {animation: true, scale: 1.2});
@@ -389,13 +456,49 @@
     document.getElementById("categorySel").addEventListener("change", applyFilters);
     document.getElementById("bloomSel").addEventListener("change", applyFilters);
 
+    // Layout switcher — physics / hierarchical TD / hierarchical LR.
+    // Matches the three modes the classmate's graph-viewer.html offers.
+    function setLayout(mode) {
+      if (mode === "hierarchical-ud") {
+        network.setOptions({
+          layout: {hierarchical: {direction: "UD", sortMethod: "directed",
+                                   nodeSpacing: 150, levelSeparation: 110}},
+          physics: {enabled: false},
+        });
+      } else if (mode === "hierarchical-lr") {
+        network.setOptions({
+          layout: {hierarchical: {direction: "LR", sortMethod: "directed",
+                                   nodeSpacing: 110, levelSeparation: 160}},
+          physics: {enabled: false},
+        });
+      } else {
+        network.setOptions({
+          layout: {hierarchical: false},
+          physics: {enabled: true},
+        });
+      }
+      document.getElementById("physicsBtn").textContent =
+        (mode === "physics") ? "Pause physics" : "Physics off";
+    }
     document.getElementById("layoutSel").addEventListener("change", function (e) {
-      const isHier = e.target.value === "hierarchical";
-      network.setOptions({
-        layout: {hierarchical: isHier ? {direction: "UD", sortMethod: "directed",
-                                         nodeSpacing: 150, levelSeparation: 110} : false},
-        physics: {enabled: !isHier},
-      });
+      setLayout(e.target.value);
+    });
+
+    // Fit to view — re-center + zoom to show every visible node.
+    document.getElementById("fitBtn").addEventListener("click", function () {
+      network.fit({animation: {duration: 350, easingFunction: "easeInOutQuad"}});
+    });
+
+    // Toggle physics — pause / resume the force simulation so the user
+    // can grab a node and pin it. Only meaningful in the "physics"
+    // layout; greyed-out semantically when on a hierarchical layout.
+    let physicsOn = true;
+    document.getElementById("physicsBtn").addEventListener("click", function () {
+      const layout = document.getElementById("layoutSel").value;
+      if (layout !== "physics") return;   // no-op on hierarchical layouts
+      physicsOn = !physicsOn;
+      network.setOptions({physics: {enabled: physicsOn}});
+      this.textContent = physicsOn ? "Pause physics" : "Resume physics";
     });
 
     document.getElementById("resetBtn").addEventListener("click", function () {
@@ -404,7 +507,9 @@
       document.getElementById("bloomSel").value = "";
       document.getElementById("layoutSel").value = "physics";
       applyFilters();
-      network.setOptions({layout: {hierarchical: false}, physics: {enabled: true}});
+      setLayout("physics");
+      physicsOn = true;
+      document.getElementById("physicsBtn").textContent = "Pause physics";
       network.fit({animation: true});
     });
   })();
