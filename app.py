@@ -166,17 +166,32 @@ html, body, [class*="css"] {
     color: #111111 !important;
 }
 
-/* The popover panel itself — clean white card with thin border. */
-[data-testid="stPopoverBody"] {
+/* The popover panel — compact white card. Streamlit's popover renders
+   in a portal layer with several wrapping divs; we force pure white +
+   a thin border across every wrapper so no warm cream leaks through. */
+[data-baseweb="popover"],
+[data-baseweb="popover"] > div,
+[data-baseweb="popover"] [data-baseweb="block"],
+[data-testid="stPopoverBody"],
+div[data-testid="stPopoverBody"] > div {
     background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
+}
+[data-testid="stPopoverBody"] {
     border: 1px solid #EEEEEE !important;
     border-radius: 10px !important;
     box-shadow: 0 6px 24px rgba(0,0,0,0.08) !important;
-    min-width: 240px !important;
-    padding: 0.6rem !important;
+    /* Compact menu — narrow card, not a full-width sheet. */
+    width: 260px !important;
+    max-width: 260px !important;
+    min-width: 220px !important;
+    padding: 0.45rem !important;
 }
 
-/* Menu items inside the popover are full-width plain buttons. */
+/* Menu items inside the popover — full-width plain rows, no card bg. */
+[data-testid="stPopoverBody"] .stButton {
+    margin: 0 !important;
+}
 [data-testid="stPopoverBody"] .stButton > button {
     width: 100% !important;
     text-align: left !important;
@@ -184,15 +199,22 @@ html, body, [class*="css"] {
     color: #111111 !important;
     border: none !important;
     border-radius: 6px !important;
-    padding: 0.55rem 0.7rem !important;
+    padding: 0.45rem 0.65rem !important;
     font-size: 0.86rem !important;
     font-weight: 500 !important;
-    min-height: 38px !important;
+    min-height: 34px !important;
     justify-content: flex-start !important;
+    box-shadow: none !important;
 }
 [data-testid="stPopoverBody"] .stButton > button:hover {
     background: #FAFAFA !important;
     color: #111111 !important;
+}
+
+/* Streamlit's divider inside the popover — thinner, less margin. */
+[data-testid="stPopoverBody"] hr {
+    margin: 0.35rem 0 !important;
+    border-color: #EEEEEE !important;
 }
 
 /* The "Hi, <name>" header block inside the popover. */
@@ -798,7 +820,7 @@ with _bar_right:
     # CSS without affecting any other popovers elsewhere in the app.
     st.markdown('<div class="profile-popover-slot">', unsafe_allow_html=True)
     with st.popover(
-        f"  {_initial}    Hi, {_name}    ▾",
+        f"Hi, {_name}  ▾",
         use_container_width=True,
         help="Wearly has no accounts — your data stays local on this device.",
     ):
