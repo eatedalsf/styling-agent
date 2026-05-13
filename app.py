@@ -133,13 +133,39 @@ html, body, [class*="css"] {
 .app-bar-right {
     display: flex; align-items: center; gap: 0.6rem;
 }
+/* Profile chip — now a real <a> link that routes to the Profile section
+   via Streamlit's query-param API. Keyboard-focusable, hover state,
+   honest tooltip that explains Wearly has no accounts. */
 .profile-chip {
     display: inline-flex; align-items: center; gap: 0.55rem;
-    padding: 0.32rem 0.55rem 0.32rem 0.4rem;
+    padding: 0.32rem 0.85rem 0.32rem 0.4rem;
     background: #FFFFFF;
     border: 1px solid #E5E5E5;
     border-radius: 99px;
+    text-decoration: none !important;
+    color: inherit !important;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.08s ease;
+    user-select: none;
 }
+.profile-chip:hover {
+    background: #FAFAFA;
+    border-color: #111111;
+}
+.profile-chip:active {
+    transform: translateY(1px);
+}
+.profile-chip:focus-visible {
+    outline: 2px solid #111111;
+    outline-offset: 2px;
+}
+.profile-chip-arrow {
+    font-size: 0.7rem;
+    color: #8E8E93;
+    margin-left: 0.15rem;
+    line-height: 1;
+}
+.profile-chip:hover .profile-chip-arrow { color: #111111; }
 .profile-avatar {
     width: 28px; height: 28px;
     border-radius: 50%;
@@ -576,6 +602,22 @@ def score_color(score):
 
 if "section" not in st.session_state:
     st.session_state["section"] = "home"
+
+# Query-param routing — lets clickable HTML links (e.g. the profile chip
+# in the top app bar) navigate the app without a full reload. Reads
+# ?section=<key> on every rerun and updates session state to match.
+# `_VALID_SECTIONS` is consulted lower in the file; we guard with a
+# small inline set here so the import order doesn't matter.
+_qp = st.query_params.get("section")
+if _qp in {"home", "today", "wardrobe", "shop", "profile", "demo"}:
+    if st.session_state["section"] != _qp:
+        st.session_state["section"] = _qp
+    # Clear the query param so the address bar stays clean and a manual
+    # refresh doesn't re-trigger the navigation.
+    try:
+        st.query_params.clear()
+    except Exception:
+        pass
 if "result" not in st.session_state:
     st.session_state["result"] = None
 if "signed_in" not in st.session_state:
@@ -650,10 +692,13 @@ st.markdown(f"""
         <span class="brand-tag">Prototype</span>
     </div>
     <div class="app-bar-right">
-        <div class="profile-chip" title="Prototype profile · local only">
+        <a class="profile-chip" href="?section=profile" target="_self"
+           title="Open your profile — Wearly has no accounts; your data stays local"
+           aria-label="Open profile for {_name}">
             <span class="profile-avatar">{_initial}</span>
             <span class="profile-name">{_name}</span>
-        </div>
+            <span class="profile-chip-arrow" aria-hidden="true">›</span>
+        </a>
     </div>
 </div>
 """, unsafe_allow_html=True)
