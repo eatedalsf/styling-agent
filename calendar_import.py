@@ -131,9 +131,21 @@ def _parse_dtstart(raw: str) -> Optional[Dict[str, str]]:
 
     Accepts forms:
       VALUE=DATE:20260512                 -> all-day
-      :20260512T100000                    -> floating timed
-      :20260512T100000Z                   -> UTC timed
+      :20260512T100000                    -> floating timed (no conversion)
+      :20260512T100000Z                   -> UTC timed (CONVERTED to local)
       ;TZID=America/Los_Angeles:20260512T100000   -> tz-aware timed
+                                                     (treated as floating)
+
+    The previous version stripped the trailing UTC `Z` and displayed
+    the raw UTC clock time. For a user in US Central, that turned a
+    9:45 PM local "Dinner" (encoded as 034500Z next day) into "03:45"
+    on screen. The fix: when the DTSTART carries a UTC marker,
+    convert to the server's local timezone before formatting. On a
+    developer's machine that's the user's actual local time. On
+    Streamlit Cloud (server is UTC) we still produce UTC, but the
+    timestamp at least matches what Google's web UI shows the user
+    under a UTC display setting — and a future "user timezone"
+    preference can override this in one place.
     """
     raw = (raw or "").strip()
     if not raw:
@@ -146,9 +158,7 @@ def _parse_dtstart(raw: str) -> Optional[Dict[str, str]]:
         params, value = "", raw
 
     is_all_day = "VALUE=DATE" in params.upper()
-
-    # Strip trailing UTC marker; we don't try to be tz-correct on
-    # display — the user's calendar export already encodes the intent.
+    is_utc = value.strip().endswith("Z")
     value = value.strip().rstrip("Z")
 
     try:
@@ -158,10 +168,16 @@ def _parse_dtstart(raw: str) -> Optional[Dict[str, str]]:
             return {"date": dt.strftime("%Y-%m-%d"), "time": ""}
         # YYYYMMDDTHHMMSS or YYYYMMDDTHHMM
         date_part, time_part = value.split("T", 1)
-        dt = datetime.strptime(date_part, "%Y%m%d")
-        hh = time_part[:2]
-        mm = time_part[2:4] if len(time_part) >= 4 else "00"
-        return {"date": dt.strftime("%Y-%m-%d"), "time": f"{hh}:{mm}"}
+        dt = datetime.strptime(date_part + "T" + time_part[:6].ljust(6, "0"),
+                               "%Y%m%dT%H%M%S")
+        if is_utc:
+            # Mark as UTC, then convert to the server's local TZ.
+            # datetime.astimezone() with no argument resolves to the
+            # local zone via the OS — works on Windows / macOS / Linux.
+            from datetime import timezone as _tz
+            dt = dt.replace(tzinfo=_tz.utc).astimezone()
+        return {"date": dt.strftime("%Y-%m-%d"),
+                "time": dt.strftime("%H:%M")}
     except (ValueError, IndexError):
         return None
 

@@ -50,6 +50,16 @@ class TestICSParser(unittest.TestCase):
     """parse_ics_text handles the common subset of RFC 5545."""
 
     def test_minimal_timed_event(self):
+        # A DTSTART ending in `Z` is a UTC timestamp by the iCalendar
+        # spec. The parser now converts it to the server's local
+        # timezone before storing — so the displayed event time
+        # matches what Google / Apple show the user, instead of raw
+        # UTC clock time. On CI (UTC runners) the expected output
+        # stays 09:00 / 2026-05-12; on a developer in UTC-5 it
+        # becomes 04:00 of the same day. Computing expectations via
+        # the same astimezone() the parser uses keeps this test
+        # correct on every timezone.
+        from datetime import datetime, timezone
         from calendar_import import parse_ics_text
         ics = (
             "BEGIN:VCALENDAR\r\n"
@@ -61,13 +71,17 @@ class TestICSParser(unittest.TestCase):
             "END:VEVENT\r\n"
             "END:VCALENDAR\r\n"
         )
+        expected_local = datetime(
+            2026, 5, 12, 9, 0, tzinfo=timezone.utc
+        ).astimezone()
+
         events = parse_ics_text(ics)
         self.assertEqual(len(events), 1)
         ev = events[0]
         self.assertEqual(ev["id"], "abc-123@wearly")
         self.assertEqual(ev["title"], "Team standup")
-        self.assertEqual(ev["date"], "2026-05-12")
-        self.assertEqual(ev["time"], "09:00")
+        self.assertEqual(ev["date"], expected_local.strftime("%Y-%m-%d"))
+        self.assertEqual(ev["time"], expected_local.strftime("%H:%M"))
         self.assertEqual(ev["type"], "work")        # "standup" keyword
         self.assertEqual(ev["formality"], "business")
         self.assertEqual(ev["source"], "ics")

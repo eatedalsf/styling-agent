@@ -698,6 +698,47 @@ COLOR_HEX = {
     "white/gold":    "#E8DAA8",
 }
 
+def _format_time_12h(time_str: str) -> str:
+    """
+    Render a calendar event's "HH:MM" or "H:MM AM/PM" string in
+    user-friendly 12-hour format. Returns "" on empty / unparseable
+    input (so the caller can safely concatenate without showing junk).
+
+    Accepted inputs:
+      "18:00"      -> "6:00 PM"
+      "09:05"      -> "9:05 AM"
+      "00:30"      -> "12:30 AM"
+      "12:00"      -> "12:00 PM"
+      "8:00 AM"    -> "8:00 AM" (already 12-hour, passed through)
+      ""           -> ""
+      "all-day"    -> "all-day"
+    """
+    s = (time_str or "").strip()
+    if not s:
+        return ""
+    # Already 12-hour? Pass through (covers manually-entered seed events
+    # like "10:00 AM" in seed_calendar_events.json).
+    upper = s.upper()
+    if upper.endswith(" AM") or upper.endswith(" PM"):
+        return s
+    # Non-numeric tokens ("all-day") — return verbatim.
+    if ":" not in s:
+        return s
+    try:
+        hh_str, mm_str = s.split(":", 1)
+        hh = int(hh_str)
+        mm = int(mm_str[:2])
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            return s
+    except (ValueError, IndexError):
+        return s
+    suffix = "AM" if hh < 12 else "PM"
+    hh12 = hh % 12
+    if hh12 == 0:
+        hh12 = 12
+    return f"{hh12}:{mm:02d} {suffix}"
+
+
 def _resolve_image_path(rel_or_abs: str) -> str:
     """Resolve a wardrobe image path (typically `wardrobe_images/UC001.png`)
     to an absolute path that lives next to wardrobe.json."""
@@ -1302,7 +1343,7 @@ def _render_outfit_result(result: dict):
                 {event.get('title','N/A')}
             </div>
             <div style="font-size:0.84rem; color:#6E6E73;">
-                {event.get('date','Today')} &nbsp;·&nbsp; {event.get('time','')}
+                {event.get('date','Today')} &nbsp;·&nbsp; {_format_time_12h(event.get('time',''))}
             </div>
             {"<div style='font-size:0.82rem;color:#6E6E73;margin-top:0.5rem;'>" + event.get('notes','') + "</div>" if event.get('notes') else ""}
         </div>
@@ -1743,7 +1784,7 @@ def _render_home():
         ev_title = next_event.get("title", "—")
         ev_meta_parts = []
         if next_event.get("time"):
-            ev_meta_parts.append(next_event["time"])
+            ev_meta_parts.append(_format_time_12h(next_event["time"]))
         if next_event.get("type"):
             ev_meta_parts.append(next_event["type"].replace("_", " ").title())
         ev_meta = " · ".join(ev_meta_parts) if ev_meta_parts else "Today"
@@ -2057,7 +2098,7 @@ def _render_coming_up_this_week() -> None:
         ev_title = ev.get("title", "Untitled event")
         ev_when = ev.get("date", "—")
         if ev.get("time"):
-            ev_when = f"{ev_when}  ·  {ev['time']}"
+            ev_when = f"{ev_when}  ·  {_format_time_12h(ev['time'])}"
         ev_type = (ev.get("type") or "").lower()
 
         # Tiny weather note (skip if no usable data).
@@ -2789,7 +2830,7 @@ def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist,
 
     ev_title = ev.get("title", "Untitled event")
     ev_date  = ev.get("date", "—")
-    ev_time  = ev.get("time", "")
+    ev_time  = _format_time_12h(ev.get("time", ""))
     ev_type  = (ev.get("type") or "").lower()
     when_text = ev_date + (f"  ·  {ev_time}" if ev_time else "")
 
