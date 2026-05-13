@@ -140,25 +140,40 @@ html, body, [class*="css"] {
    the end. Hover + focus states keep the affordance obvious.
    We scope every rule via `.profile-popover-slot` so we don't
    accidentally restyle any other popovers in the app. */
-.profile-popover-slot { display: flex; justify-content: flex-end; background: transparent !important; }
+.profile-popover-slot { display: flex; justify-content: flex-end; }
 
-/* Force pure white on every layer the popover trigger renders inside —
-   Streamlit's column wrapper, the popover container, the button element
-   itself, and any inner span. Without this the warm-ivory app background
-   shows through the rounded corners as a soft cream tint. */
+/* Nuke every layer between the column and the actual <button> so no
+   wrapping element shows a halo behind the chip. Targets the column
+   itself, every nested div, every Streamlit element container, every
+   markdown wrapper, every popover wrapper. background:transparent so
+   it inherits the page's white and nothing draws on its own. */
 .profile-popover-slot,
-.profile-popover-slot > div,
+.profile-popover-slot *,
+.profile-popover-slot div,
+.profile-popover-slot [data-testid],
+.profile-popover-slot [class*="st-"],
 .profile-popover-slot [data-testid="stPopover"],
-.profile-popover-slot [data-testid="stPopover"] > div,
-.profile-popover-slot [data-testid="stPopover"] > div > button,
-.profile-popover-slot button {
-    background: #FFFFFF !important;
-    background-color: #FFFFFF !important;
+.profile-popover-slot [data-testid="stElementContainer"],
+.profile-popover-slot [data-testid="stVerticalBlock"] {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+/* The column that hosts the popover slot itself — same treatment, in
+   case the chip is rendered inside a column wrapper one level above. */
+[data-testid="stHorizontalBlock"] > [data-testid="column"]:has(.profile-popover-slot),
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:has(.profile-popover-slot) {
+    background: transparent !important;
+    background-color: transparent !important;
 }
 
 .profile-popover-slot [data-testid="stPopover"] > div > button,
 .profile-popover-slot button[kind="secondary"],
 .profile-popover-slot button {
+    background: #FFFFFF !important;
+    background-color: #FFFFFF !important;
     color: #111111 !important;
     border: 1px solid #E5E5E5 !important;
     border-radius: 99px !important;
