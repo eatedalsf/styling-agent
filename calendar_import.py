@@ -456,15 +456,30 @@ def unsubscribe_calendar() -> dict:
     return {"success": True, "error": None}
 
 
-def refresh_subscription(replace: bool = False, timeout: int = 10) -> dict:
+def refresh_subscription(replace: bool = True, timeout: int = 10) -> dict:
     """
-    Fetch the subscribed URL and merge the resulting events into
+    Fetch the subscribed URL and write the resulting events to
     calendar_events.json. Behaves like import_ics_events() under the
-    hood and returns the same result shape, plus a "fetched_bytes" key
-    so the UI can show how much came in.
+    hood and returns the same result shape, plus a "fetched_bytes"
+    key so the UI can show how much came in.
 
-    `replace=True` discards events currently on disk before merging
-    (useful for a clean re-sync).
+    `replace=True` (default) — MIRROR mode. The .ics URL is treated
+    as the source of truth: any event currently in the local file
+    that is NOT in the fetched .ics gets dropped. This is what users
+    expect from a calendar "subscription" — removing an event from
+    Google Calendar must remove it from Wearly too, the same way
+    Apple Calendar drops it from a subscribed view.
+
+    `replace=False` — UPSERT mode. New events are added, existing
+    events with matching IDs are refreshed in place, and anything
+    not in the .ics is left alone. Useful when the user has a mix
+    of URL-subscribed events and ad-hoc events they don't want
+    overwritten — but the standard subscription contract is mirror,
+    so this is the non-default branch.
+
+    .ics FILE uploads use import_ics_events() directly with its own
+    default of replace=False — uploads are one-shot additions, not
+    a recurring source of truth.
     """
     sub = _load_subscription()
     url = sub.get("url")

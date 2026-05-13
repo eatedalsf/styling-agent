@@ -813,7 +813,9 @@ def _auto_refresh_subscription_if_needed(max_age_seconds: int = 300) -> None:
         return
 
     try:
-        res = refresh_subscription(replace=False, timeout=8)
+        # Mirror mode: pick up deletions in the source calendar
+        # automatically. See refresh_subscription docstring.
+        res = refresh_subscription(replace=True, timeout=8)
         st.session_state["_cal_auto_refresh_result"] = res
     except Exception as _e:
         st.session_state["_cal_auto_refresh_result"] = {
@@ -1709,6 +1711,18 @@ def _load_home_context():
 
 
 def _render_home():
+    # If the user has a URL subscription and it hasn't synced in the
+    # last 5 minutes, mirror it now so the "Next event" card reflects
+    # what's actually in their calendar — not a snapshot from before
+    # they deleted something. Bust the @st.cache_data cache afterwards
+    # so the next call to _load_home_context() reads the fresh file.
+    _stale_marker_before = st.session_state.get("_cal_auto_refresh_result")
+    _auto_refresh_subscription_if_needed()
+    if st.session_state.get("_cal_auto_refresh_result") is not _stale_marker_before:
+        try:
+            _load_home_context.clear()
+        except Exception:
+            pass
     next_event, weather, _ = _load_home_context()
     _today = datetime.today()
     today_label = _today.strftime("%A · %B ") + str(_today.day)
@@ -2216,11 +2230,19 @@ def _render_calendar_import() -> None:
                     if st.button("↻  Refresh from calendar", key="cal_url_refresh",
                                  type="primary", use_container_width=True):
                         with st.spinner("Fetching your calendar…"):
-                            res = refresh_subscription(replace=False)
+                            # Mirror mode: deletions in the source
+                            # calendar are reflected locally.
+                            res = refresh_subscription(replace=True)
                         if res.get("success"):
+                            dropped = max(
+                                0,
+                                (sub.get("last_event_count") or 0)
+                                - res.get("total", 0)
+                            )
                             st.success(
                                 f"Synced. {len(res['added'])} new · "
                                 f"{len(res['updated'])} refreshed · "
+                                f"{dropped} removed · "
                                 f"{res['total']} total."
                             )
                             st.rerun()
@@ -2251,7 +2273,9 @@ def _render_calendar_import() -> None:
                             st.error(sub_res.get("error", "Could not save the URL."))
                         else:
                             with st.spinner(f"Fetching your {sub_res['label']}…"):
-                                res = refresh_subscription(replace=False)
+                                # First sync from a URL — replace any
+                                # stale local seeds with the source.
+                                res = refresh_subscription(replace=True)
                             if res.get("success"):
                                 st.success(
                                     f"Connected to your {sub_res['label']}. "
@@ -2659,7 +2683,20 @@ def _render_planner():
 
     col_l, col_r = st.columns([5, 1], gap="small")
     with col_r:
-        if st.button("↻ Refresh", key="planner_refresh", use_container_width=True):
+        if st.button("↻ Re-sync calendar", key="planner_refresh",
+                     use_container_width=True,
+                     help=("Pulls fresh events from your subscribed calendar "
+                           "and drops anything you've deleted at the source.")):
+            # Force a full mirror-mode resync from the URL (if any),
+            # then invalidate the planner cache so the next render
+            # rebuilds plans from the now-truthful event list.
+            if sub:
+                try:
+                    from calendar_import import refresh_subscription as _refresh
+                    with st.spinner("Re-syncing your calendar…"):
+                        _refresh(replace=True, timeout=10)
+                except Exception as _e:
+                    st.warning(f"Re-sync failed: {_e}. Showing cached events.")
             st.session_state.pop("planner_plans", None)
             st.rerun()
 
