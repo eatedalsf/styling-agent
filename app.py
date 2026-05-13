@@ -754,7 +754,7 @@ if "section" not in st.session_state:
 # `_VALID_SECTIONS` is consulted lower in the file; we guard with a
 # small inline set here so the import order doesn't matter.
 _qp = st.query_params.get("section")
-if _qp in {"home", "today", "wardrobe", "shop", "profile", "demo"}:
+if _qp in {"home", "today", "planner", "wardrobe", "shop", "profile", "demo"}:
     if st.session_state["section"] != _qp:
         st.session_state["section"] = _qp
     # Clear the query param so the address bar stays clean and a manual
@@ -1212,11 +1212,12 @@ st.markdown(
 _SECTIONS = [
     ("home",     "Home"),
     ("today",    "Today"),
+    ("planner",  "Planner"),
     ("wardrobe", "Wardrobe"),
     ("shop",     "Shop"),
     # Profile and Before / After were moved out of the top nav into
     # the user dropdown menu — see the popover block above. The top
-    # nav is reserved for the four daily-use destinations.
+    # nav is reserved for the daily-use destinations.
 ]
 _active = st.session_state["section"]
 
@@ -1331,14 +1332,27 @@ def _render_outfit_result(result: dict):
     col_outfit, col_score = st.columns([3, 2], gap="large")
 
     with col_outfit:
+        # Items render with real thumbnails (image_path / source_image_url
+        # / clean placeholder) so the card shows what was picked, not
+        # just a row of names. Centralized in _item_thumbnail_html.
         item_rows = []
         for item in outfit:
             swatch_hex = color_to_swatch(item.get("color", ""))
+            thumb = _item_thumbnail_html(item, size_px=48)
             row = (
-                '<div class="outfit-item">'
-                '<span class="item-swatch" style="background:' + swatch_hex + '"></span>'
-                '<span style="font-weight:500">' + item["name"] + '</span>'
-                '<span class="item-color-chip">' + item.get("color", "") + '</span>'
+                '<div class="outfit-item" style="gap:0.85rem;">'
+                + thumb +
+                '<div style="display:flex; flex-direction:column; line-height:1.3; flex:1; min-width:0;">'
+                  '<span style="font-weight:500; color:#1C1917; '
+                  'overflow:hidden; text-overflow:ellipsis;">'
+                  + item.get("name", "—") +
+                  '</span>'
+                  '<span style="font-size:0.74rem; color:#6E6E73; margin-top:0.15rem;">'
+                  + (item.get("type", "—") or "—") +
+                  '</span>'
+                '</div>'
+                '<span class="item-swatch" style="background:' + swatch_hex + ';"></span>'
+                '<span class="item-color-chip">' + (item.get("color", "") or "—") + '</span>'
                 '</div>'
             )
             item_rows.append(row)
@@ -1469,12 +1483,14 @@ def _render_outfit_result(result: dict):
             </div>"""
         st.markdown(f'<div class="card" style="margin-top:0">{steps_html}</div>', unsafe_allow_html=True)
 
-    # ── Reasoning ──────────────────────────────────────────
-    with st.expander("Full Agent Reasoning", expanded=False):
-        r_html = ""
-        for i, r in enumerate([x for x in reasons if x.strip()], 1):
-            r_html += f'<div class="reason-item"><span class="reason-num">{i}</span><span>{r}</span></div>'
-        st.markdown(f'<div class="card" style="margin-top:0">{r_html}</div>', unsafe_allow_html=True)
+    # ── Reasoning (story-style, grouped, citation pills) ─────
+    # The flat numbered list felt like a debug log. This version groups
+    # reasoning lines by which step they came from (Selected, Color,
+    # Note, Skipping, etc.) and renders rule citations as small pills
+    # rather than inline brackets — same data, much more readable.
+    with st.expander("Why this outfit — the agent's reasoning",
+                     expanded=False):
+        _render_reasoning_story(reasons)
 
     # ── Reasoning graph (live, interactive — built from THIS result) ──────────
     # This is the "agent, not chatbot" feature in graph form. The schema view
@@ -1822,6 +1838,162 @@ def _render_home():
 # ─────────────────────────────────────────────
 # TODAY — outfit result (or empty state)
 # ─────────────────────────────────────────────
+
+_REASONING_CITATION_RE = __import__("re").compile(r"\[([a-z-]+#R\d+)\]")
+
+
+def _render_reasoning_story(lines: list) -> None:
+    """
+    Render the reasoning trail as a clean, grouped, story-style panel.
+
+    Groups by the first word of each line (Selected / Added / Skipping /
+    Note / etc.) so closely-related decisions cluster together. Rule
+    citations like `[occasion-rules#R3]` are extracted from the prose
+    and surfaced as small pills below the sentence — so the citation
+    is still visible but no longer interrupts the reading rhythm.
+    """
+    raw_lines = [(ln or "").strip() for ln in (lines or []) if (ln or "").strip()]
+    if not raw_lines:
+        st.markdown(
+            "<div style='font-size:0.86rem; color:#6E6E73;'>"
+            "No reasoning recorded for this run.</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Group classification — used to pick the section header + icon.
+    def _classify(line: str) -> tuple:
+        low = line.lower().lstrip()
+        if low.startswith("today's context"):
+            return ("Context",   "Your context for today")
+        if low.startswith("skipping"):
+            return ("Excluded",  "Items you ruled out")
+        if low.startswith(("selected", "added", "chose")):
+            return ("Pieces",    "What Wearly picked, and why")
+        if low.startswith("note:"):
+            return ("Notes",     "Heads-up notes")
+        if line.startswith("✓") or line.startswith("⚠"):
+            return ("Color",     "Color-harmony check")
+        if "missing" in low or "shopping suggestion" in low:
+            return ("Gaps",      "What's missing, and what to add")
+        if low.startswith("warm") or low.startswith("cool") or low.startswith("bold"):
+            return ("Palette",   "Palette notes")
+        return ("Other", "Other reasoning")
+
+    # Order sections deliberately — context first, picks next, then
+    # color, notes, gaps. "Other" trails at the end.
+    section_order = [
+        "Context", "Pieces", "Excluded",
+        "Color", "Palette", "Notes", "Gaps", "Other",
+    ]
+    grouped: dict = {k: [] for k in section_order}
+    for line in raw_lines:
+        sec, _ = _classify(line)
+        grouped[sec].append(line)
+
+    # Section subtitle lookup (used in header).
+    subtitle_for = {sec: _classify("dummy " + sec)[1] for sec in section_order}
+    subtitle_for["Context"]  = "Your context for today"
+    subtitle_for["Pieces"]   = "What Wearly picked, and why"
+    subtitle_for["Excluded"] = "Items you ruled out"
+    subtitle_for["Color"]    = "Color-harmony check"
+    subtitle_for["Palette"]  = "Palette notes"
+    subtitle_for["Notes"]    = "Heads-up notes"
+    subtitle_for["Gaps"]     = "What's missing, and what to add"
+    subtitle_for["Other"]    = "Other reasoning"
+
+    for section in section_order:
+        bucket = grouped.get(section) or []
+        if not bucket:
+            continue
+
+        # Section header card.
+        st.markdown(
+            "<div style='margin-top:0.9rem; margin-bottom:0.4rem;'>"
+            "<div style='font-size:0.66rem; color:#8E8E93; "
+            "letter-spacing:0.14em; text-transform:uppercase; font-weight:600;'>"
+            f"{section}</div>"
+            f"<div style='font-size:0.78rem; color:#6E6E73; margin-top:0.15rem;'>"
+            f"{subtitle_for[section]}</div></div>",
+            unsafe_allow_html=True,
+        )
+
+        for line in bucket:
+            # Split out any rule citations into pills shown below the line.
+            tags = _REASONING_CITATION_RE.findall(line)
+            clean = _REASONING_CITATION_RE.sub("", line).strip().rstrip(".")
+            pills_html = ""
+            if tags:
+                pills_html = "".join(
+                    f'<span style="font-size:0.66rem; color:#111111; '
+                    f'background:#FAFAFA; border:1px solid #EEEEEE; '
+                    f'padding:1px 9px; border-radius:99px; margin-right:0.35rem; '
+                    f'letter-spacing:0.04em; font-family:DM Mono, monospace;">'
+                    f'{t}</span>'
+                    for t in tags
+                )
+
+            # Sub-note indentation: lines that start with two spaces are
+            # secondary detail (e.g. "  Aligns with your preferred tailored fit").
+            is_subnote = line.startswith("  ") or line.startswith("\t")
+            row_style = ("padding:0.45rem 0 0.5rem 1.2rem; border-left:2px solid "
+                         "#EEEEEE; margin-left:0.4rem;"
+                         if is_subnote else
+                         "padding:0.5rem 0;")
+            text_color = "#6E6E73" if is_subnote else "#1C1917"
+
+            st.markdown(
+                f"<div style='{row_style}'>"
+                f"<div style='font-size:0.9rem; color:{text_color}; line-height:1.55;'>"
+                f"{clean}.</div>"
+                + (f"<div style='margin-top:0.35rem;'>{pills_html}</div>" if pills_html else "")
+                + "</div>",
+                unsafe_allow_html=True,
+            )
+
+
+def _item_thumbnail_html(item: dict, size_px: int = 44) -> str:
+    """
+    Single source of truth for item thumbnails across the app.
+
+    Priority order:
+      1. Local image_path (saved by the Photo tab) -> embedded as
+         data: URI so it renders even on a transient filesystem.
+      2. Remote source_image_url (from the Link tab) -> direct img src
+         with onerror fallback that hides the broken-glyph.
+      3. Clean placeholder card showing the item's type initial. No
+         broken-image glyphs anywhere.
+    """
+    if not isinstance(item, dict):
+        item = {}
+    size = max(20, int(size_px))
+    base_style = (
+        f"width:{size}px; height:{size}px; object-fit:cover; "
+        f"border-radius:6px; border:1px solid #E5E5E5; flex-shrink:0; "
+        f"background:#FAFAFA;"
+    )
+    ipath = item.get("image_path")
+    src_image = item.get("source_image_url")
+    if ipath:
+        data_uri = _image_to_data_uri(ipath)
+        if data_uri:
+            return (
+                f'<img src="{data_uri}" alt="" style="{base_style}" '
+                f'onerror="this.style.display=\'none\'">'
+            )
+    if src_image:
+        return (
+            f'<img src="{src_image}" alt="" style="{base_style}" '
+            f'onerror="this.style.display=\'none\'">'
+        )
+    initial = (item.get("type") or item.get("name") or "?")[:1].upper()
+    return (
+        f'<div style="{base_style} display:flex; align-items:center; '
+        f'justify-content:center; color:#8E8E93; '
+        f'font-family:DM Sans,sans-serif; font-size:0.78rem; '
+        f'font-weight:600; letter-spacing:0.04em;">{initial}</div>'
+    )
+
 
 def _render_coming_up_this_week() -> None:
     """
@@ -2316,8 +2488,20 @@ def _render_today():
                 _run_and_store(last.get("mode", "calendar"), last.get("everyday_request"))
             st.rerun()
 
-        # ── Coming up this week ─────────────────────────────────
-        _render_coming_up_this_week()
+        # The week-ahead view used to live here. It now has its own
+        # top-nav section ("Planner") so users can browse upcoming
+        # events without first having to plan today's outfit. A
+        # compact link points there from the bottom of the result.
+        st.markdown(
+            "<div style='margin:1.4rem 0 0; padding-top:1rem; "
+            "border-top:1px solid #EEEEEE; font-size:0.84rem; color:#6E6E73;'>"
+            "Browsing the week ahead? Open the "
+            "<a href='?section=planner' target='_self' style='color:#111111; "
+            "font-weight:500;'>Planner</a> for outfits + gaps across "
+            "every upcoming event."
+            "</div>",
+            unsafe_allow_html=True,
+        )
     else:
         st.markdown("""
         <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
@@ -2359,6 +2543,285 @@ def _render_today():
         # Note: the calendar-connection surface used to live here but
         # moved to the Profile screen — it's a one-time setup, not a
         # daily-use control.
+
+
+# ─────────────────────────────────────────────
+# PLANNER — the week + month ahead
+# ─────────────────────────────────────────────
+
+def _render_planner():
+    """
+    Calendar-driven view of upcoming events with a recommended outfit
+    per event. Three tabs:
+
+      This week   — events in the next 7 days
+      This month  — events in the next 31 days
+      All upcoming — everything we know about (capped at days_ahead=60)
+
+    Per-event card carries: title + type, date/time, weather, the
+    recommended outfit with images, any wardrobe gaps + a one-click
+    "Save to wishlist" for the missing piece type.
+    """
+    try:
+        from styling_agent import plan_upcoming_events
+        from calendar_import import get_subscription
+        from shopping_tool import add_wishlist_item, gap_is_on_wishlist
+    except Exception as _e:
+        st.error(f"Planner unavailable: {_e}")
+        return
+
+    # Refresh subscription if stale, so newly-added Google/Apple events
+    # show up here even if the user came straight to the Planner.
+    _auto_refresh_subscription_if_needed()
+
+    st.markdown("""
+    <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
+        <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Planner</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">
+            Outfits, gaps, and wishlist suggestions for every event on your calendar — week and month ahead.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # Empty-calendar guidance — link to the Profile screen where Connect lives.
+    sub = get_subscription()
+    if not sub:
+        st.markdown(
+            "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
+            "border-radius:6px; padding:1.2rem 1.4rem;'>"
+            "<div style='font-family:\"DM Serif Display\",serif; font-size:1.15rem; color:#1C1917;'>"
+            "No calendar connected"
+            "</div>"
+            "<div style='font-size:0.86rem; color:#6E6E73; margin-top:0.4rem; line-height:1.55;'>"
+            "Open the <a href='?section=profile' target='_self' style='color:#111111; "
+            "font-weight:500;'>Profile screen</a> to connect Google Calendar or "
+            "iCloud (one URL paste, no sign-in). After that, the Planner "
+            "shows every upcoming event with a recommended outfit."
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+
+    # Plan up to 30 events across 60 days — plenty for week + month tabs.
+    # Cached per-session so flipping between tabs is instant; the
+    # refresh button below clears the cache.
+    plans = st.session_state.get("planner_plans")
+    if plans is None:
+        with st.spinner("Reading your calendar and planning each event…"):
+            try:
+                plans = plan_upcoming_events(limit=30, days_ahead=60)
+            except Exception as _e:
+                plans = []
+                st.error(f"Could not plan upcoming events: {_e}")
+        st.session_state["planner_plans"] = plans
+
+    col_l, col_r = st.columns([5, 1], gap="small")
+    with col_r:
+        if st.button("↻ Refresh", key="planner_refresh", use_container_width=True):
+            st.session_state.pop("planner_plans", None)
+            st.rerun()
+
+    if not plans:
+        st.markdown(
+            "<div style='margin-top:1rem; font-size:0.86rem; color:#6E6E73;'>"
+            "Nothing on your calendar in the next 60 days yet. Add an event "
+            "in Google Calendar or Apple Calendar and click <strong>↻ Refresh</strong>."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    # Split plans by how far away the event is.
+    from datetime import date, datetime, timedelta
+    today_d = date.today()
+    end_week = today_d + timedelta(days=7)
+    end_month = today_d + timedelta(days=31)
+
+    def _ev_date(p):
+        try:
+            return datetime.strptime(
+                (p.get("event") or {}).get("date", ""), "%Y-%m-%d"
+            ).date()
+        except Exception:
+            return None
+
+    week_plans  = [p for p in plans if (_ev_date(p) and today_d <= _ev_date(p) <= end_week)]
+    month_plans = [p for p in plans if (_ev_date(p) and today_d <= _ev_date(p) <= end_month)]
+    all_plans   = [p for p in plans if (_ev_date(p) and _ev_date(p) >= today_d)]
+
+    _tab_week, _tab_month, _tab_all = st.tabs([
+        f"This week ({len(week_plans)})",
+        f"This month ({len(month_plans)})",
+        f"All upcoming ({len(all_plans)})",
+    ])
+    with _tab_week:
+        _render_planner_card_list(week_plans, scope_label="this week")
+    with _tab_month:
+        _render_planner_card_list(month_plans, scope_label="this month")
+    with _tab_all:
+        _render_planner_card_list(all_plans, scope_label="upcoming")
+
+
+def _render_planner_card_list(plans: list, scope_label: str) -> None:
+    """Render a list of event-plan cards, with an empty-state nudge."""
+    try:
+        from shopping_tool import add_wishlist_item, gap_is_on_wishlist
+    except Exception:
+        add_wishlist_item = gap_is_on_wishlist = None
+
+    if not plans:
+        st.markdown(
+            "<div style='margin-top:1rem; font-size:0.86rem; color:#6E6E73;'>"
+            f"Nothing on your calendar {scope_label}. "
+            "Add an event in Google/Apple Calendar — Wearly will pick it up on the next refresh."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    for p in plans:
+        _render_planner_event_card(p, add_wishlist_item, gap_is_on_wishlist)
+
+
+def _render_planner_event_card(p: dict, add_wishlist_item, gap_is_on_wishlist) -> None:
+    """One rich card per event: header, weather, outfit-with-images,
+    gaps, save-to-wishlist actions, plan-in-detail button."""
+    ev = p.get("event") or {}
+    rec = p.get("recommendation") or []
+    weather = p.get("weather") or {}
+    gaps = p.get("gaps") or []
+    suggestions = p.get("shopping_suggestions") or []
+
+    ev_title = ev.get("title", "Untitled event")
+    ev_date  = ev.get("date", "—")
+    ev_time  = ev.get("time", "")
+    ev_type  = (ev.get("type") or "").lower()
+    when_text = ev_date + (f"  ·  {ev_time}" if ev_time else "")
+
+    weather_text = ""
+    if isinstance(weather, dict) and weather.get("temp_f") not in (None, "—"):
+        weather_text = f"{weather.get('temp_f')}°F · {weather.get('condition','')}"
+        if weather.get("layer_advice"):
+            weather_text += f" · {weather['layer_advice']}"
+
+    # Type badge top-right.
+    type_badge = ""
+    if ev_type:
+        type_badge = (
+            f'<span style="font-size:0.62rem; color:#111111; background:#FAFAFA; '
+            f'border:1px solid #EEEEEE; padding:1px 9px; border-radius:99px; '
+            f'letter-spacing:0.08em; text-transform:uppercase; font-weight:600;">'
+            f'{ev_type}</span>'
+        )
+
+    # ── Outer card frame ──
+    st.markdown(
+        '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+        'border-radius:8px; padding:1.1rem 1.2rem; margin-bottom:0.8rem;">'
+        '<div style="display:flex; justify-content:space-between; '
+        'align-items:baseline; gap:0.6rem; flex-wrap:wrap;">'
+        f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.2rem; '
+        f'color:#1C1917; line-height:1.2;">{ev_title}</div>'
+        f'{type_badge}'
+        '</div>'
+        f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.25rem;">'
+        f'{when_text}</div>'
+        + (f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.15rem;">'
+           f'<em>{weather_text}</em></div>' if weather_text else "")
+        + '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Outfit row with thumbnails ──
+    if rec:
+        thumbs_html = '<div style="display:flex; flex-wrap:wrap; gap:0.8rem; margin:0.6rem 0 0.9rem;">'
+        for it in rec[:6]:
+            thumb = _item_thumbnail_html(it, size_px=56)
+            color_chip = ""
+            if it.get("color"):
+                color_chip = (
+                    f'<span style="font-size:0.66rem; color:#6E6E73; '
+                    f'background:#FAFAFA; border:1px solid #EEEEEE; padding:1px 7px; '
+                    f'border-radius:99px;">{it["color"]}</span>'
+                )
+            thumbs_html += (
+                '<div style="display:flex; align-items:center; gap:0.55rem; '
+                'padding:0.4rem 0.7rem; background:#FFFFFF; border:1px solid #EEEEEE; '
+                'border-radius:6px;">'
+                f'{thumb}'
+                '<div>'
+                f'<div style="font-size:0.84rem; color:#1C1917; font-weight:500;">{it.get("name","—")}</div>'
+                f'<div style="font-size:0.7rem; color:#6E6E73; margin-top:0.15rem;">'
+                f'{it.get("type","")}'
+                + ('  ·  ' + color_chip if color_chip else "") +
+                '</div></div></div>'
+            )
+        thumbs_html += '</div>'
+        st.markdown(thumbs_html, unsafe_allow_html=True)
+    else:
+        st.markdown(
+            '<div style="font-size:0.84rem; color:#8E8E93; font-style:italic; '
+            'margin:0.5rem 0 0.8rem;">'
+            "No matching pieces in your wardrobe for this event."
+            '</div>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Gaps + wishlist actions ──
+    if gaps:
+        st.markdown(
+            '<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
+            'border-left:3px solid #111111; border-radius:6px; '
+            'padding:0.7rem 0.95rem; margin-bottom:0.7rem;">'
+            '<div style="font-size:0.7rem; color:#8E8E93; letter-spacing:0.12em; '
+            'text-transform:uppercase; font-weight:600;">Missing for this event</div>'
+            f'<div style="font-size:0.86rem; color:#1C1917; margin-top:0.35rem;">'
+            + ", ".join(gaps) +
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        # One Save-to-wishlist button per gap, if the wishlist tool is available.
+        if add_wishlist_item and gap_is_on_wishlist:
+            for gi, gap in enumerate(gaps):
+                key_suffix = f"{ev.get('id','x')}_{gi}_{gap}"
+                if gap_is_on_wishlist(gap):
+                    st.caption(f"✓ '{gap}' is already on your wishlist.")
+                else:
+                    sugg = suggestions[gi] if gi < len(suggestions) else f"A versatile {gap}."
+                    if st.button(
+                        f"Save '{gap}' to my wishlist",
+                        key=f"planner_wish_{key_suffix}",
+                        use_container_width=False,
+                    ):
+                        rr = add_wishlist_item({
+                            "name":        f"Missing {gap} for upcoming events",
+                            "category":    gap,
+                            "tags":        [ev_type] if ev_type else [],
+                            "priority":    "medium",
+                            "notes":       sugg,
+                            "linked_gap":  gap,
+                        })
+                        if rr.get("success"):
+                            st.toast(f"Added '{gap}' to your wishlist.")
+                            st.rerun()
+                        else:
+                            st.error(rr.get("error", "Could not add to wishlist."))
+
+    # ── Plan-in-detail link ──
+    cols = st.columns([3, 1], gap="small")
+    with cols[1]:
+        if st.button(
+            "Plan in detail →",
+            key=f"planner_detail_{ev.get('id','x')}",
+            use_container_width=True,
+        ):
+            st.session_state["result"] = p
+            st.session_state["last_run"] = {
+                "mode": "calendar",
+                "everyday_request": None,
+                "target_event_id": ev.get("id"),
+            }
+            st.session_state["section"] = "today"
+            st.rerun()
 
 
 # ─────────────────────────────────────────────
@@ -3897,6 +4360,7 @@ def _render_demo():
 _router = {
     "home":     _render_home,
     "today":    _render_today,
+    "planner":  _render_planner,
     "wardrobe": _render_wardrobe,
     "shop":     _render_shop,
     "profile":  _render_profile,

@@ -233,11 +233,42 @@ def _save_image_for_item(item_id: str, image_bytes: bytes,
 _EMPTY_USER_OVERLAY = {"clothing": [], "shoes": [], "accessories": []}
 
 
+_CANONICAL_OCCASIONS = {"work", "gym", "dinner", "formal", "casual",
+                        "weekend", "evening", "date", "travel"}
+
+
+def _ensure_useful_occasion_tags(item: dict) -> bool:
+    """
+    Quiet migration: if an item's `tags` contains no canonical occasion
+    tag at all, derive sensible defaults from its category + formality
+    and add them. Returns True iff the item was modified. Existing
+    legitimate tags are preserved — we only ever append.
+
+    Fixes the case where a user added an item with no occasion tag and
+    it silently dropped out of every candidate pool.
+    """
+    tags = [t.lower() for t in (item.get("tags") or [])]
+    if any(t in _CANONICAL_OCCASIONS for t in tags):
+        return False
+    derived = _default_occasion_tags(
+        item.get("type", ""),
+        item.get("formality", ""),
+    )
+    merged = list(dict.fromkeys(tags + derived))   # preserve order, dedupe
+    item["tags"] = merged
+    return True
+
+
 def get_user_wardrobe() -> dict:
     """
     Return the user-added overlay. Tolerant of:
       - missing file (returns empty overlay)
       - malformed JSON (returns empty overlay, error string set)
+
+    Also runs a one-time tag migration on existing items so user-added
+    items that lack any occasion tag get reasonable defaults and become
+    eligible for the agent's candidate pool. The migration is silent
+    and writes the corrected overlay back to disk.
     """
     if not os.path.exists(USER_DATA_PATH):
         return {"success": True, "user_wardrobe": dict(_EMPTY_USER_OVERLAY), "error": None}
@@ -250,6 +281,30 @@ def get_user_wardrobe() -> dict:
             "shoes":       list(data.get("shoes", [])),
             "accessories": list(data.get("accessories", [])),
         }
+        # Quiet tag migration. Writes back ONLY when something changed.
+        modified = False
+        for section in ("clothing", "shoes", "accessories"):
+            for it in normalized[section]:
+                if _ensure_useful_occasion_tags(it):
+                    modified = True
+        if modified:
+            try:
+                on_disk = {
+                    "_comment": data.get(
+                        "_comment",
+                        "User-added wardrobe items. Created and maintained by the "
+                        "Wardrobe Builder. Items here are MERGED with wardrobe.json "
+                        "at read time by wardrobe_tool.get_wardrobe(),",
+                    ),
+                    "clothing":    normalized["clothing"],
+                    "shoes":       normalized["shoes"],
+                    "accessories": normalized["accessories"],
+                }
+                _atomic_write_json(USER_DATA_PATH, on_disk)
+            except Exception:
+                # Migration is best-effort; if the write fails we still
+                # return the in-memory normalised overlay.
+                pass
         return {"success": True, "user_wardrobe": normalized, "error": None}
     except (json.JSONDecodeError, OSError) as e:
         return {
@@ -350,6 +405,32 @@ def _next_user_id(overlay: dict, section: str) -> str:
     return f"{prefix}{next_n:03d}"
 
 
+def _default_occasion_tags(category: str, formality: str) -> list:
+    """
+    Derive a useful set of occasion tags when the user didn't pick any.
+    Without this fallback an item saved with just its category as a tag
+    (e.g. ['dress']) would never match an occasion-tag filter and would
+    be silently ignored by the agent. The derivation is conservative —
+    we map by formality first, category second.
+    """
+    formality = (formality or "casual").lower()
+    category  = (category  or "").lower()
+
+    if category == "activewear" or formality == "athletic":
+        return ["gym"]
+    if formality == "formal":
+        return ["formal", "dinner"]
+    if formality == "business":
+        return ["work", "dinner"]
+    if formality == "smart_casual":
+        return ["work", "dinner", "casual"]
+    # casual / unset / unknown
+    base = ["casual", "weekend"]
+    if category in ("dress",):
+        base.append("dinner")
+    return base
+
+
 def save_user_item(category: str, item_fields: dict,
                    image_bytes: bytes = None,
                    link_metadata: dict = None) -> dict:
@@ -399,14 +480,27 @@ def save_user_item(category: str, item_fields: dict,
     overlay_result = get_user_wardrobe()
     overlay = overlay_result["user_wardrobe"]
 
+    formality = (item_fields.get("formality") or "casual").lower()
+
+    # Tags: if the user supplied a non-empty list, honor it; otherwise
+    # derive useful defaults so the agent can actually use this item.
+    # Bare [category] tags were causing user-added items to fall out
+    # of the candidate pool for every occasion — see the docstring of
+    # _default_occasion_tags() for the why.
+    raw_tags = item_fields.get("tags") or []
+    if raw_tags:
+        tags = [t.lower() for t in raw_tags]
+    else:
+        tags = _default_occasion_tags(category, formality)
+
     item = {
         "id":          _next_user_id(overlay, section),
         "type":        category,
         "name":        name,
         "color":       color,
-        "formality":   (item_fields.get("formality") or "casual").lower(),
+        "formality":   formality,
         "season":      [s.lower() for s in (item_fields.get("season") or ["all"])] or ["all"],
-        "tags":        [t.lower() for t in (item_fields.get("tags") or [category])],
+        "tags":        tags,
         "availability": (item_fields.get("availability") or "available").lower(),
         "source":      "user",
     }

@@ -35,35 +35,40 @@ from typing import Any, Dict, Optional
 # Palette — matches the Streamlit app's design system.
 # ─────────────────────────────────────────────
 
+# Minimal white-on-white palette matching the rest of the app. Single
+# matte-black accent for the high-importance roles (User, Outfit), a
+# mid-grey for context (event / weather / fit profile), a light grey
+# for items, and a restrained red for gap-style warning nodes.
 _PALETTE = {
-    "paper":      "#F8F4ED",
-    "card":       "#FDFAF7",
-    "warm_card":  "#FAF3EE",
-    "item_card":  "#F5EDE3",
-    "ink":        "#1C1917",
-    "body":       "#4A3D36",
-    "secondary":  "#7C6F64",
-    "eyebrow":    "#A8937E",
-    "edge":       "#C8B8A8",
-    "accent":     "#C17F5A",
-    "accent_deep":"#9F5A36",
-    "warn":       "#FDF3EE",
-    "warn_border":"#C17F5A",
+    "paper":       "#FFFFFF",
+    "card":        "#FFFFFF",
+    "subtle_card": "#FAFAFA",
+    "item_card":   "#F5F5F5",
+    "ink":         "#111111",
+    "body":        "#2E2E2E",
+    "secondary":   "#6E6E73",
+    "edge":        "#D1D1D6",
+    "edge_strong": "#111111",
+    "accent":      "#111111",
+    "warn":        "#FCF2F2",
+    "warn_border": "#B91C1C",
 }
 
 # Visual styling per entity type. Same colors used in the schema and
 # live-run graphs so a reviewer can recognize the role of each node.
+# Sizes bumped slightly and shape variety reduced to make hover + click
+# targets larger and labels more readable.
 _NODE_STYLES: Dict[str, Dict[str, Any]] = {
-    "User":                 {"bg": _PALETTE["card"],      "border": _PALETTE["accent"],      "size": 28, "shape": "dot"},
-    "FitProfile":           {"bg": _PALETTE["warm_card"], "border": _PALETTE["accent_deep"], "size": 20, "shape": "box"},
-    "CalendarEvent":        {"bg": _PALETTE["warm_card"], "border": _PALETTE["accent_deep"], "size": 22, "shape": "box"},
-    "WeatherSnapshot":      {"bg": _PALETTE["warm_card"], "border": _PALETTE["accent_deep"], "size": 20, "shape": "box"},
-    "WardrobeItem":         {"bg": _PALETTE["item_card"], "border": _PALETTE["eyebrow"],     "size": 18, "shape": "dot"},
-    "OutfitRecommendation": {"bg": _PALETTE["card"],      "border": _PALETTE["ink"],         "size": 30, "shape": "diamond"},
-    "WardrobeGap":          {"bg": _PALETTE["warn"],      "border": _PALETTE["warn_border"], "size": 18, "shape": "triangleDown"},
-    "ShoppingSuggestion":   {"bg": _PALETTE["warn"],      "border": _PALETTE["accent_deep"], "size": 16, "shape": "triangleDown"},
-    "Feedback":             {"bg": "#EFE3CC",             "border": _PALETTE["secondary"],   "size": 16, "shape": "square"},
-    "Concept":              {"bg": _PALETTE["item_card"], "border": _PALETTE["eyebrow"],     "size": 14, "shape": "dot"},
+    "User":                 {"bg": _PALETTE["ink"],         "border": _PALETTE["ink"],         "size": 32, "shape": "dot",          "font_color": "#FFFFFF"},
+    "FitProfile":           {"bg": _PALETTE["subtle_card"], "border": _PALETTE["secondary"],   "size": 22, "shape": "box"},
+    "CalendarEvent":        {"bg": _PALETTE["subtle_card"], "border": _PALETTE["ink"],         "size": 26, "shape": "box"},
+    "WeatherSnapshot":      {"bg": _PALETTE["subtle_card"], "border": _PALETTE["secondary"],   "size": 22, "shape": "box"},
+    "WardrobeItem":         {"bg": _PALETTE["item_card"],   "border": _PALETTE["edge"],        "size": 20, "shape": "dot"},
+    "OutfitRecommendation": {"bg": _PALETTE["card"],        "border": _PALETTE["ink"],         "size": 34, "shape": "diamond"},
+    "WardrobeGap":          {"bg": _PALETTE["warn"],        "border": _PALETTE["warn_border"], "size": 22, "shape": "triangleDown"},
+    "ShoppingSuggestion":   {"bg": _PALETTE["warn"],        "border": _PALETTE["secondary"],   "size": 18, "shape": "triangleDown"},
+    "Feedback":             {"bg": _PALETTE["item_card"],   "border": _PALETTE["secondary"],   "size": 18, "shape": "square"},
+    "Concept":              {"bg": _PALETTE["item_card"],   "border": _PALETTE["edge"],        "size": 16, "shape": "dot"},
 }
 
 # Cap nodes per graph to keep the render legible.
@@ -78,27 +83,51 @@ def _new_network(height_px: int = 520):
         bgcolor=_PALETTE["paper"], font_color=_PALETTE["ink"],
         notebook=False, cdn_resources="in_line", directed=True,
     )
-    # Calm physics tuned for ~10–25-node graphs.
+    # Physics retuned for ~10–25-node graphs:
+    #   - Stronger repulsion (-6500) so nodes don't crowd each other.
+    #   - Longer springs (190) so edges read clearly between roles.
+    #   - Heavier damping (0.6) so the simulation settles fast and
+    #     stays put, instead of drifting after the user releases a node.
+    #   - solver: forceAtlas2Based feels less twitchy than barnesHut on
+    #     the medium-sized graphs Wearly renders.
+    # Edges use curved smoothing so multi-hop paths don't overlap.
+    # Node labels get a white stroke so they're readable on top of
+    # neighbouring nodes when the layout briefly crowds during settle.
     net.set_options("""
     {
-      "nodes": {"borderWidth": 2, "font": {"size": 13, "face": "DM Sans, sans-serif"}, "shadow": false},
+      "nodes": {
+        "borderWidth": 2,
+        "font": {"size": 14, "face": "DM Sans, sans-serif", "color": "#111111",
+                 "strokeWidth": 3, "strokeColor": "#FFFFFF"},
+        "shadow": false,
+        "margin": 10
+      },
       "edges": {
-        "smooth": {"type": "continuous", "forceDirection": "none"},
-        "arrows": {"to": {"enabled": true, "scaleFactor": 0.45}},
-        "color": {"color": "#C8B8A8", "highlight": "#C17F5A"},
-        "font":  {"size": 10, "color": "#7C6F64", "strokeWidth": 0}
+        "smooth": {"type": "cubicBezier", "forceDirection": "horizontal", "roundness": 0.4},
+        "arrows": {"to": {"enabled": true, "scaleFactor": 0.55}},
+        "color": {"color": "#D1D1D6", "highlight": "#111111", "hover": "#111111"},
+        "font":  {"size": 11, "color": "#6E6E73", "strokeWidth": 3, "strokeColor": "#FFFFFF",
+                  "align": "middle"},
+        "width": 1.2
       },
       "physics": {
-        "barnesHut": {
-          "gravitationalConstant": -3500,
-          "centralGravity": 0.18,
-          "springLength": 130,
-          "springConstant": 0.04,
-          "damping": 0.5
+        "enabled": true,
+        "solver": "forceAtlas2Based",
+        "forceAtlas2Based": {
+          "gravitationalConstant": -90,
+          "centralGravity": 0.012,
+          "springLength": 190,
+          "springConstant": 0.05,
+          "damping": 0.6,
+          "avoidOverlap": 0.7
         },
-        "minVelocity": 0.5
+        "stabilization": {"enabled": true, "iterations": 250, "fit": true},
+        "minVelocity": 0.6
       },
-      "interaction": {"hover": true, "tooltipDelay": 100, "navigationButtons": false}
+      "interaction": {
+        "hover": true, "tooltipDelay": 120, "navigationButtons": false,
+        "zoomView": true, "dragView": true, "multiselect": false
+      }
     }
     """)
     return net
@@ -110,7 +139,14 @@ def _add_node(net, node_id: str, label: str, type_name: str,
     silently overwrites duplicate IDs, but we guard anyway."""
     style = _NODE_STYLES.get(type_name, _NODE_STYLES["Concept"])
     # Cap label length so long names don't overlap.
-    display_label = label if len(label) <= 32 else (label[:29] + "…")
+    display_label = label if len(label) <= 28 else (label[:25] + "…")
+    # Node-specific font overrides (used by the User node which has a
+    # dark background and needs white-on-dark text).
+    node_font = None
+    if style.get("font_color"):
+        node_font = {"color": style["font_color"], "size": 14,
+                     "face": "DM Sans, sans-serif",
+                     "strokeWidth": 3, "strokeColor": style["bg"]}
     net.add_node(
         node_id,
         label=display_label,
@@ -118,6 +154,7 @@ def _add_node(net, node_id: str, label: str, type_name: str,
         shape=style["shape"],
         size=style["size"],
         title=title or f"{type_name}: {label}",
+        font=node_font,
     )
 
 
@@ -292,7 +329,7 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
         # isn't in `outfit`). Add a faint trace if missing.
         target_iid = f"item:{item_id}"
         net.add_node(target_iid, label=item_name,
-                     color={"background": _PALETTE["item_card"], "border": _PALETTE["eyebrow"]},
+                     color={"background": _PALETTE["item_card"], "border": _PALETTE["edge"]},
                      shape="dot", size=14,
                      title=f"Excluded from this run: {item_name}")
         net.add_edge(fid, target_iid, label="excludes_from_pool")
