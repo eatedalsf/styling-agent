@@ -104,6 +104,7 @@ def run_agent(
     rejected_ids: list = None,
     rejection_reasons: list = None,
     todays_context: str = None,
+    target_event_id: str = None,
 ) -> dict:
     """
     Main agent entry point.
@@ -158,7 +159,18 @@ def run_agent(
     step1 = {"step": 1, "name": "Determine Occasion", "status": "ok", "output": ""}
 
     if mode == "calendar":
-        calendar_result = get_upcoming_events(days_ahead=7)
+        calendar_result = get_upcoming_events(days_ahead=14)
+
+        # If the caller specified a specific event (used by the
+        # "Coming up this week" panel that plans for each upcoming
+        # event), pick that one instead of the chronologically-next.
+        if (target_event_id and calendar_result.get("success")
+                and calendar_result.get("events")):
+            picked = [e for e in calendar_result["events"]
+                      if e.get("id") == target_event_id]
+            if picked:
+                calendar_result = {**calendar_result, "events": picked}
+
         if not calendar_result["success"] or not calendar_result["events"]:
             # ── Routine fallback ──────────────────────────────────
             # When the calendar has no upcoming event, consult the
@@ -569,3 +581,52 @@ def run_agent(
     result["reasoning"] = reasoning
 
     return result
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AHEAD-OF-TIME PLANNING
+# ──────────────────────────────────────────────────────────────────────────────
+
+def plan_upcoming_events(limit: int = 5, days_ahead: int = 14) -> list:
+    """
+    Pre-plan an outfit for each of the user's next `limit` calendar
+    events within `days_ahead` days. Returns a list of `result` dicts —
+    one per event, in chronological order. Each result has the same
+    shape as a single run_agent() call.
+
+    Calling this is a convenience wrapper for the "Coming up this week"
+    panel in the UI. The full agent runs once per event, so weather +
+    color scoring + rule citations are all populated per outfit. The
+    list is short by design (default 5) — Wearly is a planner, not a
+    forecaster, and brands of weather data degrade past ~7 days anyway.
+
+    Returns an empty list when the calendar has no upcoming events.
+    Errors during individual event runs are caught — that one event
+    gets an `error`-stamped result, and the rest still plan.
+    """
+    try:
+        cal_result = get_upcoming_events(days_ahead=days_ahead)
+    except Exception:
+        return []
+    if not cal_result.get("success") or not cal_result.get("events"):
+        return []
+
+    events = cal_result["events"][: max(0, int(limit))]
+    plans = []
+    for ev in events:
+        try:
+            r = run_agent(mode="calendar",
+                          target_event_id=ev.get("id"))
+            plans.append(r)
+        except Exception as e:
+            plans.append({
+                "event": ev,
+                "recommendation": [],
+                "reasoning": [f"Could not plan this event: {e}"],
+                "error": str(e),
+                "gaps": [],
+                "color_score": None,
+                "weather": None,
+                "steps": [],
+            })
+    return plans

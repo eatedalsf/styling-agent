@@ -781,14 +781,62 @@ if "rejection_reasons" not in st.session_state:
     st.session_state["rejection_reasons"] = []
 
 
+def _auto_refresh_subscription_if_needed(max_age_seconds: int = 300) -> None:
+    """
+    If the user has a calendar URL subscription and it hasn't been
+    synced in the last `max_age_seconds`, refresh it silently before
+    the agent runs. Best-effort — any failure is logged to a session
+    flag but never blocks the agent. The cached events from the last
+    successful sync are used as a fall-back.
+    """
+    try:
+        from calendar_import import get_subscription, refresh_subscription
+        from datetime import datetime, timedelta
+    except Exception:
+        return
+
+    sub = get_subscription()
+    if not sub.get("url"):
+        return
+
+    last = sub.get("last_synced_at")
+    needs_refresh = True
+    if last:
+        try:
+            # last_synced_at is ISO-8601 with a trailing "Z"
+            ts = datetime.fromisoformat(last.replace("Z", ""))
+            needs_refresh = (datetime.utcnow() - ts) > timedelta(seconds=max_age_seconds)
+        except Exception:
+            needs_refresh = True
+
+    if not needs_refresh:
+        return
+
+    try:
+        res = refresh_subscription(replace=False, timeout=8)
+        st.session_state["_cal_auto_refresh_result"] = res
+    except Exception as _e:
+        st.session_state["_cal_auto_refresh_result"] = {
+            "success": False, "error": f"Auto-refresh failed: {_e}",
+        }
+
+
 def _run_and_store(mode: str, everyday_request: str = None,
                    rejected_ids=None, rejection_reasons=None,
                    todays_context: str = None) -> dict:
     """Wrapper: runs the agent, stores result + the invocation params so
     a later 'Regenerate' can replay the same mode with rejection context.
+    Auto-refreshes the calendar subscription (if any) before the run so
+    new events the user added in Google/Apple are picked up automatically.
     todays_context is a free-text "what's going on right now" field — a
     pattern borrowed from a classmate's dream-journal project where adding
     real-life context made the AI's reasoning feel grounded."""
+    # Calendar-mode plans always start from the freshest possible event
+    # list. Everyday-mode runs don't depend on the calendar, but we still
+    # refresh because the "Coming up this week" panel rendered alongside
+    # the result needs current events too.
+    _auto_refresh_subscription_if_needed()
+
     ctx = todays_context if todays_context is not None else st.session_state.get("todays_context", "")
     res = run_agent(
         mode=mode,
@@ -1775,6 +1823,123 @@ def _render_home():
 # TODAY — outfit result (or empty state)
 # ─────────────────────────────────────────────
 
+def _render_coming_up_this_week() -> None:
+    """
+    "Coming up this week" panel rendered below the current outfit on the
+    Today screen. Shows up to four upcoming events (after the one
+    currently displayed) with a pre-planned outfit summary for each.
+    A "Plan in detail →" button per event swaps the active result to
+    that event's full agent output without losing your place.
+    """
+    try:
+        from styling_agent import plan_upcoming_events
+    except Exception:
+        return
+
+    current_event_id = ((st.session_state.get("result") or {}).get("event") or {}).get("id")
+    plans = plan_upcoming_events(limit=6, days_ahead=14)
+
+    # Skip whichever event is the one currently shown in the main card.
+    upcoming = [p for p in plans
+                if (p.get("event") or {}).get("id") != current_event_id][:4]
+
+    if not upcoming:
+        return
+
+    st.markdown(
+        '<div style="margin:1.6rem 0 0.6rem; padding-top:1.2rem; '
+        'border-top:1px solid #EEEEEE;">'
+        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.25rem; '
+        'color:#111111; line-height:1.2;">Coming up this week</div>'
+        '<div style="font-size:0.82rem; color:#6E6E73; margin-top:0.3rem; '
+        'line-height:1.55;">'
+        "Wearly pre-plans an outfit for each upcoming event. Weather is a "
+        "forecast — re-plan closer to the day if the forecast shifts."
+        "</div></div>",
+        unsafe_allow_html=True,
+    )
+
+    for p in upcoming:
+        ev = p.get("event") or {}
+        rec = p.get("recommendation") or []
+        weather = p.get("weather") or {}
+
+        ev_title = ev.get("title", "Untitled event")
+        ev_when = ev.get("date", "—")
+        if ev.get("time"):
+            ev_when = f"{ev_when}  ·  {ev['time']}"
+        ev_type = (ev.get("type") or "").lower()
+
+        # Tiny weather note (skip if no usable data).
+        weather_note = ""
+        if isinstance(weather, dict) and weather.get("temp_f") not in (None, "—"):
+            temp = weather.get("temp_f")
+            cond = weather.get("condition", "")
+            weather_note = (
+                f'<span style="font-size:0.74rem; color:#6E6E73; margin-left:0.6rem;">'
+                f'· {temp}°F {cond}</span>'
+            )
+
+        # Up to 4 outfit items shown as swatch + name.
+        items_html = ""
+        for it in rec[:4]:
+            swatch = color_to_swatch(it.get("color", ""))
+            items_html += (
+                '<span style="display:inline-flex; align-items:center; gap:0.4rem; '
+                'margin-right:0.85rem; font-size:0.84rem; color:#1C1917;">'
+                f'<span class="item-swatch" style="background:{swatch}"></span>'
+                f'{it.get("name","—")}'
+                '</span>'
+            )
+        if not rec:
+            items_html = (
+                '<span style="font-size:0.82rem; color:#8E8E93; font-style:italic;">'
+                "No matching items in your wardrobe — Wearly would suggest a gap."
+                "</span>"
+            )
+
+        # Type badge top-right.
+        type_badge = ""
+        if ev_type:
+            type_badge = (
+                f'<span style="font-size:0.62rem; color:#111111; background:#FAFAFA; '
+                f'border:1px solid #EEEEEE; padding:1px 9px; border-radius:99px; '
+                f'letter-spacing:0.08em; text-transform:uppercase; font-weight:600;">'
+                f'{ev_type}</span>'
+            )
+
+        # Card markup as a flat single-line string (markdown-safe).
+        row_html = (
+            '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+            'border-radius:6px; padding:0.95rem 1.1rem; margin-bottom:0.6rem;">'
+            '<div style="display:flex; justify-content:space-between; '
+            'align-items:baseline; gap:0.6rem; flex-wrap:wrap;">'
+            f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.1rem; '
+            f'color:#1C1917; line-height:1.2;">{ev_title}</div>'
+            f'{type_badge}'
+            '</div>'
+            f'<div style="font-size:0.78rem; color:#6E6E73; margin-top:0.25rem;">'
+            f'{ev_when}{weather_note}</div>'
+            f'<div style="margin-top:0.6rem;">{items_html}</div>'
+            '</div>'
+        )
+        st.markdown(row_html, unsafe_allow_html=True)
+
+        # The button has to live OUTSIDE the markdown so it's clickable.
+        if st.button(
+            f"Plan in detail →",
+            key=f"plan_in_detail_{ev.get('id','')}",
+            use_container_width=False,
+        ):
+            st.session_state["result"] = p
+            st.session_state["last_run"] = {
+                "mode": "calendar",
+                "everyday_request": None,
+                "target_event_id": ev.get("id"),
+            }
+            st.rerun()
+
+
 def _render_calendar_import() -> None:
     """
     Privacy-respecting calendar connection — two paths:
@@ -2118,6 +2283,22 @@ def _render_routine_editor() -> None:
 
 def _render_today():
     res = st.session_state.get("result")
+
+    # Surface any silent auto-refresh outcome from the last run so the
+    # user sees that fresh events were pulled (or notices an issue).
+    _ar = st.session_state.pop("_cal_auto_refresh_result", None)
+    if _ar:
+        if _ar.get("success") and (_ar.get("added") or _ar.get("updated")):
+            st.toast(
+                f"Calendar synced: {len(_ar.get('added', []))} new · "
+                f"{len(_ar.get('updated', []))} refreshed."
+            )
+        elif not _ar.get("success") and _ar.get("error"):
+            # Don't pop a toast for every "no URL" case — only when there
+            # IS a subscription and the refresh actually failed.
+            if "subscribed" not in (_ar.get("error", "") or "").lower():
+                st.toast(f"Calendar auto-refresh: {_ar.get('error', 'failed')}")
+
     if res:
         st.markdown("""
         <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
@@ -2134,6 +2315,9 @@ def _render_today():
             with st.spinner("Re-running the agent…"):
                 _run_and_store(last.get("mode", "calendar"), last.get("everyday_request"))
             st.rerun()
+
+        # ── Coming up this week ─────────────────────────────────
+        _render_coming_up_this_week()
     else:
         st.markdown("""
         <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
