@@ -63,13 +63,42 @@ SEED_WARDROBE_PATH = _seed_wardrobe_path()
 
 
 # Empty overlay used as a fallback when user_profile.json is missing or unreadable.
+# Layer 1 — core identity & style fields (mirror the wardrobe.json owner block,
+# but live in the overlay so the seed is never mutated).
+# Layer 2 — overlay-only preferences (no equivalent in the seed).
+# Layer 3 — body measurements (optional; helps Wearly suggest pieces that
+# fit the user's real proportions rather than relying only on body-shape
+# categories). Every measurement is optional and body-positive in framing.
 _EMPTY_OVERLAY = {
+    # Layer 1 — core identity (was seed-only, now user-editable)
+    "name":               None,
+    "body_shape":         None,
+    "skin_tone":          None,
+    "preferred_fit":      None,
+    "style_preferences":  [],
+    # Layer 2 — overlay-only preferences
     "modesty_preference": None,
     "comfort_needs":      [],
     "style_goals":        [],
     "highlight_features": [],
     "balance_areas":      [],
+    # Layer 3 — body measurements (optional, body-positive)
+    "measurements":       {},
 }
+
+
+# Canonical measurement fields. Each entry: key, label, unit, how-to-measure
+# tip. Tips are body-positive and instructional — no judgmental language.
+MEASUREMENT_FIELDS = [
+    ("height",   "Height",         "in", "Stand against a wall in bare feet, look straight ahead. Mark the top of your head, then measure floor-to-mark."),
+    ("bust",     "Bust",           "in", "Wrap the tape around the fullest part of your bust, keeping it parallel to the floor. Don't pull tight — just snug."),
+    ("waist",    "Natural waist",  "in", "Find the narrowest part of your torso, usually just above the navel. Wrap the tape level."),
+    ("hips",     "Hips",           "in", "Stand with feet together. Wrap the tape around the fullest part of your hips and seat, parallel to the floor."),
+    ("inseam",   "Inseam",         "in", "Inner-leg measurement from the top of the inner thigh down to where you want pants to break (usually the ankle bone)."),
+    ("shoulder", "Shoulder width", "in", "Across the back, from the bony point at one shoulder to the bony point at the other."),
+    ("arm",      "Arm length",     "in", "From the shoulder bone, down the outside of the arm with a slight bend at the elbow, to the wristbone."),
+    ("neck",     "Neck",           "in", "Wrap the tape around the base of the neck where a shirt collar would sit, with one finger of slack."),
+]
 
 
 # ─────────────────────────────────────────────
@@ -123,6 +152,7 @@ def get_fit_profile() -> dict:
         ("preferred_fit", ""), ("style_preferences", []),
         ("modesty_preference", None), ("comfort_needs", []),
         ("style_goals", []), ("highlight_features", []), ("balance_areas", []),
+        ("measurements", {}),
     ):
         merged.setdefault(k, default)
     return {"success": True, "profile": merged, "error": None}
@@ -151,21 +181,36 @@ def _atomic_write_json(path: str, data: dict) -> None:
 
 def save_fit_profile(updates: dict) -> dict:
     """
-    Persist a partial update to the overlay. Only the five overlay keys
-    are honored:
+    Persist a partial update to the overlay. Accepted keys:
+
+      Layer 1 (core identity, was seed-only):
+        name, body_shape, skin_tone, preferred_fit, style_preferences
+      Layer 2 (overlay-only preferences):
         modesty_preference, comfort_needs, style_goals,
-        highlight_features, balance_areas.
+        highlight_features, balance_areas
+      Layer 3 (optional measurements):
+        measurements   — dict of {field_key: float | None}
 
     Anything else is ignored. Body-positive language is enforced on
     free-form text fields — see check_value_for_forbidden_language().
+    Empty strings normalize to None so the seed value can show through.
     """
     overlay = _load_overlay()
-    accepted = ("modesty_preference", "comfort_needs", "style_goals",
-                "highlight_features", "balance_areas")
+    accepted = (
+        "name", "body_shape", "skin_tone", "preferred_fit", "style_preferences",
+        "modesty_preference", "comfort_needs", "style_goals",
+        "highlight_features", "balance_areas",
+        "measurements",
+    )
     for k in accepted:
-        if k in updates:
-            v = updates[k]
-            # Scan any free-form list/string content for forbidden language.
+        if k not in updates:
+            continue
+        v = updates[k]
+
+        # Body-positive language check on any free-form text content.
+        # measurements is numeric and exempt; other keys go through the
+        # scanner so the contract holds even on the new core fields.
+        if k != "measurements":
             forbidden = check_value_for_forbidden_language(v)
             if forbidden:
                 return {
@@ -173,7 +218,29 @@ def save_fit_profile(updates: dict) -> dict:
                     "error": (f"Body-positive language only. Avoid: "
                               f"{', '.join(sorted(forbidden))}."),
                 }
-            overlay[k] = v
+
+        # Normalize empty strings to None for single-value text fields so
+        # the seed value shines through when the user clears a field.
+        if isinstance(v, str) and v.strip() == "":
+            v = None
+
+        # measurements: sanitize the dict — keep only known keys, drop
+        # blanks / non-numeric values silently.
+        if k == "measurements" and isinstance(v, dict):
+            known = {f[0] for f in MEASUREMENT_FIELDS}
+            cleaned = {}
+            for mk, mv in v.items():
+                if mk not in known:
+                    continue
+                try:
+                    if mv in (None, "", 0, 0.0):
+                        continue
+                    cleaned[mk] = float(mv)
+                except (TypeError, ValueError):
+                    continue
+            v = cleaned
+
+        overlay[k] = v
 
     on_disk = {
         "_comment": "User fit / style profile overlay. See fit_tool.py.",

@@ -2647,17 +2647,64 @@ def _render_profile():
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Measurements card (renders only when at least one is saved) ──
+    _meas = profile.get("measurements", {}) or {}
+    if any(_meas.values()):
+        try:
+            from fit_tool import MEASUREMENT_FIELDS as _MF
+        except Exception:
+            _MF = []
+        _rows = ""
+        for _key, _label, _unit, _tip in _MF:
+            _val = _meas.get(_key)
+            if _val:
+                _rows += (
+                    f'<div style="flex:1; min-width:120px;">'
+                    f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                    f'text-transform:uppercase; margin-bottom:0.25rem;">{_label}</div>'
+                    f'<div style="font-size:0.95rem; color:#1C1917;">{_val:g} {_unit}</div>'
+                    f'</div>'
+                )
+        if _rows:
+            st.markdown(
+                f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; '
+                f'padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+                f'<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+                f'text-transform:uppercase; font-weight:600; margin-bottom:0.9rem;">Measurements</div>'
+                f'<div style="display:flex; flex-wrap:wrap; gap:1.4rem; row-gap:1rem;">{_rows}</div>'
+                f'<div style="font-size:0.74rem; color:#8E8E93; margin-top:1rem; line-height:1.55;">'
+                f"Private. Stored locally on this device. Used only to suggest pieces "
+                f"that fit your real proportions."
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
+
     # ── Edit form (overlay only — never touches seed wardrobe) ──
-    with st.expander("Edit your fit & style preferences", expanded=False):
+    # First-time users land on a blank seed and can fill in everything;
+    # returning users see their saved values pre-filled. Every field is
+    # optional. Wearly never frames a body as a problem.
+    measurements = profile.get("measurements", {}) or {}
+
+    with st.expander("Edit your profile, preferences & measurements", expanded=False):
         st.markdown("""
         <div style="font-size:0.82rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;">
             Every field is optional. Wearly applies a preference only when you've shared it.
             <br><strong style="color:#111111;">Body-positive language only.</strong>
-            Use words like <em>highlight, balance, support, improve, increase confidence</em>.
-            Wearly rejects corrective language like "hide," "fix," or "minimize" by design.
+            Wearly rejects corrective vocabulary like "hide," "fix," or "minimize" by design.
+            Measurements are private and stored locally — they help Wearly suggest pieces
+            that fit your real proportions instead of relying only on a body-shape label.
         </div>
         """, unsafe_allow_html=True)
 
+        _BODY_SHAPE_OPTIONS = ["", "hourglass", "pear", "apple", "rectangle",
+                               "inverted triangle", "athletic", "neat hourglass"]
+        _SKIN_TONE_OPTIONS  = ["", "warm olive", "cool fair", "deep warm",
+                               "neutral", "cool deep", "warm light"]
+        _FIT_OPTIONS        = ["", "tailored", "relaxed", "structured",
+                               "fluid", "loose", "fitted"]
+        _STYLE_PREFS_OPTIONS = ["classic", "elegant", "minimal", "edgy",
+                                "romantic", "playful", "preppy", "bohemian",
+                                "androgynous", "sporty", "modern"]
         _MODESTY_OPTIONS = ["", "low", "moderate", "high"]
         _COMFORT_OPTIONS = ["soft fabrics", "stretchy fabrics", "no stiff collars",
                             "breathable layers", "no tight waistbands", "no scratchy seams"]
@@ -2667,13 +2714,69 @@ def _render_profile():
                          "arms", "back", "collarbone"]
 
         with st.form("profile_edit_form"):
+            # ── Section 1: Identity ──────────────────────────────
+            st.markdown(
+                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                "text-transform:uppercase; font-weight:600; margin:0.2rem 0 0.6rem;'>"
+                "Identity</div>", unsafe_allow_html=True,
+            )
+            new_name = st.text_input(
+                "Display name",
+                value=(name if isinstance(name, str) and name != "You" else ""),
+                placeholder="What should Wearly call you?",
+                help="Used only in greetings (the chip and the home screen).",
+            )
+
+            # ── Section 2: Style profile ─────────────────────────
+            st.markdown(
+                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                "text-transform:uppercase; font-weight:600; margin:1.2rem 0 0.6rem;'>"
+                "Style profile</div>", unsafe_allow_html=True,
+            )
+            col_s1, col_s2, col_s3 = st.columns(3, gap="medium")
+            with col_s1:
+                new_body = st.selectbox(
+                    "Body shape",
+                    options=_BODY_SHAPE_OPTIONS,
+                    index=_BODY_SHAPE_OPTIONS.index(body) if (isinstance(body, str) and body in _BODY_SHAPE_OPTIONS) else 0,
+                    help="A proportion preference, not a classification. Industry-standard "
+                         "label set — Wearly uses it only to suggest cuts you've said work for you. "
+                         "Leave blank if you'd rather skip the category.",
+                )
+            with col_s2:
+                new_skin = st.selectbox(
+                    "Skin tone palette",
+                    options=_SKIN_TONE_OPTIONS,
+                    index=_SKIN_TONE_OPTIONS.index(skin) if (isinstance(skin, str) and skin in _SKIN_TONE_OPTIONS) else 0,
+                    help="Pick the palette closest to your undertone. Drives Step 7 color scoring.",
+                )
+            with col_s3:
+                new_fit = st.selectbox(
+                    "Preferred fit",
+                    options=_FIT_OPTIONS,
+                    index=_FIT_OPTIONS.index(fit_v) if (isinstance(fit_v, str) and fit_v in _FIT_OPTIONS) else 0,
+                    help="The cut you reach for most often.",
+                )
+            new_prefs = st.multiselect(
+                "Style preferences",
+                options=_STYLE_PREFS_OPTIONS,
+                default=[p for p in prefs if p in _STYLE_PREFS_OPTIONS],
+                help="A few words that describe your taste. Wearly surfaces these in the reasoning trail.",
+            )
+
+            # ── Section 3: Comfort & expression ──────────────────
+            st.markdown(
+                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                "text-transform:uppercase; font-weight:600; margin:1.4rem 0 0.6rem;'>"
+                "Comfort & expression</div>", unsafe_allow_html=True,
+            )
             col_a, col_b = st.columns(2, gap="medium")
             with col_a:
                 new_modesty = st.selectbox(
                     "Modesty preference",
                     options=_MODESTY_OPTIONS,
                     index=_MODESTY_OPTIONS.index(modesty) if modesty in _MODESTY_OPTIONS else 0,
-                    help="Optional. Higher modesty filters out very revealing pieces; 'low' applies no constraint.",
+                    help="Higher modesty filters out very revealing pieces; 'low' applies no constraint.",
                 )
                 new_goals = st.multiselect(
                     "Style goals", options=_GOAL_OPTIONS,
@@ -2695,32 +2798,74 @@ def _render_profile():
                     help="Body areas you'd like to bring into proportion. Wearly never frames these as flaws.",
                 )
 
+            # ── Section 4: Measurements ──────────────────────────
+            st.markdown(
+                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                "text-transform:uppercase; font-weight:600; margin:1.4rem 0 0.4rem;'>"
+                "Body measurements (optional)</div>", unsafe_allow_html=True,
+            )
+            st.markdown(
+                "<div style='font-size:0.78rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;'>"
+                "All measurements are optional and stored locally. Each field has a small "
+                "<strong>?</strong> tip explaining how to measure. Use inches; round to the nearest "
+                "half-inch. Honest framing — these help Wearly suggest pieces that fit your "
+                "<em>actual</em> proportions, not category averages."
+                "</div>", unsafe_allow_html=True,
+            )
+
+            # Import the field definitions from fit_tool so the form and the
+            # data model never drift.
+            try:
+                from fit_tool import MEASUREMENT_FIELDS as _MEAS_FIELDS
+            except Exception:
+                _MEAS_FIELDS = []
+
+            new_measurements = {}
+            # 4 columns x N rows
+            _per_row = 4
+            for _row_start in range(0, len(_MEAS_FIELDS), _per_row):
+                _row = _MEAS_FIELDS[_row_start:_row_start + _per_row]
+                _cols = st.columns(len(_row), gap="medium")
+                for _i, (_key, _label, _unit, _tip) in enumerate(_row):
+                    with _cols[_i]:
+                        _current = measurements.get(_key)
+                        new_measurements[_key] = st.number_input(
+                            f"{_label} ({_unit})",
+                            min_value=0.0,
+                            max_value=120.0,
+                            step=0.5,
+                            value=float(_current) if isinstance(_current, (int, float)) else 0.0,
+                            help=_tip,
+                            key=f"measure_{_key}",
+                        )
+
+            # ── Save ─────────────────────────────────────────────
+            st.markdown("<div style='height:0.8rem'></div>", unsafe_allow_html=True)
             save_btn = st.form_submit_button(
                 "Save profile", type="primary", use_container_width=True,
             )
             if save_btn:
                 upd = {
+                    "name":               (new_name.strip() or None),
+                    "body_shape":         (new_body or None),
+                    "skin_tone":          (new_skin or None),
+                    "preferred_fit":      (new_fit or None),
+                    "style_preferences":  new_prefs,
                     "modesty_preference": (new_modesty or None),
                     "comfort_needs":      new_comfort,
                     "style_goals":        new_goals,
                     "highlight_features": new_highlights,
                     "balance_areas":      new_balances,
+                    "measurements":       new_measurements,
                 }
                 res = save_fit_profile(upd)
                 if res.get("success"):
-                    st.success("Profile updated. Wearly will reflect these preferences in your next outfit.")
+                    st.success(
+                        "Profile updated. Wearly will reflect these in your next outfit."
+                    )
                     st.rerun()
                 else:
                     st.error(f"Could not save: {res.get('error', 'unknown error')}")
-
-    # ── Auth placeholder + privacy note ──
-    c1, c2 = st.columns(2, gap="small")
-    with c1:
-        if st.button("Edit name & body shape (coming soon)", key="profile_edit_seed", disabled=True, use_container_width=True):
-            pass
-    with c2:
-        if st.button("Sign in with Apple / Google (coming soon)", key="profile_signin", disabled=True, use_container_width=True):
-            pass
 
     st.markdown("""
     <p style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin-top:1rem;">
