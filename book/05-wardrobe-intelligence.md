@@ -93,3 +93,19 @@ The Wardrobe Builder accepts a photo and uses it to **assist** the user — not 
 - `wardrobe_tool.py` for the filter implementation.
 - `styling_agent.py` (steps 4–6) for the orchestration.
 - `tests/test_tools.py` for pool-filter correctness.
+
+---
+
+## Key terms
+
+- **Wardrobe filtering** — Step 4 — narrow the closet by occasion tags, season, availability, and rejection exclusions ([glossary](../docs/glossary.md)).
+- **Outfit construction** — Step 5 — dress vs. separates branching, gym branching, outerwear injection below 60°F ([glossary](../docs/glossary.md)).
+- **Knowledge graph (runtime)** — `graph/graph.json` — wardrobe items + relations the agent reasons over ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* What temperature threshold injects outerwear into a non-formal outfit?
+2. *(Understand)* Why is dress-vs-separates a branch rather than a score?
+3. *(Apply)* Given a 55°F dinner event, which Step 5 branches fire, in order?
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

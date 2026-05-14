@@ -61,3 +61,19 @@ The Before / After screen earns 90 seconds in a 600-second talk — about 15% of
 - The screen: `app.py` → `_render_demo()`.
 - The narrative: `docs/demo_script.md`.
 - The data behind the "live" moment: any of the smoke tests in `tests/test_agent_smoke.py`.
+
+---
+
+## Key terms
+
+- **Before / after delta** — the comparison of 15 minutes of manual planning against ~3 seconds of agent reasoning ([glossary](../docs/glossary.md)).
+- **Seven-step workflow** — the loop the delta makes visible ([glossary](../docs/glossary.md)).
+- **Result-dict contract** — the data shape the demo screen reads to draw its panels ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Roughly how much time does the agent claim to save on the closet decision?
+2. *(Understand)* Why is *making the work visible* part of the value the demo claims — not just the time savings?
+3. *(Apply)* Sketch how a reviewer could falsify the time-savings claim in a 30-minute user test.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

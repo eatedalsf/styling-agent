@@ -105,3 +105,19 @@ Honest framing: citations name the *frameworks Wearly's rules draw on*. They do 
 - **Body-positive language contract (docs):** `tests/test_documentation_integrity.py`.
 - **Course philosophy:** `Wearly_References_and_Course_Context.md` §3 and §7.
 - **Per-rule source mapping:** the *Source basis* footer of each file in `skills/wearly-styling-agent/`.
+
+---
+
+## Key terms
+
+- **Evidence categories** — the nine source categories every Wearly rule traces back to ([glossary](../docs/glossary.md)).
+- **Citation chip** — the `[pack#R<N>]` tag — the runtime side of the citation chain ([glossary](../docs/glossary.md)).
+- **Honesty contract** — no fabricated citations; categories named only when textbook-common ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* How many evidence categories does Wearly organize its sources under?
+2. *(Understand)* Why is the *Color Me Beautiful* framework deliberately *not* cited as science in §3.3?
+3. *(Apply)* Pick any reasoning line from a recent agent run. Trace its citation chip back to an evidence category.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

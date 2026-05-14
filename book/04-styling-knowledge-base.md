@@ -90,3 +90,20 @@ The honesty contract from chapter 12: Wearly says *"tends to work well,"* not *"
 - The palettes: `color_rules.json`.
 - The skin-tone scoring: `color_tool.py` · `score_outfit_colors()`.
 - The canonical sourcing: `docs/evidence-and-references.md`.
+
+---
+
+## Key terms
+
+- **Required pieces** — the minimum type-set an occasion needs (e.g., work = top + bottom) ([glossary](../docs/glossary.md)).
+- **Color tier** — the +8 / +4 / −10 scoring scale for color against skin-tone palette ([glossary](../docs/glossary.md)).
+- **Skin-tone palette** — one of three named palettes the color formula reads from ([glossary](../docs/glossary.md)).
+- **Rule citation (R<N>)** — a numbered heading inside a Skill rule file ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Name the three skin-tone palettes Wearly ships today.
+2. *(Understand)* Why does Wearly use rules rather than a learned compatibility model in this prototype?
+3. *(Apply)* Look up `occasion-rules.md` R2 in the skill pack. Which rule heading does it resolve to, and which chapter cites it?
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

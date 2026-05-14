@@ -36,3 +36,19 @@ That promise governs every design decision in the app: every screen must move th
 - The course context that frames the academic project: `Wearly_References_and_Course_Context.md`.
 - The architecture snapshot: `docs/architecture.md`.
 - The product in motion: `streamlit run app.py`.
+
+---
+
+## Key terms
+
+- **Agent** — a system that reads context first and recommends with a visible reasoning trail ([glossary](../docs/glossary.md)).
+- **Body-positive language contract** — the runtime + documentation rule that forbids corrective vocabulary ([glossary](../docs/glossary.md)).
+- **Honesty contract** — the four rules that govern every claim Wearly makes ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Name the four rules of Wearly's honesty contract.
+2. *(Understand)* Why does Wearly insist on the agent / chatbot distinction in its product vision?
+3. *(Apply)* Pick one item on the agent-not-chatbot list and identify the screen in the running app where it shows up.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

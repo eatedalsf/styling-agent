@@ -100,3 +100,19 @@ The phases are loose, not contractual. The roadmap exists to make trade-offs vis
 
 - The canonical roadmap: `Wearly_Product_Brief.md` §13.
 - The current state: `git log --oneline` + the **Status today** table above.
+
+---
+
+## Key terms
+
+- **Skill package** — the `skills/wearly-styling-agent/` rule pack (8 rule files + `SKILL.md`) ([glossary](../docs/glossary.md)).
+- **Result-dict contract** — the stable boundary that lets the UI and agent evolve independently ([glossary](../docs/glossary.md)).
+- **Wishlist** — the locally-saved taste signal that biases future recommendations ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Name one feature shipped today and one feature on the roadmap.
+2. *(Understand)* Why is the result-dict contract called out as a stability anchor in the roadmap?
+3. *(Apply)* Pick a roadmap item. Identify one rule pack and one chapter that would need to change to land it.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

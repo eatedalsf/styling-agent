@@ -84,3 +84,20 @@ For the full evidence framing — what category supports the fit logic and what'
 - The body-positive contract: `fit_tool.FORBIDDEN_TOKENS` + `tests/test_documentation_language.py`.
 - Phase 3 data plan: `Wearly_Product_Brief.md` §7.5.
 - Canonical sourcing: `docs/evidence-and-references.md`.
+
+---
+
+## Key terms
+
+- **Fit profile** — optional, user-declared preferences — every field has a safe default ([glossary](../docs/glossary.md)).
+- **Body shape (preference)** — a user-declared proportion preference; never inferred from images ([glossary](../docs/glossary.md)).
+- **Profile hash** — detects mid-session profile edits to trigger the regenerate banner ([glossary](../docs/glossary.md)).
+- **Body-positive language contract** — runtime forbidden tokens enforced in `fit_tool` ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* List three forbidden tokens from the body-positive language contract.
+2. *(Understand)* Why is `body_shape` framed as a *preference* rather than a *classification*?
+3. *(Apply)* A user leaves `body_shape` blank. Which proportion-related rules fire, and which don't?
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

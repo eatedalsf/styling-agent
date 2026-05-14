@@ -108,3 +108,19 @@ The connection between context and recommendation is **explicit in the reasoning
 - The calendar tool: `calendar_tool.py`.
 - The weather tool: `weather_tool.py`.
 - The agent step that consumes both: `styling_agent.py` (steps 1 and 3).
+
+---
+
+## Key terms
+
+- **Calendar context** — upcoming events; falls back to *casual* when none are scheduled ([glossary](../docs/glossary.md)).
+- **Weather context** — live Open-Meteo lookup with seasonal fallback ([glossary](../docs/glossary.md)).
+- **Occasion tag** — the canonical label calendar events map to ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Which weather data source does Wearly call, and what's the fallback when it's unreachable?
+2. *(Understand)* Why does Wearly classify by *tag* rather than passing the raw event title into the workflow?
+3. *(Apply)* Walk through the context Wearly assembles for a 70°F Saturday brunch with no calendar event set.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

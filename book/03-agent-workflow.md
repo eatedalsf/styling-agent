@@ -119,3 +119,20 @@ Every failure mode is tested in `tests/test_agent_smoke.py` or `tests/test_tools
 - The decision flow: `workflow_diagram.md`.
 - The system snapshot: `docs/architecture.md`.
 - Run it yourself: `streamlit run app.py` → tap **Plan today's outfit**.
+
+---
+
+## Key terms
+
+- **Seven-step workflow** — determine occasion → load profile → check weather → filter wardrobe → build outfit → check gaps → score color ([glossary](../docs/glossary.md)).
+- **Reject & regenerate** — the agentic loop where a rejection becomes a constraint for the next run ([glossary](../docs/glossary.md)).
+- **Citation chip** — the `[pack#R<N>]` tag appended to a reasoning line, resolvable via `rule_refs.py` ([glossary](../docs/glossary.md)).
+- **Result-dict contract** — the single boundary between the agent and the UI ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* List the seven steps in order.
+2. *(Understand)* Why does Step 2 (load profile) come *before* Step 4 (filter wardrobe), rather than after?
+3. *(Apply)* A user rejects the recommendation citing fit. Trace which steps re-run and which inputs change.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

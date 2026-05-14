@@ -78,3 +78,18 @@ The single external network call is to Open-Meteo with a lat/lon (no user identi
 - The profile privacy note: `app.py` → end of `_render_profile()`.
 - The single external call: `weather_tool.py`.
 - The product brief commitments: `Wearly_Product_Brief.md`.
+
+---
+
+## Key terms
+
+- **Privacy stance** — minimum-necessary access, no third parties, no implicit data collection ([glossary](../docs/glossary.md)).
+- **Honesty contract** — the four rules that govern every claim, including privacy claims ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* Name the four GDPR articles Wearly's privacy stance maps to.
+2. *(Understand)* Why does Wearly cite GDPR if the prototype doesn't transmit data?
+3. *(Apply)* A user asks to delete all their Wearly data. Describe the exact steps in the prototype today.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*

@@ -56,3 +56,20 @@ Live retailer scraping is out of scope. Per-store adapters with HTML/JSON-LD par
 - `styling_agent.py` → `REQUIRED_PIECES`, `SHOPPING_SUGGESTIONS`, Step 6.
 - `wardrobe_tool.py` → `check_gaps()`.
 - The Streamlit screen: tap **Everyday Occasion → Gym** in the sidebar → outerwear gap appears at the bottom of the outfit screen.
+
+---
+
+## Key terms
+
+- **Gap** — a required piece type the user does not own for the current occasion ([glossary](../docs/glossary.md)).
+- **Qualified gap** — a gap that's *also* plausibly shoppable for this occasion ([glossary](../docs/glossary.md)).
+- **Favorite stores** — locally-saved retailer hints — personalize the suggestion, never transmit ([glossary](../docs/glossary.md)).
+- **Wishlist** — locally-saved items the user wants next, with optional priority + `linked_gap` ([glossary](../docs/glossary.md)).
+
+## Self-check
+
+1. *(Remember)* What two conditions must hold for a gap to be *qualified*?
+2. *(Understand)* Why are shopping suggestions descriptive rather than promotional?
+3. *(Apply)* A user with no blazer attends a work meeting. Trace the gap from detection to the surfaced suggestion.
+
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
