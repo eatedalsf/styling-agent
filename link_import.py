@@ -26,10 +26,46 @@ the production-grade replacement path.
 from __future__ import annotations
 
 import html as _html
+import io as _io
 import re
 import urllib.parse
 import urllib.request
 import urllib.error
+
+
+# ─────────────────────────────────────────────
+# COLOR PALETTE for image-based color inference
+# ─────────────────────────────────────────────
+# Named colors mapped to their canonical RGB anchors. Mirrors the
+# 22-color palette demo_wardrobe.py + app.py already use, so a color
+# inferred from an image will be one of the names the rest of the app
+# understands. RGB anchors are deliberately desaturated / approximate
+# so a "navy" patch of variable lighting still maps to "navy".
+_NAMED_COLORS_RGB = {
+    "ivory":      (241, 231, 214),
+    "cream":      (239, 227, 204),
+    "white":      (244, 239, 232),
+    "beige":      (214, 195, 164),
+    "tan":        (201, 167, 127),
+    "nude":       (217, 191, 167),
+    "camel":      (184, 152, 120),
+    "olive":      (122, 117, 72),
+    "sage":       (157, 168, 139),
+    "gold":       (201, 169, 104),
+    "burgundy":   (107, 44, 42),
+    "red":        (160, 58, 50),
+    "rust":       (168, 90, 60),
+    "terracotta": (193, 127, 90),
+    "forest":     (62, 92, 68),
+    "navy":       (31, 42, 68),
+    "blue":       (74, 111, 165),
+    "black":      (28, 25, 23),
+    "charcoal":   (46, 42, 39),
+    "grey":       (154, 147, 140),
+    "silver":     (191, 193, 194),
+    "brown":      (90, 60, 40),
+    "pink":       (220, 170, 175),
+}
 
 
 # ─────────────────────────────────────────────
@@ -267,6 +303,109 @@ def _search_all_tags(haystack: str) -> list:
                     found.append(canonical)
                 break
     return found
+
+
+def infer_color_from_image_url(
+    url: str, timeout: float = 6.0,
+) -> tuple[str, str]:
+    """
+    Best-effort: download the product image and return the closest
+    named color from `_NAMED_COLORS_RGB`. Returns ("", "low") on any
+    failure (no PIL, network error, decode error, ambiguous result).
+
+    Returns ``(color_name, confidence)`` where confidence is one of
+    "high" / "medium" / "low". The confidence is reported back to the
+    UI so the user knows whether to trust the suggestion or not.
+
+    Method:
+      1. Download (≤ 4 MB, polite UA, 6 s timeout).
+      2. Pillow → center-crop the middle 60% of the frame (avoids the
+         retailer's white background + the model's skin / face when
+         present). For a product shot of a tee on a model, that
+         keeps the torso fabric and drops the periphery.
+      3. Resize to 64×64 for stable color histogram.
+      4. Quantize to 6 colors via Image.quantize. Take the most-common
+         color.
+      5. Map that RGB to the nearest named color by Euclidean RGB
+         distance. Confidence = "high" if distance < 35, "medium" if
+         < 70, else "low" (returned anyway — the caller decides).
+
+    The function never raises and never blocks longer than `timeout`.
+    """
+    if not url:
+        return "", "low"
+    try:
+        from PIL import Image
+    except Exception:
+        return "", "low"
+
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": _DEFAULT_UA,
+            "Accept":     "image/jpeg, image/png, image/webp",
+        })
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            raw = resp.read(4 * 1024 * 1024)
+        if not raw:
+            return "", "low"
+    except Exception:
+        return "", "low"
+
+    try:
+        img = Image.open(_io.BytesIO(raw))
+        img.load()
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGB")
+        if img.mode == "RGBA":
+            # Composite onto white so transparent backgrounds (common
+            # in catalog PNGs) don't masquerade as black pixels.
+            bg = Image.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+
+        # Center-crop to 60% of width × 60% of height.
+        w, h = img.size
+        cw, ch = int(w * 0.6), int(h * 0.6)
+        left = (w - cw) // 2
+        top = (h - ch) // 2
+        img = img.crop((left, top, left + cw, top + ch))
+
+        # Small + quantized for stable histogram.
+        img = img.resize((64, 64), Image.LANCZOS)
+        q = img.quantize(colors=6)
+        palette = q.getpalette()
+        if not palette:
+            return "", "low"
+        counts = sorted(q.getcolors() or [], key=lambda c: -c[0])
+        if not counts:
+            return "", "low"
+
+        # Top color in cropped region.
+        _count, idx = counts[0]
+        r = palette[idx * 3]
+        g = palette[idx * 3 + 1]
+        b = palette[idx * 3 + 2]
+    except Exception:
+        return "", "low"
+
+    # Map to nearest named color.
+    best_name = ""
+    best_dist = 10 ** 9
+    for name, anchor in _NAMED_COLORS_RGB.items():
+        dist = ((r - anchor[0]) ** 2
+                + (g - anchor[1]) ** 2
+                + (b - anchor[2]) ** 2)
+        if dist < best_dist:
+            best_dist = dist
+            best_name = name
+    # Distance is squared. < 35² ≈ 1225 → high; < 70² = 4900 → medium.
+    if best_dist < 1225:
+        conf = "high"
+    elif best_dist < 4900:
+        conf = "medium"
+    else:
+        conf = "low"
+    return best_name, conf
 
 
 def infer_fields_from_text(text: str) -> dict:
@@ -576,6 +715,11 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
             "url": url, "source_store": "", "source_image_url": None,
             "inferred": {"name": "", "category": None, "color": None, "tags": [],
                          "formality": None, "season": None},
+            "sources": {
+                "name": "default", "category": "default", "color": "default",
+                "tags": "default", "formality": "default", "season": "default",
+                "image": "default",
+            },
             "metadata": {"title": None, "og_title": None, "og_image": None,
                          "og_description": None, "description": None,
                          "jsonld_product": {}},
@@ -615,67 +759,201 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
 
     inferred = infer_fields_from_text(text_pool)
 
-    # Override with JSON-LD when more specific.
-    if jsonld.get("color") and not inferred.get("color"):
-        inferred["color"] = jsonld["color"].lower()
+    # Source tracking: each inferred field records WHERE its value
+    # came from so the UI can render a "from metadata" / "from image"
+    # caption next to each chip. "default" means an opinionated
+    # fallback (no signal in the page / image / URL).
+    sources: dict = {
+        "name":      "default",
+        "category":  "default",
+        "color":     "default",
+        "tags":      "default",
+        "formality": "default",
+        "season":    "default",
+        "image":     "default",
+    }
+
+    # Category: JSON-LD wins; otherwise text-pool keyword match.
     if jsonld.get("category"):
-        # JSON-LD categories are often retailer-specific strings like
-        # "Women > Dresses > Maxi Dresses". Map down to a Wearly category.
         cat_text = jsonld["category"].lower()
         for keyword, target in CATEGORY_KEYWORDS.items():
             if keyword in cat_text:
                 inferred["category"] = target
+                sources["category"] = "metadata"
                 break
+    elif inferred.get("category"):
+        sources["category"] = "text"
+
+    # Color: JSON-LD wins; then text-pool keyword; then (only as a
+    # final fallback) the dominant-color sampler against the og:image.
+    # Image-based inference NEVER overrides a metadata or text color.
+    image_url = jsonld.get("image") or meta.get("og_image")
+    if jsonld.get("color"):
+        inferred["color"] = jsonld["color"].lower()
+        sources["color"] = "metadata"
+    elif inferred.get("color"):
+        sources["color"] = "text"
+    elif image_url:
+        # No textual color signal — sample the image.
+        img_color, img_conf = infer_color_from_image_url(image_url)
+        if img_color and img_conf in ("high", "medium"):
+            inferred["color"] = img_color
+            sources["color"] = f"image:{img_conf}"
+        # Low-confidence image guess is dropped — better empty than wrong.
 
     # ── Formality inference ─────────────────────────────────────────
-    # Look at category + tags + name keywords to pick one of:
-    #   formal | business | smart_casual | casual | athletic
+    # Category-aware cues. Each branch sets `formality` AND records
+    # whether the call was forced by an explicit keyword (source=
+    # "text") or by a category-based default (source="category-fallback").
     text_low = text_pool.lower()
     cat = (inferred.get("category") or "").lower()
     tag_set = set(inferred.get("tags") or [])
     formality = None
+    formality_source = ""
+
+    # 1) Strong textual cues — these win regardless of category.
     if "formal" in tag_set or any(w in text_low for w in
-            ("gown", "tuxedo", "black tie", "black-tie", "blacktie", "cocktail")):
-        formality = "formal"
+            ("gown", "tuxedo", "black tie", "black-tie", "blacktie",
+             "cocktail", "evening gown")):
+        formality, formality_source = "formal", "text"
     elif "work" in tag_set or any(w in text_low for w in
-            ("blazer", "suit", "professional", "office")):
-        formality = "business"
-    elif cat == "activewear" or "gym" in tag_set:
-        formality = "athletic"
+            ("blazer", "suit ", "suiting", "professional", "office wear",
+             "workwear", "tailored")):
+        formality, formality_source = "business", "text"
+    elif cat == "activewear" or "gym" in tag_set or any(
+            w in text_low for w in (
+                "activewear", "sportswear", "training", "yoga ",
+                "running", "athletic", "workout")):
+        formality, formality_source = "athletic", "text"
+    elif any(w in text_low for w in ("silk", "chiffon", "satin", "lace")):
+        formality, formality_source = "smart_casual", "text"
     elif "evening" in tag_set or "dinner" in tag_set or "date" in tag_set:
-        formality = "smart_casual"
-    elif "casual" in tag_set or "weekend" in tag_set:
-        formality = "casual"
-    # Sensible default by category:
+        formality, formality_source = "smart_casual", "text"
+
+    # 2) Category-aware fallbacks. Encodes what the user listed:
+    #    tee / tank / hoodie / shorts / sneakers → casual
+    #    blouse / oxford / button-down / silk top → smart_casual
+    #    sheath / midi / wrap dress → smart_casual; gown → formal
+    #    heels / pumps → smart_casual (formal if "evening"/"black tie")
+    #    boots → smart_casual; sneakers → casual
     if formality is None:
-        if cat in ("dress",):
-            formality = "smart_casual"
-        elif cat in ("activewear",):
-            formality = "athletic"
+        if cat == "top":
+            if any(w in text_low for w in (
+                    "tee", "t-shirt", "tshirt", "tank", "hoodie",
+                    "sweatshirt", "henley")):
+                formality, formality_source = "casual", "category-fallback"
+            elif any(w in text_low for w in (
+                    "blouse", "oxford", "button-down", "button down",
+                    "button-up", "button up", "collared")):
+                formality, formality_source = "smart_casual", "category-fallback"
+            else:
+                formality, formality_source = "casual", "category-fallback"
+        elif cat == "bottom":
+            if any(w in text_low for w in ("jeans", "denim", "shorts",
+                                            "joggers", "sweatpants")):
+                formality, formality_source = "casual", "category-fallback"
+            elif any(w in text_low for w in ("trousers", "slacks",
+                                              "pleated", "wide-leg",
+                                              "wide leg")):
+                formality, formality_source = "smart_casual", "category-fallback"
+            else:
+                formality, formality_source = "casual", "category-fallback"
+        elif cat == "dress":
+            if any(w in text_low for w in ("gown", "cocktail",
+                                            "black tie", "evening")):
+                formality, formality_source = "formal", "category-fallback"
+            elif any(w in text_low for w in ("sundress", "sleeveless",
+                                              "t-shirt dress")):
+                formality, formality_source = "casual", "category-fallback"
+            else:
+                # Sheath, midi, wrap, slip, etc.
+                formality, formality_source = "smart_casual", "category-fallback"
+        elif cat == "outerwear":
+            formality, formality_source = "smart_casual", "category-fallback"
+        elif cat == "shoes":
+            if any(w in text_low for w in ("heel", "heels", "pump",
+                                            "pumps", "stiletto")):
+                formality, formality_source = "smart_casual", "category-fallback"
+            elif any(w in text_low for w in ("sneaker", "sneakers",
+                                              "trainer", "trainers",
+                                              "running")):
+                formality, formality_source = "casual", "category-fallback"
+            elif any(w in text_low for w in ("boot", "boots", "loafer",
+                                              "loafers")):
+                formality, formality_source = "smart_casual", "category-fallback"
+            else:
+                formality, formality_source = "casual", "category-fallback"
+        elif cat == "activewear":
+            formality, formality_source = "athletic", "category-fallback"
         else:
-            formality = "casual"
+            formality, formality_source = "casual", "default"
+
+    sources["formality"] = formality_source
 
     # ── Season inference ───────────────────────────────────────────
-    # Look for explicit season tokens; otherwise infer from fabric /
-    # weight keywords. Returns a list (the wardrobe schema accepts
-    # multi-season items).
+    # Two passes:
+    #   1) Direct fabric / item-type keyword matching (existing logic).
+    #   2) Category + item-type combination fallback so a Uniqlo "tee"
+    #      doesn't fall back to ["all"]. T-shirts are spring/summer
+    #      (plus fall for layering); knitwear is fall/winter.
     season_hits: list = []
     spring_kw = ("spring", "linen", "cotton", "chambray", "poplin",
                  "seersucker", "midi", "lightweight")
     summer_kw = ("summer", "linen", "cotton", "muslin", "sundress",
-                 "swim", "shorts", "tank", "camisole", "sleeveless")
+                 "swim", "shorts", "tank", "camisole", "sleeveless",
+                 "short sleeve", "short-sleeve")
     fall_kw   = ("fall", "autumn", "knit", "cardigan", "wool blend",
-                 "long sleeve", "long-sleeve", "merino")
+                 "long sleeve", "long-sleeve", "merino", "flannel")
     winter_kw = ("winter", "wool", "cashmere", "puffer", "parka",
-                 "heavyweight", "thermal", "shearling", "fleece")
+                 "heavyweight", "thermal", "shearling", "fleece",
+                 "down jacket", "down coat")
     def _hits(words):
         return any(re.search(rf"\b{re.escape(w)}\b", text_low) for w in words)
     if _hits(spring_kw): season_hits.append("spring")
     if _hits(summer_kw): season_hits.append("summer")
     if _hits(fall_kw):   season_hits.append("fall")
     if _hits(winter_kw): season_hits.append("winter")
-    # If nothing matched, default to all-year.
+    season_source = "text" if season_hits else ""
+
+    # Category-based season fallback (when text-pool keyword pass
+    # produced nothing). Aligned with the user's expectations:
+    #   tee / t-shirt → spring + summer + fall (layering)
+    #   tank          → summer
+    #   knit/sweater  → fall + winter
+    #   coat/puffer   → fall + winter
+    #   sandal        → summer
+    #   sneaker/jeans → all
+    if not season_hits:
+        if cat == "top":
+            if any(w in text_low for w in ("tee", "t-shirt", "tshirt")):
+                season_hits = ["spring", "summer", "fall"]
+            elif "tank" in text_low or "camisole" in text_low:
+                season_hits = ["summer"]
+            elif any(w in text_low for w in ("sweater", "cardigan",
+                                              "turtleneck", "knit")):
+                season_hits = ["fall", "winter"]
+            # else stays empty → final default ["all"]
+        elif cat == "outerwear":
+            if any(w in text_low for w in ("puffer", "parka", "wool",
+                                            "cashmere", "shearling",
+                                            "down")):
+                season_hits = ["fall", "winter"]
+            else:
+                season_hits = ["fall", "winter"]
+        elif cat == "shoes":
+            if any(w in text_low for w in ("sandal", "sandals")):
+                season_hits = ["summer"]
+            elif any(w in text_low for w in ("boot", "boots")):
+                season_hits = ["fall", "winter"]
+        elif cat == "dress":
+            if any(w in text_low for w in ("sundress", "linen",
+                                            "sleeveless")):
+                season_hits = ["spring", "summer"]
+        if season_hits:
+            season_source = "category-fallback"
+
     season = season_hits if season_hits else ["all"]
+    sources["season"] = season_source or "default"
 
     # Prefer JSON-LD name, then og:title, then plain <title>, then slug.
     # Every name source goes through the same suffix-strip so a title
@@ -693,36 +971,81 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
         # chars), prefer it over the full string.
         return head if len(head) >= 3 else s.strip()
 
-    name = _strip_store_suffix((jsonld.get("name") or "").strip())
-    if not name:
-        name = _strip_store_suffix((meta.get("og_title") or "").strip())
-    if not name:
-        name = _strip_store_suffix((meta.get("title") or "").strip())
-    if not name:
+    # Name resolution (provenance tracked separately).
+    if jsonld.get("name"):
+        name = _strip_store_suffix(jsonld["name"].strip())
+        sources["name"] = "metadata"
+    elif meta.get("og_title"):
+        name = _strip_store_suffix(meta["og_title"].strip())
+        sources["name"] = "title"
+    elif meta.get("title"):
+        name = _strip_store_suffix(meta["title"].strip())
+        sources["name"] = "title"
+    else:
         name = slug_name
+        sources["name"] = "slug" if name else "default"
     _name_tokens = [t for t in re.split(r"\s+", name) if t]
     if _name_tokens and all(t.lower() in _NOISE_SEGMENT_WORDS for t in _name_tokens):
         name = ""
+        sources["name"] = "default"
 
-    # Tags: when keyword inference produced an empty list, fall back to
-    # a minimal default derived from the inferred formality, so the
-    # item is searchable in the wardrobe filter pool out of the box.
-    # The user can edit / remove the tag in the review form.
+    # Tags: text-derived hits first, then expand using a
+    # (category, formality) table when text yielded nothing. Aligned
+    # with how the recommendation engine filters by occasion tag —
+    # e.g. a t-shirt should reach the candidate pool for "casual",
+    # "weekend", AND "travel" even when the retailer page doesn't
+    # name any of those words.
     final_tags = list(inferred.get("tags") or [])
-    if not final_tags:
-        if formality == "business":
-            final_tags = ["work"]
-        elif formality == "formal":
-            final_tags = ["formal"]
-        elif formality == "athletic":
-            final_tags = ["gym"]
-        elif formality == "smart_casual":
-            final_tags = ["dinner"]
-        else:  # casual, default
-            final_tags = ["casual"]
+    tag_source = "text" if final_tags else ""
 
-    # Prefer JSON-LD image when present (usually higher quality than og:image).
-    image_url = jsonld.get("image") or meta.get("og_image")
+    if not final_tags:
+        # (category, formality) → useful occasion tags.
+        _TAG_FALLBACK = {
+            ("top",        "casual"):       ["casual", "weekend", "travel"],
+            ("top",        "smart_casual"): ["dinner", "smart_casual", "work"],
+            ("top",        "business"):     ["work", "smart_casual"],
+            ("top",        "formal"):       ["formal"],
+            ("top",        "athletic"):     ["gym"],
+            ("bottom",     "casual"):       ["casual", "weekend", "travel"],
+            ("bottom",     "smart_casual"): ["smart_casual", "work"],
+            ("bottom",     "business"):     ["work", "smart_casual"],
+            ("dress",      "casual"):       ["casual", "weekend"],
+            ("dress",      "smart_casual"): ["dinner", "smart_casual"],
+            ("dress",      "formal"):       ["formal"],
+            ("outerwear",  "casual"):       ["casual", "travel"],
+            ("outerwear",  "smart_casual"): ["work", "smart_casual", "travel"],
+            ("outerwear",  "business"):     ["work", "smart_casual"],
+            ("outerwear",  "formal"):       ["formal"],
+            ("shoes",      "casual"):       ["casual", "weekend", "travel"],
+            ("shoes",      "smart_casual"): ["dinner", "smart_casual", "work"],
+            ("shoes",      "business"):     ["work"],
+            ("shoes",      "formal"):       ["formal"],
+            ("accessory",  "casual"):       ["casual", "weekend"],
+            ("accessory",  "smart_casual"): ["dinner", "smart_casual"],
+            ("accessory",  "formal"):       ["formal"],
+            ("activewear", "athletic"):     ["gym"],
+        }
+        final_tags = _TAG_FALLBACK.get((cat, formality), [])
+        if final_tags:
+            tag_source = "category-fallback"
+        else:
+            # Last-resort fallback by formality only (unchanged from v1).
+            if formality == "business":
+                final_tags = ["work"]
+            elif formality == "formal":
+                final_tags = ["formal"]
+            elif formality == "athletic":
+                final_tags = ["gym"]
+            elif formality == "smart_casual":
+                final_tags = ["dinner"]
+            else:
+                final_tags = ["casual"]
+            tag_source = "default"
+
+    sources["tags"] = tag_source
+
+    if image_url:
+        sources["image"] = "metadata"
 
     return {
         "url":              url,
@@ -736,6 +1059,7 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
             "formality": formality,
             "season":    season,
         },
+        "sources":      sources,
         "metadata":     meta,
         "fetched":      fetch_result.get("success", False),
         "fetch_error":  None if fetch_result.get("success") else fetch_result.get("error"),

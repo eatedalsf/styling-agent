@@ -4492,6 +4492,40 @@ def _render_wardrobe():
                     '</div>'
                 )
 
+            # Provenance chips — short labels so the user can see at a
+            # glance which fields came from retailer metadata vs were
+            # inferred from the page title, image, or just a category-
+            # based default. Source values are produced by link_import.
+            _sources = link_data.get("sources") or {}
+            def _src_chip(src: str) -> str:
+                if not src or src == "default":
+                    return ('<span style="font-size:0.6rem; color:#8E8E93; '
+                            'background:#FAFAFA; border:1px solid #EEEEEE; '
+                            'padding:1px 7px; border-radius:99px; '
+                            'margin-left:0.4rem;">default</span>')
+                pretty = {
+                    "metadata":           "from metadata",
+                    "text":               "inferred from text",
+                    "title":              "from page title",
+                    "slug":               "from URL slug",
+                    "image:high":         "inferred from image",
+                    "image:medium":       "inferred from image (review)",
+                    "category-fallback":  "inferred from category",
+                }.get(src, src)
+                bg = ("#EFF5EB" if src.startswith(("metadata", "title", "image:high"))
+                      else "#FBF1DD" if src == "image:medium"
+                      else "#F7F3EC")
+                fg = ("#3A6B4A" if src.startswith(("metadata", "title", "image:high"))
+                      else "#7C5A22" if src == "image:medium"
+                      else "#6E6E73")
+                bd = ("#C9DDC1" if src.startswith(("metadata", "title", "image:high"))
+                      else "#EFD9A6" if src == "image:medium"
+                      else "#EEEEEE")
+                return (f'<span style="font-size:0.6rem; color:{fg}; '
+                        f'background:{bg}; border:1px solid {bd}; '
+                        f'padding:1px 7px; border-radius:99px; '
+                        f'margin-left:0.4rem;">{pretty}</span>')
+
             st.markdown(f"""
             <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.2rem 1.4rem; margin-top:0.4rem; margin-bottom:1rem;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.8rem;">
@@ -4503,12 +4537,14 @@ def _render_wardrobe():
                     <div style="flex:1; min-width:220px;">
                         <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Store</div>
                         <div style="font-size:0.95rem; color:#1C1917; margin-bottom:0.6rem;">{link_data.get('source_store') or '—'}</div>
-                        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Suggested name</div>
+                        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:0.25rem;">Suggested name {_src_chip(_sources.get('name',''))}</div>
                         <div style="font-family:'DM Serif Display',serif; font-size:1.15rem; color:#1C1917; line-height:1.25;">{suggested_name_display}</div>
-                        <div style="font-size:0.76rem; color:#6E6E73; margin-top:0.5rem; line-height:1.5;">
-                            Category: <strong>{inferred.get('category') or '— (pick below)'}</strong><br>
-                            Color: <strong>{inferred.get('color') or '— (type below)'}</strong><br>
-                            Occasion tags: <strong>{', '.join(inferred.get('tags', [])) or '—'}</strong>
+                        <div style="font-size:0.76rem; color:#6E6E73; margin-top:0.5rem; line-height:1.7;">
+                            Category: <strong>{inferred.get('category') or '— (pick below)'}</strong>{_src_chip(_sources.get('category',''))}<br>
+                            Color: <strong>{inferred.get('color') or '— (type below)'}</strong>{_src_chip(_sources.get('color',''))}<br>
+                            Formality: <strong>{inferred.get('formality') or '—'}</strong>{_src_chip(_sources.get('formality',''))}<br>
+                            Seasons: <strong>{', '.join(inferred.get('season') or []) or '—'}</strong>{_src_chip(_sources.get('season',''))}<br>
+                            Occasions: <strong>{', '.join(inferred.get('tags', [])) or '—'}</strong>{_src_chip(_sources.get('tags',''))}
                         </div>
                     </div>
                 </div>
@@ -4544,6 +4580,13 @@ def _render_wardrobe():
 
                 # Pre-select inferred category if it matches one of our options.
                 cat_default = inferred.get("category") if inferred.get("category") in _CATEGORY_OPTIONS else "top"
+                # Pre-select inferred formality (previously left at the
+                # selectbox's first option — the user had to manually
+                # change every link import to anything other than the
+                # default).
+                form_default = (inferred.get("formality")
+                                if inferred.get("formality") in _FORMALITY_OPTIONS
+                                else _FORMALITY_OPTIONS[0])
                 col_c, col_d = st.columns([1, 1], gap="small")
                 with col_c:
                     l_category = st.selectbox(
@@ -4551,11 +4594,23 @@ def _render_wardrobe():
                         index=_CATEGORY_OPTIONS.index(cat_default), key="l_category",
                     )
                 with col_d:
-                    l_formality = st.selectbox("Formality", options=_FORMALITY_OPTIONS, key="l_formality")
+                    l_formality = st.selectbox(
+                        "Formality", options=_FORMALITY_OPTIONS,
+                        index=_FORMALITY_OPTIONS.index(form_default),
+                        key="l_formality",
+                    )
 
+                # Pre-select inferred seasons (intersected with the
+                # known vocabulary). Default to ["all"] only when
+                # inference produced nothing.
+                pre_seasons = [s for s in (inferred.get("season") or [])
+                                if s in _SEASON_OPTIONS]
+                if not pre_seasons:
+                    pre_seasons = ["all"]
                 l_seasons = st.multiselect(
                     "Seasons (leave empty to mean year-round)",
-                    options=_SEASON_OPTIONS, default=["all"], key="l_seasons",
+                    options=_SEASON_OPTIONS, default=pre_seasons,
+                    key="l_seasons",
                 )
 
                 # Pre-select inferred tags, intersected with our known vocabulary.

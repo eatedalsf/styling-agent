@@ -436,5 +436,271 @@ class TestLinkImportedItemReachesAgent(unittest.TestCase):
         self.assertNotIn("source_store", r["item"])
 
 
+# ─────────────────────────────────────────────
+# IMPROVED INFERENCE — provenance, image color, category fallbacks
+# ─────────────────────────────────────────────
+
+class TestImageColorInference(unittest.TestCase):
+    """Image-based color inference is best-effort: it should map a
+    near-white PIL-rendered tile to "white" / "ivory" / "cream", a
+    near-black tile to "black", a navy tile to "navy", etc. The output
+    feeds into the orchestrator only as a LAST-resort color signal —
+    metadata and text always win."""
+
+    def _make_solid_image_url_mock(self, rgb):
+        """Return a mock that makes urlopen serve a 64x64 solid-RGB JPEG.
+        Used to stub the HTTP fetch inside infer_color_from_image_url."""
+        from PIL import Image
+        import io
+        buf = io.BytesIO()
+        Image.new("RGB", (64, 64), rgb).save(buf, format="PNG")
+        raw_bytes = buf.getvalue()
+
+        class _FakeResp:
+            def __init__(self, b): self._b = b
+            def __enter__(self): return self
+            def __exit__(self, *a): return False
+            def read(self, *a, **k): return self._b
+        return _FakeResp(raw_bytes)
+
+    def test_white_image_maps_to_white_family(self):
+        from link_import import infer_color_from_image_url
+        with mock.patch("urllib.request.urlopen",
+                        return_value=self._make_solid_image_url_mock(
+                            (245, 240, 233))):
+            color, conf = infer_color_from_image_url("https://x/x.jpg")
+        self.assertIn(color, ("white", "ivory", "cream"))
+        self.assertIn(conf, ("high", "medium"))
+
+    def test_navy_image_maps_to_navy(self):
+        from link_import import infer_color_from_image_url
+        with mock.patch("urllib.request.urlopen",
+                        return_value=self._make_solid_image_url_mock(
+                            (30, 40, 65))):
+            color, conf = infer_color_from_image_url("https://x/x.jpg")
+        self.assertIn(color, ("navy", "charcoal", "black"))
+
+    def test_black_image_maps_to_black(self):
+        from link_import import infer_color_from_image_url
+        with mock.patch("urllib.request.urlopen",
+                        return_value=self._make_solid_image_url_mock(
+                            (20, 18, 16))):
+            color, conf = infer_color_from_image_url("https://x/x.jpg")
+        self.assertIn(color, ("black", "charcoal"))
+
+    def test_network_failure_returns_empty(self):
+        from link_import import infer_color_from_image_url
+        with mock.patch("urllib.request.urlopen",
+                        side_effect=Exception("network down")):
+            color, conf = infer_color_from_image_url("https://x/x.jpg")
+        self.assertEqual(color, "")
+        self.assertEqual(conf, "low")
+
+
+class TestProvenanceTracking(unittest.TestCase):
+    """Each inferred field carries a source label so the UI can render
+    'from metadata' / 'from image' captions next to the chip."""
+
+    def _canned(self, **kw):
+        """Build a minimal extracted-metadata dict for fetch_url_metadata."""
+        base = {"title": None, "og_title": None, "og_image": None,
+                "og_description": None, "description": None,
+                "jsonld_product": {}}
+        base.update(kw)
+        return {"success": True, "extracted": base, "error": None}
+
+    def test_jsonld_color_marked_as_metadata(self):
+        canned = self._canned(jsonld_product={"name": "Crew Tee",
+                                                "color": "white",
+                                                "category": "Tops"})
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned):
+            r = import_product_link("https://www.uniqlo.com/us/en/products/X")
+        self.assertEqual(r["inferred"]["color"], "white")
+        self.assertEqual(r["sources"]["color"], "metadata")
+
+    def test_metadata_color_wins_over_image(self):
+        """When JSON-LD provides a color, the image sampler must NOT
+        be consulted — the metadata value is canonical."""
+        canned = self._canned(
+            jsonld_product={"name": "Crew Tee", "color": "navy",
+                            "image": "https://x/img.png"},
+        )
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("red", "high")) as image_mock:
+            r = import_product_link("https://uniqlo.com/p")
+        # Color is navy (metadata), not red (would-be image guess)
+        self.assertEqual(r["inferred"]["color"], "navy")
+        self.assertEqual(r["sources"]["color"], "metadata")
+        image_mock.assert_not_called()
+
+    def test_text_color_wins_over_image(self):
+        canned = self._canned(
+            og_title="Ivory Silk Blouse",
+            og_image="https://x/img.png",
+        )
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("red", "high")) as image_mock:
+            r = import_product_link("https://retailer.com/p")
+        self.assertEqual(r["inferred"]["color"], "ivory")
+        self.assertEqual(r["sources"]["color"], "text")
+        image_mock.assert_not_called()
+
+    def test_image_color_used_only_when_metadata_and_text_are_silent(self):
+        canned = self._canned(
+            og_title="Women's Mini T-Shirt",  # no color words
+            og_image="https://x/img.png",
+        )
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("white", "high")):
+            r = import_product_link("https://uniqlo.com/p")
+        self.assertEqual(r["inferred"]["color"], "white")
+        self.assertEqual(r["sources"]["color"], "image:high")
+
+    def test_low_confidence_image_color_dropped(self):
+        canned = self._canned(og_title="Cool tee", og_image="https://x/i.png")
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("brown", "low")):
+            r = import_product_link("https://r.com/p")
+        self.assertIsNone(r["inferred"]["color"])
+
+
+class TestUniqloWhiteTeeScenario(unittest.TestCase):
+    """Integration: the user's reported Uniqlo white T-shirt URL should
+    yield a usable set of inferred fields without manual entry."""
+
+    def test_uniqlo_white_tee_full_inference(self):
+        # Simulate the Uniqlo page that returns og:title naming the
+        # product but NO color metadata, AND the image is white.
+        canned = {
+            "success": True,
+            "extracted": {
+                "title": "Womens Mini T-Shirt | UNIQLO US",
+                "og_title": "Womens Mini T-Shirt | UNIQLO US",
+                "og_image": "https://image.uniqlo.com/x.png",
+                "og_description": "Cotton crew-neck tee",
+                "description": "Cotton crew-neck tee",
+                "jsonld_product": {},
+            },
+            "error": None,
+        }
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=canned), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("white", "high")):
+            r = import_product_link(
+                "https://www.uniqlo.com/us/en/products/E422992-000")
+        inf = r["inferred"]
+        # Store-suffix stripped from name.
+        self.assertNotIn("UNIQLO", inf["name"])
+        self.assertIn("T-Shirt", inf["name"])
+        # Color inferred from the image (since neither metadata nor
+        # text named one).
+        self.assertEqual(inf["color"], "white")
+        self.assertEqual(r["sources"]["color"], "image:high")
+        # Category from text — "Tee" / "T-shirt" → top.
+        self.assertEqual(inf["category"], "top")
+        # Formality — casual (tee).
+        self.assertEqual(inf["formality"], "casual")
+        # Season expanded — NOT just ["all"] for a t-shirt.
+        self.assertIn("summer", inf["season"])
+        self.assertIn("spring", inf["season"])
+        # Tags — useful broader set, not just ["casual"].
+        self.assertIn("casual",  inf["tags"])
+        self.assertIn("weekend", inf["tags"])
+        self.assertIn("travel",  inf["tags"])
+
+
+class TestCategoryFallbackTags(unittest.TestCase):
+    """When text inference produces no occasion tags, the
+    (category, formality) fallback table should supply a broader
+    starter set than just a single tag."""
+
+    def _canned(self, og_title):
+        return {"success": True, "extracted": {
+            "title": og_title, "og_title": og_title, "og_image": None,
+            "og_description": "", "description": "", "jsonld_product": {},
+        }, "error": None}
+
+    def test_casual_top_gets_casual_weekend_travel(self):
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=self._canned("Plain Crew T-Shirt")), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("", "low")):
+            r = import_product_link("https://r.com/tee")
+        tags = set(r["inferred"]["tags"])
+        self.assertEqual(r["inferred"]["formality"], "casual")
+        self.assertIn("casual",  tags)
+        self.assertIn("weekend", tags)
+        self.assertIn("travel",  tags)
+        self.assertEqual(r["sources"]["tags"], "category-fallback")
+
+    def test_smart_casual_blouse_gets_dinner_smart_casual_work(self):
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=self._canned(
+                            "Silk Button-Down Blouse")), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("", "low")):
+            r = import_product_link("https://r.com/blouse")
+        tags = set(r["inferred"]["tags"])
+        self.assertEqual(r["inferred"]["formality"], "smart_casual")
+        # silk + blouse / button-down → smart_casual; tags from table.
+        self.assertTrue(tags & {"dinner", "smart_casual", "work"},
+                        msg=f"got {tags}")
+
+    def test_dress_gown_gets_formal(self):
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=self._canned("Evening Gown")), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("", "low")):
+            r = import_product_link("https://r.com/gown")
+        self.assertEqual(r["inferred"]["formality"], "formal")
+        # Tags either include "formal" (from category fallback) or
+        # "evening" / "dinner" (from direct text inference). Both are
+        # acceptable starting points the user can adjust.
+        tags = set(r["inferred"]["tags"])
+        self.assertTrue(tags & {"formal", "evening", "dinner"},
+                        msg=f"got {tags}")
+
+
+class TestSeasonInference(unittest.TestCase):
+    """A t-shirt should not fall back to ['all']; it should land on
+    spring/summer/fall (layering)."""
+
+    def _canned(self, og_title):
+        return {"success": True, "extracted": {
+            "title": og_title, "og_title": og_title, "og_image": None,
+            "og_description": "", "description": "", "jsonld_product": {},
+        }, "error": None}
+
+    def test_tshirt_season_includes_summer(self):
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=self._canned("Crew Neck T-Shirt")), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("", "low")):
+            r = import_product_link("https://r.com/tee")
+        s = set(r["inferred"]["season"])
+        self.assertTrue(s & {"summer", "spring"},
+                        msg=f"got {r['inferred']['season']}")
+        self.assertNotEqual(r["inferred"]["season"], ["all"])
+
+    def test_cashmere_coat_is_winter(self):
+        with mock.patch("link_import.fetch_url_metadata",
+                        return_value=self._canned("Cashmere Coat")), \
+             mock.patch("link_import.infer_color_from_image_url",
+                        return_value=("", "low")):
+            r = import_product_link("https://r.com/coat")
+        s = set(r["inferred"]["season"])
+        self.assertIn("winter", s)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
