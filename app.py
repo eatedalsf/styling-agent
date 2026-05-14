@@ -3907,16 +3907,50 @@ def _render_wardrobe():
     try:
         from demo_wardrobe import (
             load_demo_wardrobe, unload_demo_wardrobe, is_demo_loaded,
+            real_photos_enabled,
         )
         _demo_active = is_demo_loaded()
+        _photos_on   = real_photos_enabled()
     except Exception as _e:
         _demo_active = False
+        _photos_on   = False
         load_demo_wardrobe = unload_demo_wardrobe = None  # type: ignore
 
     if load_demo_wardrobe is not None:
         # Always-visible card (not an expander) — the previous
         # collapsed expander was missed twice. This sits at the very
         # top of the Wardrobe page, above Backup & Restore.
+        photo_status_line = (
+            "<div style='font-size:0.78rem; color:#2E5B41; "
+            "background:#E8F1EA; border:1px solid #C5DBC9; "
+            "border-radius:4px; padding:0.45rem 0.75rem; "
+            "margin-top:0.7rem;'>"
+            "✓ <strong>Real photos enabled</strong> — PEXELS_API_KEY "
+            "detected. Reload will fetch keyword-matched product "
+            "photos via the free Pexels API."
+            "</div>"
+            if _photos_on else
+            "<div style='font-size:0.78rem; color:#7C5A22; "
+            "background:#FBF1DD; border:1px solid #EFD9A6; "
+            "border-radius:4px; padding:0.55rem 0.85rem; "
+            "margin-top:0.7rem; line-height:1.5;'>"
+            "<strong>Real product photos available — 1-minute setup.</strong><br>"
+            "Pexels gives free keyword-matched fashion photos "
+            "(200/hr, no card needed). Sign up at "
+            "<a href='https://www.pexels.com/api/' target='_blank' "
+            "style='color:#7C5A22; font-weight:500;'>pexels.com/api</a>, "
+            "then set the env var and restart Streamlit:<br>"
+            "<code style='font-size:0.74rem;'>"
+            "$env:PEXELS_API_KEY = \"&lt;your key&gt;\""
+            "</code> (Windows) &nbsp;or&nbsp; "
+            "<code style='font-size:0.74rem;'>"
+            "export PEXELS_API_KEY=\"&lt;your key&gt;\""
+            "</code> (bash).<br>"
+            "Without a key, items fall back to clean drawn "
+            "silhouettes — recognizable but not photos."
+            "</div>"
+        )
+
         st.markdown(
             "<div style='background:#FFFFFF; border:2px solid #111111; "
             "border-radius:8px; padding:1.25rem 1.4rem 1.05rem; "
@@ -3940,9 +3974,10 @@ def _render_wardrobe():
             "weekend / gym / dinner / formal / travel. Each item "
             "carries fabric, silhouette, and body-positive style "
             "notes so the agent can demo skin-tone, fit, and "
-            "modesty reasoning. Polished colored card images "
-            "generated locally — nothing fetched at runtime."
-            "</div></div>",
+            "modesty reasoning."
+            "</div>"
+            + photo_status_line
+            + "</div>",
             unsafe_allow_html=True,
         )
         cols = st.columns([1, 1], gap="small")

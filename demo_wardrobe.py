@@ -33,7 +33,50 @@ import io
 import json
 import os
 import tempfile
-from typing import Any, Dict, List
+import urllib.request
+import urllib.parse
+import urllib.error
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional, Tuple
+
+
+# ── Real-photo source ─────────────────────────────────────
+# As of 2026, the once-popular `source.unsplash.com` keyword
+# endpoint returns 503 (deprecated late 2024) and LoremFlickr's
+# tag-matching is too loose to be useful for clothing (a
+# "terracotta wrap dress" query came back with a cat statue).
+# The reliable route is the Pexels REST API — free tier 200 req/h
+# / 20 000 / month, accurate keyword search, large clothing
+# library — but it requires a 1-minute signup at pexels.com/api
+# and an API key.
+#
+# How to enable real photos:
+#   $env:PEXELS_API_KEY = "<your free key>"      # Windows PowerShell
+#   export PEXELS_API_KEY="<your free key>"       # bash / zsh
+# Then click "Reload demo wardrobe" in the Wardrobe screen.
+# Items whose Pexels query fails (rate-limited, no match, network
+# down) fall back to the silhouette renderer — the demo always
+# loads, just with a mix of real photos and illustrations.
+
+_PEXELS_BASE    = "https://api.pexels.com/v1/search"
+_FETCH_UA       = (
+    "Mozilla/5.0 (Wearly/0.4; +https://eatedalsf.github.io/styling-agent)"
+)
+_FETCH_TIMEOUT  = 10.0     # per-photo
+_PARALLEL_FETCH = 6        # concurrent connections
+
+
+def _pexels_api_key() -> str:
+    """Return the configured Pexels API key, or empty string when
+    none is set. Reading lazily lets the user export the env var
+    and click Reload without restarting Streamlit."""
+    return os.environ.get("PEXELS_API_KEY", "").strip()
+
+
+def real_photos_enabled() -> bool:
+    """Surface-area helper for the UI: whether the loader will
+    actually try Pexels on the next Reload."""
+    return bool(_pexels_api_key())
 
 
 # ── Locations ─────────────────────────────────────────────
@@ -753,6 +796,140 @@ _DRAW_BY_TYPE = {
 }
 
 
+# ── Real-photo fetcher (Unsplash Source, no API key) ─────
+
+def _fetch_real_photo(
+    query: str,
+    w: int = 400,
+    h: int = 500,
+    timeout: float = _FETCH_TIMEOUT,
+) -> bytes:
+    """
+    Fetch a real, keyword-matched product photo from Pexels.
+    Returns image bytes on success, empty bytes on any failure
+    (no API key, network error, no result, decode error, rate
+    limit). NEVER raises — the loader falls back to silhouette
+    on empty.
+
+    Why not free, no-key services?
+      * `source.unsplash.com/featured/...` — 503 since the 2024
+        Unsplash Source deprecation.
+      * loremflickr — returns random tag-matched photos. Tested
+        with "terracotta wrap dress" and got a cat statue. Loose
+        matching is worse than the silhouette renderer.
+      * picsum.photos — random photos, no keyword filter.
+      * Real Unsplash REST API — works but needs an API key too.
+
+    Pexels gives accurate keyword-matched fashion photos with a
+    free tier generous enough for a demo (200 req/h, 20 000 /
+    month). Set $env:PEXELS_API_KEY (Windows) or
+    `export PEXELS_API_KEY=...` (bash) and click Reload.
+    """
+    key = _pexels_api_key()
+    if not key or not query:
+        return b""
+
+    params = {
+        "query":       query.replace(",", " "),
+        "per_page":    1,
+        "orientation": "portrait",
+    }
+    search_url = f"{_PEXELS_BASE}?{urllib.parse.urlencode(params)}"
+    try:
+        req = urllib.request.Request(search_url, headers={
+            "Authorization": key,
+            "User-Agent":    _FETCH_UA,
+            "Accept":        "application/json",
+        })
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            data = json.loads(resp.read(2 * 1024 * 1024))
+        photos = data.get("photos") or []
+        if not photos:
+            return b""
+        # Take the medium-large URL (Pexels' "large" is 940 wide —
+        # plenty for our 400x500 cards).
+        src = photos[0].get("src") or {}
+        img_url = src.get("large") or src.get("medium") or src.get("original")
+        if not img_url:
+            return b""
+    except Exception:
+        return b""
+
+    try:
+        req = urllib.request.Request(img_url, headers={
+            "User-Agent": _FETCH_UA,
+            "Accept":     "image/jpeg, image/png, image/webp",
+        })
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read(4 * 1024 * 1024)
+    except Exception:
+        return b""
+
+
+# Back-compat alias — old callers / tests might still import the
+# Unsplash name; map it to the new working implementation.
+_fetch_unsplash_photo = _fetch_real_photo
+
+
+def _resize_for_card(
+    raw_bytes: bytes,
+    size: tuple = _DEFAULT_CARD_SIZE,
+) -> bytes:
+    """
+    Re-encode an arbitrary photo to a 400×500 PNG with object-fit:
+    cover semantics. Returns empty bytes on failure.
+
+    Pillow loads any JPEG/PNG/WEBP Unsplash returns, we center-crop
+    to the card aspect ratio, then resize. Consistent output size
+    keeps the wardrobe-list thumbnail grid tidy.
+    """
+    if not raw_bytes:
+        return b""
+    try:
+        from PIL import Image
+    except ImportError:
+        return b""
+
+    try:
+        img = Image.open(io.BytesIO(raw_bytes))
+        img.load()
+        # Convert to RGB so PNGs with alpha or palette-mode images
+        # serialize cleanly downstream.
+        if img.mode not in ("RGB", "RGBA"):
+            img = img.convert("RGB")
+        if img.mode == "RGBA":
+            # Composite alpha onto white so the card background is
+            # uniform (matching the rest of Wearly's white-on-white).
+            from PIL import Image as _I
+            bg = _I.new("RGB", img.size, (255, 255, 255))
+            bg.paste(img, mask=img.split()[-1])
+            img = bg
+
+        # Center-crop to the target aspect ratio (cover).
+        target_w, target_h = size
+        target_ratio = target_w / target_h
+        src_w, src_h = img.size
+        src_ratio = src_w / src_h
+        if src_ratio > target_ratio:
+            # Source wider than target — crop horizontally.
+            new_w = int(src_h * target_ratio)
+            left = (src_w - new_w) // 2
+            img = img.crop((left, 0, left + new_w, src_h))
+        elif src_ratio < target_ratio:
+            new_h = int(src_w / target_ratio)
+            top = (src_h - new_h) // 2
+            img = img.crop((0, top, src_w, top + new_h))
+
+        # Downscale to the target.
+        img = img.resize((target_w, target_h), Image.LANCZOS)
+
+        out = io.BytesIO()
+        img.save(out, format="PNG", optimize=True)
+        return out.getvalue()
+    except Exception:
+        return b""
+
+
 # ── Card image generator ──────────────────────────────────
 
 def _generate_card_image(
@@ -853,23 +1030,51 @@ def _generate_card_image(
     return out.getvalue()
 
 
-def _save_card(item: Dict[str, Any]) -> str:
-    """Save a generated card and return the relative path stored in the
-    item record. Empty string on failure."""
+def _save_card(item: Dict[str, Any], use_photos: bool = True) -> Tuple[str, str]:
+    """
+    Save a card image for a demo item. Returns (relative_path, source)
+    where source is one of:
+      - "photo"       → real Unsplash photo, resized + cached
+      - "silhouette"  → fall-back PIL illustration
+      - ""            → save failed entirely (path is also empty)
+
+    When `use_photos=True` (default), tries Unsplash first using
+    item["unsplash_query"]. On any failure (no query, network error,
+    decode error, resize error), falls back to the silhouette
+    renderer — the demo still loads, just without that one photo.
+    """
     os.makedirs(WARDROBE_IMAGES_DIR, exist_ok=True)
     item_id = item.get("id", "")
     if not item_id:
-        return ""
-    png_bytes = _generate_card_image(item)
+        return "", ""
+
+    png_bytes = b""
+    source = ""
+
+    # `unsplash_query` is the canonical field name on each demo
+    # item; the keywords drive whichever real-photo source we use.
+    if use_photos and item.get("unsplash_query"):
+        raw = _fetch_real_photo(item["unsplash_query"])
+        if raw:
+            png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
+            if png_bytes:
+                source = "photo"
+
     if not png_bytes:
-        return ""
+        png_bytes = _generate_card_image(item)
+        if png_bytes:
+            source = "silhouette"
+
+    if not png_bytes:
+        return "", ""
+
     out_path = os.path.join(WARDROBE_IMAGES_DIR, f"{item_id}.png")
     try:
         with open(out_path, "wb") as f:
             f.write(png_bytes)
     except OSError:
-        return ""
-    return f"wardrobe_images/{item_id}.png"
+        return "", ""
+    return f"wardrobe_images/{item_id}.png", source
 
 
 # ── Loader / unloader ─────────────────────────────────────
@@ -931,7 +1136,10 @@ def _section_for_type(item_type: str) -> str:
     return "clothing"
 
 
-def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
+def load_demo_wardrobe(
+    regenerate_images: bool = True,
+    use_photos: bool = True,
+) -> dict:
     """
     Merge every item from `demo_wardrobe.json` into user_wardrobe.json.
 
@@ -941,17 +1149,20 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
           "added":          [item_id, ...],     # newly inserted
           "skipped":        [item_id, ...],     # already in overlay (record kept as-is)
           "refreshed":      [item_id, ...],     # already present BUT card image re-rendered
+          "photos":         int,                # of refreshed/added, how many got a real photo
+          "silhouettes":    int,                # of refreshed/added, how many fell back to silhouette
           "total_after":    int,
-          "image_errors":   [item_id, ...],     # PNG generation failed
+          "image_errors":   [item_id, ...],     # save failed entirely
           "error":          str | None,
         }
 
-    Items already present (by id) keep their existing JSON record.
-    BUT when `regenerate_images=True` (default), their card image is
-    re-rendered from the latest silhouette renderer — so clicking
-    "↻ Reload demo wardrobe" after upgrading the renderer refreshes
-    every thumbnail in place. Set `regenerate_images=False` to get
-    the old "skip everything" behavior.
+    When `use_photos=True` (default) the loader fetches a real
+    photo from Unsplash for each item that has an `unsplash_query`
+    field. Fetches run in parallel (six concurrent connections) so
+    the full 48-item load completes in ~10-15 s on a normal
+    connection. Items whose fetch fails fall back to the silhouette
+    renderer — the demo still loads, just with a mix of photos and
+    illustrations.
 
     User-added items (UC### / US### / UA###) are NEVER touched.
     """
@@ -959,6 +1170,7 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
         seed = _load_demo_seed()
     except Exception as e:
         return {"added": [], "skipped": [], "refreshed": [],
+                "photos": 0, "silhouettes": 0,
                 "total_after": 0, "image_errors": [],
                 "error": f"Could not read demo seed: {e}"}
 
@@ -978,6 +1190,8 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
     skipped:   List[str] = []
     refreshed: List[str] = []
     img_err:   List[str] = []
+    photo_count = 0
+    silhouette_count = 0
 
     all_seed_items = (
         list(seed.get("clothing", []))
@@ -985,6 +1199,38 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
         + list(seed.get("accessories", []))
     )
 
+    # Decide up front which items need an image render. Then do the
+    # actual render work in parallel — 48 sequential Unsplash fetches
+    # would block the UI for 30 s+, but ~6 concurrent connections
+    # bring it under 15 s.
+    items_to_render: List[dict] = []
+    new_items: List[dict] = []
+    for item in all_seed_items:
+        if not isinstance(item, dict) or not item.get("id"):
+            continue
+        iid = item["id"]
+        if iid in existing_ids:
+            if regenerate_images:
+                items_to_render.append(item)
+        else:
+            items_to_render.append(item)
+            new_items.append(item)
+
+    render_results: Dict[str, Tuple[str, str]] = {}
+    if items_to_render:
+        with ThreadPoolExecutor(max_workers=_PARALLEL_FETCH) as pool:
+            futures = {
+                pool.submit(_save_card, it, use_photos): it.get("id")
+                for it in items_to_render
+            }
+            for fut in as_completed(futures):
+                iid = futures[fut]
+                try:
+                    render_results[iid] = fut.result()
+                except Exception:
+                    render_results[iid] = ("", "")
+
+    # Now apply the results in the original (deterministic) order.
     for item in all_seed_items:
         if not isinstance(item, dict):
             continue
@@ -992,23 +1238,30 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
         if not iid:
             continue
 
+        # Refresh path (item already in user overlay).
         if iid in existing_ids:
             skipped.append(iid)
             if regenerate_images:
-                # Refresh the cached card image in place. Doesn't
-                # touch the JSON record at all — just redraws the
-                # PNG on disk so the upgraded renderer takes effect.
-                new_path = _save_card(item)
+                new_path, source = render_results.get(iid, ("", ""))
                 if new_path:
                     refreshed.append(iid)
+                    if source == "photo":
+                        photo_count += 1
+                    elif source == "silhouette":
+                        silhouette_count += 1
                 else:
                     img_err.append(iid)
             continue
 
-        # New item — render card, build record, append to section.
-        image_path = _save_card(item)
+        # New-item path.
+        image_path, source = render_results.get(iid, ("", ""))
         if not image_path:
             img_err.append(iid)
+        else:
+            if source == "photo":
+                photo_count += 1
+            elif source == "silhouette":
+                silhouette_count += 1
 
         record = {
             "id":           iid,
@@ -1038,6 +1291,7 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
             _persist_user_overlay(overlay)
         except Exception as e:
             return {"added": [], "skipped": skipped, "refreshed": refreshed,
+                    "photos": photo_count, "silhouettes": silhouette_count,
                     "total_after": 0, "image_errors": img_err,
                     "error": f"Save failed: {e}"}
 
@@ -1047,6 +1301,8 @@ def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
         "added":         added,
         "skipped":       skipped,
         "refreshed":     refreshed,
+        "photos":        photo_count,
+        "silhouettes":   silhouette_count,
         "total_after":   total_after,
         "image_errors":  img_err,
         "error":         None,

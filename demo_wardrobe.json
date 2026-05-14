@@ -1,636 +1,1060 @@
 {
   "_comment": "Curated demo wardrobe. ~48 items across tops, bottoms, dresses, outerwear, activewear, shoes, and accessories — designed so the styling engine has rich material to demonstrate dress vs separates, formality bands, seasonal layering, color-harmony scoring, modesty / comfort / silhouette preferences, and wardrobe-gap handling. Body-positive language only. Loaded into user_wardrobe.json via the in-app 'Load demo wardrobe' button (see demo_wardrobe.py). Each item gets a stable colored-card image rendered locally to wardrobe_images/<id>.png so the demo never depends on a live retailer URL.",
-
   "clothing": [
     {
-      "id": "DM-T001", "type": "top",
+      "id": "DM-T001",
+      "type": "top",
       "name": "Ivory Silk Blouse",
       "color": "ivory",
       "formality": "business",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["work", "dinner", "versatile"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "versatile"
+      ],
       "fabric": "silk crepe",
       "silhouette": "fluid drape",
       "style_notes": "Polished neutral; pairs with tailored trousers or a midi skirt.",
       "fit_notes": "Drapes softly through the bust; works well with a defined waist.",
-      "source_store": "Madewell"
+      "source_store": "Madewell",
+      "unsplash_query": "ivory,silk,blouse,fashion"
     },
     {
-      "id": "DM-T002", "type": "top",
+      "id": "DM-T002",
+      "type": "top",
       "name": "Black Mock-Neck Long-Sleeve",
       "color": "black",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["work", "dinner", "evening", "weekend"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "weekend"
+      ],
       "fabric": "merino-blend knit",
       "silhouette": "fitted",
       "style_notes": "Versatile base layer; high-neck coverage supports modesty preference.",
       "fit_notes": "Skims the torso with elongating vertical lines.",
-      "source_store": "Uniqlo"
+      "source_store": "Uniqlo",
+      "unsplash_query": "black,mockneck,turtleneck,knit"
     },
     {
-      "id": "DM-T003", "type": "top",
+      "id": "DM-T003",
+      "type": "top",
       "name": "Camel Cashmere Crewneck",
       "color": "camel",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["work", "weekend", "dinner"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "dinner"
+      ],
       "fabric": "cashmere",
       "silhouette": "relaxed",
       "style_notes": "Warm-tone neutral; flattering against warm olive skin per color rules.",
       "fit_notes": "Easy fit through the shoulder; layering potential under a blazer.",
-      "source_store": "Quince"
+      "source_store": "Quince",
+      "unsplash_query": "camel,cashmere,sweater,knitwear"
     },
     {
-      "id": "DM-T004", "type": "top",
+      "id": "DM-T004",
+      "type": "top",
       "name": "Striped Breton Tee",
       "color": "navy",
       "formality": "casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "cotton jersey",
       "silhouette": "relaxed",
       "style_notes": "Cool-tone striped knit; weekend staple, layers under blazers and trenches.",
       "fit_notes": "Skims the body without clinging.",
-      "source_store": "Saint James"
+      "source_store": "Saint James",
+      "unsplash_query": "striped,breton,tshirt,nautical"
     },
     {
-      "id": "DM-T005", "type": "top",
+      "id": "DM-T005",
+      "type": "top",
       "name": "White Oxford Shirt",
       "color": "white",
       "formality": "business",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["work", "weekend", "versatile"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "versatile"
+      ],
       "fabric": "cotton poplin",
       "silhouette": "structured",
       "style_notes": "Crisp classic; wears tucked for work, untucked for weekend.",
       "fit_notes": "Structured shoulders with a softly tailored body.",
-      "source_store": "J.Crew"
+      "source_store": "J.Crew",
+      "unsplash_query": "white,oxford,shirt,collared"
     },
     {
-      "id": "DM-T006", "type": "top",
+      "id": "DM-T006",
+      "type": "top",
       "name": "Burgundy Wrap Blouse",
       "color": "burgundy",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["dinner", "evening", "date", "work"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "dinner",
+        "evening",
+        "date",
+        "work"
+      ],
       "fabric": "viscose crepe",
       "silhouette": "wrap front",
       "style_notes": "Wrap silhouette defines the natural waist; warm jewel tone complements warm skin tones.",
       "fit_notes": "Adjustable tie supports preferred fit; covered coverage at the shoulder.",
-      "source_store": "Reformation"
+      "source_store": "Reformation",
+      "unsplash_query": "burgundy,wrap,blouse,fashion"
     },
     {
-      "id": "DM-T007", "type": "top",
+      "id": "DM-T007",
+      "type": "top",
       "name": "Olive Linen Tee",
       "color": "olive",
       "formality": "casual",
-      "season": ["spring", "summer"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "spring",
+        "summer"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "linen jersey",
       "silhouette": "relaxed boxy",
       "style_notes": "Breathable linen; warm earth tone that works with the warm skin-tone palette.",
       "fit_notes": "Easy drape through the torso; comfort-first.",
-      "source_store": "Everlane"
+      "source_store": "Everlane",
+      "unsplash_query": "olive,linen,tshirt,minimalist"
     },
     {
-      "id": "DM-T008", "type": "top",
+      "id": "DM-T008",
+      "type": "top",
       "name": "Charcoal Cardigan",
       "color": "charcoal",
       "formality": "smart_casual",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["work", "weekend", "travel", "versatile"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "travel",
+        "versatile"
+      ],
       "fabric": "merino wool",
       "silhouette": "open-front",
       "style_notes": "Open layering piece; wears over a blouse, tee, or dress.",
       "fit_notes": "Vertical opening creates elongating lines; layering potential.",
-      "source_store": "Uniqlo"
+      "source_store": "Uniqlo",
+      "unsplash_query": "charcoal,cardigan,knit,layering"
     },
     {
-      "id": "DM-T009", "type": "top",
+      "id": "DM-T009",
+      "type": "top",
       "name": "Cream Turtleneck",
       "color": "cream",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["work", "dinner", "evening", "weekend"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "weekend"
+      ],
       "fabric": "ribbed knit",
       "silhouette": "fitted",
       "style_notes": "High-neck coverage; cream brightens warm skin tones.",
       "fit_notes": "Ribbed knit follows the figure; structured silhouette.",
-      "source_store": "Aritzia"
+      "source_store": "Aritzia",
+      "unsplash_query": "cream,turtleneck,knit,sweater"
     },
     {
-      "id": "DM-T010", "type": "top",
+      "id": "DM-T010",
+      "type": "top",
       "name": "Sage Linen Button-Down",
       "color": "sage",
       "formality": "casual",
-      "season": ["spring", "summer"],
-      "tags": ["casual", "weekend", "travel", "dinner"],
+      "season": [
+        "spring",
+        "summer"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel",
+        "dinner"
+      ],
       "fabric": "linen",
       "silhouette": "relaxed",
       "style_notes": "Soft cool-tone for warm-weather rotation; wears open over a tank.",
       "fit_notes": "Drapey; layering potential.",
-      "source_store": "Madewell"
+      "source_store": "Madewell",
+      "unsplash_query": "sage,linen,buttondown,shirt"
     },
-
     {
-      "id": "DM-B001", "type": "bottom",
+      "id": "DM-B001",
+      "type": "bottom",
       "name": "Black Tailored Trousers",
       "color": "black",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "versatile"
+      ],
       "fabric": "wool-blend suiting",
       "silhouette": "straight",
       "style_notes": "Office-ready foundation; pairs with every top in rotation.",
       "fit_notes": "Sits at the natural waist; elongating vertical lines.",
-      "source_store": "Theory"
+      "source_store": "Theory",
+      "unsplash_query": "black,tailored,trousers,suit"
     },
     {
-      "id": "DM-B002", "type": "bottom",
+      "id": "DM-B002",
+      "type": "bottom",
       "name": "Camel Wide-Leg Trousers",
       "color": "camel",
       "formality": "smart_casual",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["work", "dinner", "weekend"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "weekend"
+      ],
       "fabric": "wool-blend twill",
       "silhouette": "wide-leg",
       "style_notes": "Warm-tone neutral; balanced silhouette pairs with fitted tops.",
       "fit_notes": "High-rise defines the waist; floor-skimming length elongates the leg.",
-      "source_store": "Aritzia"
+      "source_store": "Aritzia",
+      "unsplash_query": "camel,wide,leg,trousers"
     },
     {
-      "id": "DM-B003", "type": "bottom",
+      "id": "DM-B003",
+      "type": "bottom",
       "name": "Indigo Straight Jeans",
       "color": "navy",
       "formality": "casual",
-      "season": ["all"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "rigid denim",
       "silhouette": "straight",
       "style_notes": "True indigo weekend staple.",
       "fit_notes": "Sits high at the waist; clean straight line through the leg.",
-      "source_store": "Levi's"
+      "source_store": "Levi's",
+      "unsplash_query": "indigo,jeans,denim,straight"
     },
     {
-      "id": "DM-B004", "type": "bottom",
+      "id": "DM-B004",
+      "type": "bottom",
       "name": "Cream Pleated Midi Skirt",
       "color": "cream",
       "formality": "smart_casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["work", "dinner", "weekend"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "weekend"
+      ],
       "fabric": "satin twill",
       "silhouette": "midi pleated",
       "style_notes": "Movement-friendly pleats; warm cream brightens warm undertones.",
       "fit_notes": "Sits at the natural waist; flowing midi length.",
-      "source_store": "& Other Stories"
+      "source_store": "& Other Stories",
+      "unsplash_query": "cream,pleated,midi,skirt"
     },
     {
-      "id": "DM-B005", "type": "bottom",
+      "id": "DM-B005",
+      "type": "bottom",
       "name": "Olive Utility Pants",
       "color": "olive",
       "formality": "casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "cotton twill",
       "silhouette": "tapered cargo",
       "style_notes": "Earth-tone weekend pant with comfort signals (stretch, drawstring).",
       "fit_notes": "Tapered through the ankle; comfort-prioritized waistband.",
-      "source_store": "Madewell"
+      "source_store": "Madewell",
+      "unsplash_query": "olive,utility,cargo,pants"
     },
     {
-      "id": "DM-B006", "type": "bottom",
+      "id": "DM-B006",
+      "type": "bottom",
       "name": "Black Slim-Cut Trousers",
       "color": "black",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening"
+      ],
       "fabric": "ponte knit",
       "silhouette": "slim",
       "style_notes": "Ponte stretch for comfort under a polished line.",
       "fit_notes": "Streamlined fit; structured silhouette with stretch comfort.",
-      "source_store": "Banana Republic"
+      "source_store": "Banana Republic",
+      "unsplash_query": "black,slim,trousers,fashion"
     },
     {
-      "id": "DM-B007", "type": "bottom",
+      "id": "DM-B007",
+      "type": "bottom",
       "name": "Tan Linen Shorts",
       "color": "tan",
       "formality": "casual",
-      "season": ["summer"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "summer"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "linen",
       "silhouette": "relaxed",
       "style_notes": "Mid-thigh length; breathable for hot-weather travel.",
       "fit_notes": "Pull-on waist; relaxed leg.",
-      "source_store": "J.Crew"
+      "source_store": "J.Crew",
+      "unsplash_query": "tan,linen,shorts,summer"
     },
     {
-      "id": "DM-B008", "type": "bottom",
+      "id": "DM-B008",
+      "type": "bottom",
       "name": "Burgundy Velvet Trousers",
       "color": "burgundy",
       "formality": "formal",
-      "season": ["fall", "winter"],
-      "tags": ["formal", "evening", "dinner"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "formal",
+        "evening",
+        "dinner"
+      ],
       "fabric": "stretch velvet",
       "silhouette": "wide-leg",
       "style_notes": "Evening-ready jewel-tone velvet; pairs with a cream silk top.",
       "fit_notes": "High-rise; wide-leg silhouette elongates.",
-      "source_store": "Reformation"
+      "source_store": "Reformation",
+      "unsplash_query": "burgundy,velvet,trousers,evening"
     },
-
     {
-      "id": "DM-D001", "type": "dress",
+      "id": "DM-D001",
+      "type": "dress",
       "name": "Black Sheath Dress",
       "color": "black",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "versatile"
+      ],
       "fabric": "ponte knit",
       "silhouette": "sheath",
       "style_notes": "Foundational work-to-dinner piece. Wears alone or under a blazer.",
       "fit_notes": "Structured sheath skims the figure; knee-length elongates the leg.",
-      "source_store": "Theory"
+      "source_store": "Theory",
+      "unsplash_query": "black,sheath,dress,workwear"
     },
     {
-      "id": "DM-D002", "type": "dress",
+      "id": "DM-D002",
+      "type": "dress",
       "name": "Navy Long-Sleeve Midi",
       "color": "navy",
       "formality": "smart_casual",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["work", "dinner", "evening", "date"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "date"
+      ],
       "fabric": "ponte knit",
       "silhouette": "fit-and-flare midi",
       "style_notes": "Cool-tone navy with full sleeve coverage; modesty-preference friendly.",
       "fit_notes": "Defines the waist; midi length elongates.",
-      "source_store": "Aritzia"
+      "source_store": "Aritzia",
+      "unsplash_query": "navy,longsleeve,midi,dress"
     },
     {
-      "id": "DM-D003", "type": "dress",
+      "id": "DM-D003",
+      "type": "dress",
       "name": "Terracotta Wrap Dress",
       "color": "terracotta",
       "formality": "smart_casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["dinner", "weekend", "date", "evening"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "dinner",
+        "weekend",
+        "date",
+        "evening"
+      ],
       "fabric": "viscose crepe",
       "silhouette": "wrap",
       "style_notes": "Warm earth tone; wrap silhouette adjusts to preferred fit.",
       "fit_notes": "Wrap defines the natural waist; midi length flows.",
-      "source_store": "Reformation"
+      "source_store": "Reformation",
+      "unsplash_query": "terracotta,wrap,dress,fashion"
     },
     {
-      "id": "DM-D004", "type": "dress",
+      "id": "DM-D004",
+      "type": "dress",
       "name": "Sage Linen Sundress",
       "color": "sage",
       "formality": "casual",
-      "season": ["summer"],
-      "tags": ["casual", "weekend", "travel", "brunch"],
+      "season": [
+        "summer"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel",
+        "brunch"
+      ],
       "fabric": "linen",
       "silhouette": "A-line",
       "style_notes": "Breathable summer sundress; cool-tone sage.",
       "fit_notes": "Easy A-line shape; comfort-first.",
-      "source_store": "Doen"
+      "source_store": "Doen",
+      "unsplash_query": "sage,linen,sundress,summer"
     },
     {
-      "id": "DM-D005", "type": "dress",
+      "id": "DM-D005",
+      "type": "dress",
       "name": "Ivory Cocktail Dress",
       "color": "ivory",
       "formality": "formal",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["formal", "evening", "date"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "formal",
+        "evening",
+        "date"
+      ],
       "fabric": "structured crepe",
       "silhouette": "structured cocktail",
       "style_notes": "Polished evening option; warm ivory complements warm undertones.",
       "fit_notes": "Structured bodice; supports preferred silhouette.",
-      "source_store": "Reiss"
+      "source_store": "Reiss",
+      "unsplash_query": "ivory,cocktail,dress,evening"
     },
     {
-      "id": "DM-D006", "type": "dress",
+      "id": "DM-D006",
+      "type": "dress",
       "name": "Black Floor-Length Gown",
       "color": "black",
       "formality": "formal",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["formal", "evening", "gala"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "formal",
+        "evening",
+        "gala"
+      ],
       "fabric": "stretch crepe",
       "silhouette": "column",
       "style_notes": "Floor-length column gown for formal events.",
       "fit_notes": "Long vertical line elongates; sleeveless silhouette.",
-      "source_store": "Net-a-Porter"
+      "source_store": "Net-a-Porter",
+      "unsplash_query": "black,gown,floor,length"
     },
     {
-      "id": "DM-D007", "type": "dress",
+      "id": "DM-D007",
+      "type": "dress",
       "name": "Burgundy Long-Sleeve Maxi",
       "color": "burgundy",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["dinner", "evening", "date", "weekend"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "dinner",
+        "evening",
+        "date",
+        "weekend"
+      ],
       "fabric": "viscose jersey",
       "silhouette": "maxi",
       "style_notes": "Warm jewel-tone maxi; full sleeve and length coverage.",
       "fit_notes": "Skims the figure; covered coverage supports modesty preference.",
-      "source_store": "Aritzia"
+      "source_store": "Aritzia",
+      "unsplash_query": "burgundy,maxi,dress,longsleeve"
     },
-
     {
-      "id": "DM-O001", "type": "outerwear",
+      "id": "DM-O001",
+      "type": "outerwear",
       "name": "Camel Wool Coat",
       "color": "camel",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["work", "dinner", "weekend", "evening"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "weekend",
+        "evening"
+      ],
       "fabric": "wool blend",
       "silhouette": "single-breasted",
       "style_notes": "Iconic camel topcoat; matches the warm skin-tone palette.",
       "fit_notes": "Structured shoulders; layering potential over knits and dresses.",
-      "source_store": "Max Mara"
+      "source_store": "Max Mara",
+      "unsplash_query": "camel,wool,coat,winter"
     },
     {
-      "id": "DM-O002", "type": "outerwear",
+      "id": "DM-O002",
+      "type": "outerwear",
       "name": "Black Tailored Blazer",
       "color": "black",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "versatile"
+      ],
       "fabric": "wool blend",
       "silhouette": "fitted blazer",
       "style_notes": "Goes-with-everything blazer; structured polish for work and dinner.",
       "fit_notes": "Tailored at the waist; structured shoulder.",
-      "source_store": "Theory"
+      "source_store": "Theory",
+      "unsplash_query": "black,blazer,tailored,suit"
     },
     {
-      "id": "DM-O003", "type": "outerwear",
+      "id": "DM-O003",
+      "type": "outerwear",
       "name": "Beige Trench Coat",
       "color": "beige",
       "formality": "smart_casual",
-      "season": ["spring", "fall"],
-      "tags": ["work", "weekend", "travel"],
+      "season": [
+        "spring",
+        "fall"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "travel"
+      ],
       "fabric": "cotton gabardine",
       "silhouette": "double-breasted trench",
       "style_notes": "Rain-friendly outerwear with a defined waist belt.",
       "fit_notes": "Belted at the waist; vertical column elongates.",
-      "source_store": "Burberry"
+      "source_store": "Burberry",
+      "unsplash_query": "beige,trench,coat,rain"
     },
     {
-      "id": "DM-O004", "type": "outerwear",
+      "id": "DM-O004",
+      "type": "outerwear",
       "name": "Navy Quilted Vest",
       "color": "navy",
       "formality": "casual",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "quilted polyfill",
       "silhouette": "vest",
       "style_notes": "Lightweight insulation that layers under a coat.",
       "fit_notes": "Open-arm shape; easy layering.",
-      "source_store": "Patagonia"
+      "source_store": "Patagonia",
+      "unsplash_query": "navy,quilted,vest,outerwear"
     },
     {
-      "id": "DM-O005", "type": "outerwear",
+      "id": "DM-O005",
+      "type": "outerwear",
       "name": "Cream Cropped Cardigan",
       "color": "cream",
       "formality": "smart_casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["work", "weekend", "dinner"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "dinner"
+      ],
       "fabric": "merino",
       "silhouette": "cropped",
       "style_notes": "Cropped layering piece; brightens warm undertones.",
       "fit_notes": "Hits at the natural waist; defines proportion.",
-      "source_store": "Aritzia"
+      "source_store": "Aritzia",
+      "unsplash_query": "cream,cropped,cardigan,knit"
     },
     {
-      "id": "DM-O006", "type": "outerwear",
+      "id": "DM-O006",
+      "type": "outerwear",
       "name": "Forest Green Puffer",
       "color": "forest",
       "formality": "casual",
-      "season": ["winter"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "winter"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "fabric": "downfill",
       "silhouette": "mid-length puffer",
       "style_notes": "Cold-weather warm tone with warm fill insulation.",
       "fit_notes": "Mid-length covers through the hip; structured belted shape.",
-      "source_store": "Uniqlo"
+      "source_store": "Uniqlo",
+      "unsplash_query": "forest,green,puffer,jacket"
     },
-
     {
-      "id": "DM-A001", "type": "activewear",
+      "id": "DM-A001",
+      "type": "activewear",
       "name": "Black High-Rise Leggings",
       "color": "black",
       "formality": "athletic",
-      "season": ["all"],
-      "tags": ["gym", "workout"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "gym",
+        "workout"
+      ],
       "fabric": "compression knit",
       "silhouette": "fitted",
       "style_notes": "Support and stretch for studio classes.",
       "fit_notes": "High-rise at the natural waist; vertical seam elongates.",
-      "source_store": "Lululemon"
+      "source_store": "Lululemon",
+      "unsplash_query": "black,leggings,athletic,gym"
     },
     {
-      "id": "DM-A002", "type": "activewear",
+      "id": "DM-A002",
+      "type": "activewear",
       "name": "Sage Sports Bra",
       "color": "sage",
       "formality": "athletic",
-      "season": ["all"],
-      "tags": ["gym", "workout"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "gym",
+        "workout"
+      ],
       "fabric": "compression knit",
       "silhouette": "medium-impact",
       "style_notes": "Medium-impact support for cardio + strength.",
       "fit_notes": "Wide band; covered shoulder coverage.",
-      "source_store": "Outdoor Voices"
+      "source_store": "Outdoor Voices",
+      "unsplash_query": "sage,sports,bra,athletic"
     },
     {
-      "id": "DM-A003", "type": "activewear",
+      "id": "DM-A003",
+      "type": "activewear",
       "name": "Charcoal Athletic Tee",
       "color": "charcoal",
       "formality": "athletic",
-      "season": ["all"],
-      "tags": ["gym", "workout"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "gym",
+        "workout"
+      ],
       "fabric": "performance knit",
       "silhouette": "relaxed",
       "style_notes": "Moisture-wicking knit; relaxed shape.",
       "fit_notes": "Easy fit; comfort-first.",
-      "source_store": "Vuori"
+      "source_store": "Vuori",
+      "unsplash_query": "charcoal,athletic,tshirt,training"
     },
     {
-      "id": "DM-A004", "type": "activewear",
+      "id": "DM-A004",
+      "type": "activewear",
       "name": "Camel Studio Joggers",
       "color": "camel",
       "formality": "athletic",
-      "season": ["all"],
-      "tags": ["gym", "workout", "travel"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "gym",
+        "workout",
+        "travel"
+      ],
       "fabric": "soft fleece",
       "silhouette": "tapered jogger",
       "style_notes": "Travel-friendly between-class layer.",
       "fit_notes": "Drawstring waist; tapered ankle.",
-      "source_store": "Vuori"
+      "source_store": "Vuori",
+      "unsplash_query": "joggers,sweatpants,athleisure"
     }
   ],
-
   "shoes": [
     {
       "id": "DM-S001",
       "name": "Nude Block-Heel Pumps",
       "color": "nude",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "versatile"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "pointed block heel",
       "style_notes": "Elongating nude pump in a stable block-heel construction.",
       "fit_notes": "2-inch block heel — comfort-first; nude tone elongates the leg.",
-      "source_store": "Sam Edelman"
+      "source_store": "Sam Edelman",
+      "unsplash_query": "nude,block,heel,pumps"
     },
     {
       "id": "DM-S002",
       "name": "Black Pointed-Toe Heels",
       "color": "black",
       "formality": "formal",
-      "season": ["all"],
-      "tags": ["formal", "evening", "dinner"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "formal",
+        "evening",
+        "dinner"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "pointed stiletto",
       "style_notes": "Evening foundation in classic black leather.",
       "fit_notes": "Pointed toe streamlines; supports formal silhouette.",
-      "source_store": "Stuart Weitzman"
+      "source_store": "Stuart Weitzman",
+      "unsplash_query": "black,pointed,toe,heels"
     },
     {
       "id": "DM-S003",
       "name": "White Leather Sneakers",
       "color": "white",
       "formality": "casual",
-      "season": ["all"],
-      "tags": ["casual", "weekend", "travel"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "travel"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "court sneaker",
       "style_notes": "Clean white minimalist sneaker; wears with casual to smart-casual.",
       "fit_notes": "Comfort-first; supports long-day standing.",
-      "source_store": "Veja"
+      "source_store": "Veja",
+      "unsplash_query": "white,leather,sneakers,minimal"
     },
     {
       "id": "DM-S004",
       "name": "Tan Leather Ankle Boots",
       "color": "tan",
       "formality": "smart_casual",
-      "season": ["fall", "winter"],
-      "tags": ["work", "weekend", "dinner"],
+      "season": [
+        "fall",
+        "winter"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "dinner"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "Chelsea boot",
       "style_notes": "Warm-tone boot for fall/winter rotation.",
       "fit_notes": "Low block heel; comfort-first; pairs with denim and trousers.",
-      "source_store": "Madewell"
+      "source_store": "Madewell",
+      "unsplash_query": "tan,leather,ankle,boots"
     },
     {
       "id": "DM-S005",
       "name": "Beige Flat Ballet Shoes",
       "color": "beige",
       "formality": "casual",
-      "season": ["spring", "summer", "fall"],
-      "tags": ["casual", "weekend", "work", "travel"],
+      "season": [
+        "spring",
+        "summer",
+        "fall"
+      ],
+      "tags": [
+        "casual",
+        "weekend",
+        "work",
+        "travel"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "ballet flat",
       "style_notes": "Office-friendly flat; warm beige tone.",
       "fit_notes": "Soft padded sole; comfort-first.",
-      "source_store": "Ferragamo"
+      "source_store": "Ferragamo",
+      "unsplash_query": "beige,ballet,flats,shoes"
     },
     {
       "id": "DM-S006",
       "name": "Black Strappy Sandals",
       "color": "black",
       "formality": "formal",
-      "season": ["spring", "summer"],
-      "tags": ["formal", "evening", "dinner", "date"],
+      "season": [
+        "spring",
+        "summer"
+      ],
+      "tags": [
+        "formal",
+        "evening",
+        "dinner",
+        "date"
+      ],
       "type": "shoes",
       "fabric": "leather",
       "silhouette": "strappy heel",
       "style_notes": "Evening sandal for warm-weather formal looks.",
       "fit_notes": "Adjustable ankle strap; thin straps lengthen the silhouette.",
-      "source_store": "Stuart Weitzman"
+      "source_store": "Stuart Weitzman",
+      "unsplash_query": "black,strappy,sandals,heels"
     },
     {
       "id": "DM-S007",
       "name": "White Running Sneakers",
       "color": "white",
       "formality": "athletic",
-      "season": ["all"],
-      "tags": ["gym", "workout"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "gym",
+        "workout"
+      ],
       "type": "shoes",
       "fabric": "performance mesh",
       "silhouette": "trainer",
       "style_notes": "Cushioned trainer for cardio days.",
       "fit_notes": "Responsive sole; supports active movement.",
-      "source_store": "Nike"
+      "source_store": "Nike",
+      "unsplash_query": "white,running,sneakers,trainers"
     }
   ],
-
   "accessories": [
     {
       "id": "DM-X001",
       "name": "Gold Hoop Earrings",
       "color": "gold",
       "formality": "smart_casual",
-      "season": ["all"],
-      "tags": ["work", "dinner", "weekend", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "weekend",
+        "evening",
+        "versatile"
+      ],
       "type": "accessory",
       "style_notes": "Gold tones complement warm undertones per color rules.",
-      "source_store": "Mejuri"
+      "source_store": "Mejuri",
+      "unsplash_query": "gold,hoop,earrings,jewelry"
     },
     {
       "id": "DM-X002",
       "name": "Pearl Stud Earrings",
       "color": "white",
       "formality": "formal",
-      "season": ["all"],
-      "tags": ["formal", "work", "dinner", "evening"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "formal",
+        "work",
+        "dinner",
+        "evening"
+      ],
       "type": "accessory",
       "style_notes": "Soft luminous studs for polished looks.",
-      "source_store": "Mejuri"
+      "source_store": "Mejuri",
+      "unsplash_query": "pearl,stud,earrings,jewelry"
     },
     {
       "id": "DM-X003",
       "name": "Camel Leather Belt",
       "color": "camel",
       "formality": "smart_casual",
-      "season": ["all"],
-      "tags": ["work", "weekend", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "versatile"
+      ],
       "type": "accessory",
       "style_notes": "Defines the waist on midi skirts, wrap blouses, and high-rise trousers.",
       "fit_notes": "Adjustable; supports preferred waist definition.",
-      "source_store": "Anderson's"
+      "source_store": "Anderson's",
+      "unsplash_query": "camel,leather,belt,fashion"
     },
     {
       "id": "DM-X004",
       "name": "Black Structured Handbag",
       "color": "black",
       "formality": "business",
-      "season": ["all"],
-      "tags": ["work", "dinner", "evening", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "evening",
+        "versatile"
+      ],
       "type": "accessory",
       "style_notes": "Structured top-handle silhouette; goes with everything.",
-      "source_store": "Polène"
+      "source_store": "Polène",
+      "unsplash_query": "black,structured,handbag,leather"
     },
     {
       "id": "DM-X005",
       "name": "Tan Leather Tote",
       "color": "tan",
       "formality": "casual",
-      "season": ["all"],
-      "tags": ["work", "weekend", "travel", "versatile"],
+      "season": [
+        "all"
+      ],
+      "tags": [
+        "work",
+        "weekend",
+        "travel",
+        "versatile"
+      ],
       "type": "accessory",
       "style_notes": "Spacious work-or-weekend carry in warm tan.",
-      "source_store": "Cuyana"
+      "source_store": "Cuyana",
+      "unsplash_query": "tan,leather,tote,bag"
     },
     {
       "id": "DM-X006",
       "name": "Silk Scarf — Warm Print",
       "color": "burgundy",
       "formality": "smart_casual",
-      "season": ["fall", "winter", "spring"],
-      "tags": ["work", "dinner", "weekend", "travel"],
+      "season": [
+        "fall",
+        "winter",
+        "spring"
+      ],
+      "tags": [
+        "work",
+        "dinner",
+        "weekend",
+        "travel"
+      ],
       "type": "accessory",
       "style_notes": "Warm-print silk; wears at the neck or knotted on a bag handle.",
-      "source_store": "Hermès"
+      "source_store": "Hermès",
+      "unsplash_query": "silk,scarf,burgundy,print"
     }
   ]
 }
