@@ -114,6 +114,12 @@ RULES: Dict[str, _Rule] = {
         rule_id="R2",
         summary="Fit-profile fields are optional; missing fields skip the note.",
     ),
+    "fit#R8": _Rule(
+        skill_file="fit-silhouette-rules.md",
+        rule_id="R8",
+        summary="Measurement-derived profile suggestions are preference-based, "
+                "never prescriptive — user opts in, body-positive language only.",
+    ),
 
     # Step 5 -- wear history ---------------------------------------
     "history#R2": _Rule(

@@ -736,6 +736,62 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
         if any(sig in haystack_mod for sig in modest_signals):
             notes.append(f"respects your {modesty} modesty preference")
 
+    # ── Highlight / balance areas — fit-silhouette-rules.md §R8 ──
+    # The user's chosen highlight_features and balance_areas are the
+    # opt-in part of the R8 mapping. We surface a soft note when the
+    # item's silhouette obviously aligns with one of the user's chosen
+    # areas, citing R8 so the reasoning is traceable. Body-positive
+    # vocabulary only: "draws attention to" and "supports balance at",
+    # never "hide" or "minimize".
+    try:
+        from rule_refs import cite as _cite_rule
+    except Exception:  # pragma: no cover — registry is import-light
+        def _cite_rule(_slug: str) -> str:  # type: ignore
+            return ""
+
+    _SILHOUETTE_SIGNALS = {
+        "waist":       ("belted", "cinched", "wrap", "sheath",
+                        "fit-and-flare", "fit and flare", "waist-defined",
+                        "peplum", "tailored"),
+        "neckline":    ("v-neck", "scoop", "square neck", "boat neck",
+                        "halter", "off-shoulder", "off shoulder",
+                        "sweetheart", "cowl"),
+        "shoulders":   ("structured shoulder", "strong shoulder",
+                        "padded shoulder", "off-shoulder", "halter"),
+        "legs":        ("mini", "midi slit", "slit", "cropped pant",
+                        "cropped trouser", "tapered"),
+        "collarbone":  ("boat neck", "off-shoulder", "scoop", "v-neck"),
+        "hips":        ("peplum", "a-line", "flared", "fit-and-flare"),
+        "arms":        ("short sleeve", "sleeveless", "tank", "camisole"),
+        "back":        ("open back", "low back", "halter"),
+    }
+
+    haystack_silhouette = (
+        " ".join([
+            (item.get("name") or "").lower(),
+            (item.get("silhouette") or "").lower(),
+            " ".join([t.lower() for t in (item.get("tags") or [])]),
+        ])
+    )
+
+    highlight = [a.lower() for a in (profile.get("highlight_features") or [])]
+    for area in highlight:
+        signals = _SILHOUETTE_SIGNALS.get(area, ())
+        if signals and any(sig in haystack_silhouette for sig in signals):
+            cite_tag = _cite_rule("fit#R8")
+            tail = f" {cite_tag}" if cite_tag else ""
+            notes.append(f"draws attention to your {area}{tail}")
+            break  # one highlight note per item — avoids stacking
+
+    balance = [a.lower() for a in (profile.get("balance_areas") or [])]
+    for area in balance:
+        signals = _SILHOUETTE_SIGNALS.get(area, ())
+        if signals and any(sig in haystack_silhouette for sig in signals):
+            cite_tag = _cite_rule("fit#R8")
+            tail = f" {cite_tag}" if cite_tag else ""
+            notes.append(f"supports balance at your {area}{tail}")
+            break
+
     return [f"  {n.capitalize()}." for n in notes]
 
 

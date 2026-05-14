@@ -4896,6 +4896,224 @@ def _render_shop():
 # PROFILE — mock profile screen
 # ─────────────────────────────────────────────
 
+def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> None:
+    """
+    "Analyze measurements" panel — surfaces R8-grounded styling
+    suggestions when the user has shared bust+waist+hips. Nothing is
+    saved until the user picks fields and clicks "Apply suggestions".
+
+    Source basis: skills/wearly-styling-agent/fit-silhouette-rules.md
+    §R8. Every suggestion shown here carries the `[fit-silhouette-rules#R8]`
+    citation next to it; the same slug appears in `rule_refs.py`.
+
+    Body-positive language contract (fit#R1) is enforced two ways:
+      1. The suggestion strings come from profile_inference, which uses
+         "highlight / balance / support" verbs only.
+      2. save_fit_profile() screens every value via
+         check_value_for_forbidden_language() before persisting, so a
+         malicious profile_inference change still can't slip a
+         corrective verb through.
+    """
+    try:
+        from profile_inference import (
+            suggest_profile_from_measurements,
+            apply_suggestions,
+        )
+        from fit_tool import save_fit_profile
+    except Exception as _e:
+        # Defensive — the panel must never break the Profile page.
+        return
+
+    # The analyze button is the explicit opt-in. We never compute
+    # suggestions on page load — the user must click. This keeps the
+    # UI calm and the "no diagnosis" framing honest.
+    btn_col, info_col = st.columns([1, 3], gap="medium")
+    with btn_col:
+        analyze_clicked = st.button(
+            "Analyze measurements",
+            key="profile_analyze_btn",
+            type="secondary",
+            use_container_width=True,
+            help="Suggest preference-based styling profile fields from "
+                 "your measurements. Nothing is saved until you review "
+                 "and apply.",
+        )
+    with info_col:
+        st.markdown(
+            "<div style='font-size:0.78rem; color:#6E6E73; "
+            "line-height:1.55; padding-top:0.35rem;'>"
+            "Suggestions are <strong>preference-based, not a diagnosis</strong>. "
+            "Wearly never overwrites your saved choices — you review each "
+            "chip and apply only what feels right. "
+            "Grounded in <code style='font-size:0.74rem;'>fit-silhouette-rules.md §R8</code>."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Persist the latest analysis in session_state so the chips remain
+    # visible across the rerun caused by selecting checkboxes / pressing
+    # Apply. Cleared by the Apply handler.
+    if analyze_clicked:
+        st.session_state["_profile_inference_result"] = \
+            suggest_profile_from_measurements(measurements, profile)
+
+    result = st.session_state.get("_profile_inference_result")
+    if not result or not result.get("available"):
+        # Either the user hasn't clicked Analyze yet (no result) or
+        # they have but measurements are insufficient. The latter case
+        # gets a soft prompt.
+        if result and result.get("missing"):
+            st.info(
+                "Add at least bust, waist, and hip measurements below "
+                "to unlock preference-based styling suggestions. "
+                "Every suggestion is optional and editable."
+            )
+        return
+
+    suggestions = result.get("suggestions", {})
+
+    # Framing copy from profile_inference — the body-positive,
+    # not-a-diagnosis preamble. Rendered once at the top of the panel.
+    st.markdown(
+        '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+        'border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+        'Suggested styling profile</div>'
+        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
+        'color:#111111; line-height:1.15; margin-bottom:0.6rem;">'
+        'Preference-based, not a diagnosis'
+        '</div>'
+        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+        + "<br>".join(result.get("notes", []))
+        + '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    # Per-field chips with a checkbox. Each chip shows: field name,
+    # suggested value, confidence label, user-locked badge if already
+    # set, plain-English reason, and the R8 citation.
+    _CONF_COLOR = {"high": "#1D6033", "medium": "#7D5A00",
+                   "low": "#7A1D21", "weak heuristic": "#7A1D21"}
+
+    selected: list = []
+
+    def _chip_row(field_key: str, label: str, sug: dict) -> bool:
+        """Render one chip row; returns True if the checkbox is on."""
+        value_str = sug.get("value")
+        if not value_str:
+            value_str = ", ".join(sug.get("values") or [])
+        conf = sug.get("confidence", "medium")
+        conf_color = _CONF_COLOR.get(conf, "#6E6E73")
+        locked = sug.get("user_locked", False)
+        current = sug.get("current")
+        current_str = (
+            current if isinstance(current, str)
+            else (", ".join(current) if current else "—")
+        )
+
+        cols = st.columns([0.6, 5], gap="medium")
+        with cols[0]:
+            # Don't pre-check anything — the user must opt-in per chip.
+            on = st.checkbox(
+                " ", key=f"profile_sug_chk_{field_key}", value=False,
+                label_visibility="collapsed",
+            )
+        with cols[1]:
+            badge_html = (
+                f'<span style="font-size:0.6rem; color:{conf_color}; '
+                f'letter-spacing:0.08em; text-transform:uppercase; '
+                f'font-weight:600; margin-left:0.6rem;">'
+                f'{conf}</span>'
+            )
+            lock_html = (
+                '<span style="font-size:0.6rem; color:#7D5A00; '
+                'letter-spacing:0.08em; text-transform:uppercase; '
+                'font-weight:600; margin-left:0.6rem;">'
+                'YOU\'VE SET A VALUE</span>'
+                if locked else ""
+            )
+            st.markdown(
+                f'<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
+                f'border-radius:6px; padding:0.85rem 1.1rem; margin-bottom:0.6rem;">'
+                f'<div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:0.3rem;">'
+                f'<span style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+                f'text-transform:uppercase; font-weight:600;">{label}</span>'
+                f'{badge_html}{lock_html}'
+                f'</div>'
+                f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.25rem; '
+                f'color:#111111; line-height:1.1; margin:0.35rem 0;">{value_str}</div>'
+                f'<div style="font-size:0.76rem; color:#2E2E2E; line-height:1.5;">'
+                f'{sug.get("reason", "")}</div>'
+                f'<div style="font-size:0.7rem; color:#8E8E93; margin-top:0.45rem;">'
+                f'Currently saved: <strong>{current_str}</strong> &nbsp;·&nbsp; '
+                f'Source basis: <code style="font-size:0.7rem;">'
+                f'[{sug.get("rule_ref","fit#R8").replace("#","-rules#")}]</code>'
+                f'</div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        return on
+
+    field_labels = [
+        ("body_shape",         "Body shape"),
+        ("highlight_features", "Features you may choose to highlight"),
+        ("balance_areas",      "Areas you may choose to balance"),
+        ("preferred_fit",      "Preferred fit"),
+    ]
+    for fkey, flabel in field_labels:
+        if fkey in suggestions:
+            if _chip_row(fkey, flabel, suggestions[fkey]):
+                selected.append(fkey)
+
+    # Apply controls — the user must EXPLICITLY click Apply. Nothing is
+    # saved by the checkboxes alone.
+    apply_col, cancel_col, status_col = st.columns([1, 1, 4], gap="medium")
+    with apply_col:
+        apply_clicked = st.button(
+            "Apply suggestions",
+            key="profile_sug_apply_btn",
+            type="primary",
+            use_container_width=True,
+            disabled=not selected,
+            help=("Merge the checked suggestions into your profile. "
+                  "Highlight / balance lists are unioned with your "
+                  "existing choices; body_shape and preferred_fit "
+                  "replace the current value if checked."),
+        )
+    with cancel_col:
+        cancel_clicked = st.button(
+            "Discard suggestions",
+            key="profile_sug_cancel_btn",
+            use_container_width=True,
+            help="Close the panel without saving anything.",
+        )
+
+    if apply_clicked and selected:
+        updates = apply_suggestions(profile, result, selected)
+        if updates:
+            res = save_fit_profile(updates)
+            if res.get("success"):
+                # Mark body_shape provenance as user-confirmed since the
+                # user actively applied it.
+                if "body_shape" in updates:
+                    save_fit_profile({"_body_shape_source": "user"})
+                st.session_state.pop("_profile_inference_result", None)
+                st.success(
+                    f"Applied {len(updates)} suggestion"
+                    f"{'s' if len(updates) != 1 else ''} to your profile. "
+                    "You can edit any field in the form below."
+                )
+                st.rerun()
+            else:
+                st.error(
+                    f"Could not save: {res.get('error', 'unknown error')}."
+                )
+    elif cancel_clicked:
+        st.session_state.pop("_profile_inference_result", None)
+        st.rerun()
+
+
 def _render_profile():
     # Pull the merged fit profile (seed owner + user overlay).
     try:
@@ -5135,6 +5353,15 @@ def _render_profile():
                 '</div></div>',
                 unsafe_allow_html=True,
             )
+
+        # ── Analyze measurements → preference-based styling suggestions ──
+        # Surfaces R8-grounded suggestions for body_shape / highlight /
+        # balance / preferred_fit derived from bust+waist+hips. Nothing
+        # is saved until the user picks fields and clicks Apply — the
+        # rule pack (fit-silhouette-rules.md §R8) is the basis for every
+        # value shown here, and the citation is rendered next to each
+        # chip so the user can read the rule.
+        _render_measurement_analysis_panel(profile, _meas)
 
     # ── Edit form (overlay only — never touches seed wardrobe) ──
     # First-time users land on a blank seed and can fill in everything;
