@@ -4170,7 +4170,40 @@ def _render_wardrobe():
         _photos_on   = False
         load_demo_wardrobe = unload_demo_wardrobe = None  # type: ignore
 
-    if load_demo_wardrobe is not None:
+    # Visibility rule for the demo-wardrobe card:
+    #
+    #   - Demo IS loaded → ALWAYS show the card. It's the only way for
+    #     the user to remove the demo set, and the "Reload demo" affordance
+    #     belongs here.
+    #   - Demo is NOT loaded AND user has their own items in the overlay
+    #     (link-imports, manual entries) → HIDE the card. A user who
+    #     has built a personal wardrobe doesn't need the onboarding
+    #     CTA above their closet; showing it risks a misclick that
+    #     would mix 48 curated demo items into their real closet.
+    #   - Demo is NOT loaded AND the overlay is empty → SHOW the card.
+    #     This is the fresh-clone / public-Streamlit-Cloud path; the
+    #     demo loader is the documented one-click onboarding.
+    #
+    # The card auto re-appears if the user later clears their wardrobe.
+    _user_has_personal_items = False
+    try:
+        from wardrobe_tool import get_user_wardrobe as _gw
+        _ovl = _gw().get("user_wardrobe", {}) or {}
+        _user_has_personal_items = (
+            bool(_ovl.get("clothing"))
+            or bool(_ovl.get("shoes"))
+            or bool(_ovl.get("accessories"))
+        )
+    except Exception:
+        # If the overlay can't be read for any reason, fail OPEN —
+        # show the card so a user in trouble can rebuild quickly.
+        _user_has_personal_items = False
+    _show_demo_card = (
+        load_demo_wardrobe is not None
+        and (_demo_active or not _user_has_personal_items)
+    )
+
+    if _show_demo_card:
         # Always-visible card (not an expander) — the previous
         # collapsed expander was missed twice. This sits at the very
         # top of the Wardrobe page, above Backup & Restore.
