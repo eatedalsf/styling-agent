@@ -4412,6 +4412,15 @@ def _render_wardrobe():
             st.error(f"Link import module unavailable: {_e}")
             import_product_link = None
 
+        # Post-save banner — set by the Save handler below before it
+        # reruns the script. Pop after rendering so it only shows once.
+        # Without this, the success message rendered inside the form
+        # handler would have been lost when we cleared widget state and
+        # rerun the script.
+        _pending_link_msg = st.session_state.pop("_link_save_message", None)
+        if _pending_link_msg:
+            st.success(_pending_link_msg)
+
         url_col_a, url_col_b = st.columns([5, 2], gap="small")
         with url_col_a:
             link_url = st.text_input(
@@ -4668,13 +4677,26 @@ def _render_wardrobe():
                         if added.get("source_url"):
                             chips.append(f"[original link]({added['source_url']})")
                         chip_str = " · ".join(chips)
-                        st.success(
+                        # Stash the success message — it must survive the
+                        # rerun that resets the URL + form widget state.
+                        st.session_state["_link_save_message"] = (
                             f"Saved **{added['name']}** ({added['color']}, {added['type']}) "
                             f"as `{added['id']}` {chip_str}. It's now eligible for outfits tagged "
                             f"{', '.join(added['tags']) or added['type']}."
                         )
-                        # Clear the analyzed state so the next URL is a fresh start.
-                        st.session_state.pop("link_data", None)
+                        # Full reset: URL input, analyzed metadata, and
+                        # every form widget key. Streamlit caches widget
+                        # values by key in session_state; popping them
+                        # forces the next render to start from defaults.
+                        # Only Link-tab keys (l_*) are touched — the
+                        # Manual and Photo tabs are not affected, and the
+                        # saved item in user_wardrobe.json is untouched.
+                        for _k in ("link_data", "l_url_input",
+                                   "l_name", "l_color", "l_category",
+                                   "l_formality", "l_seasons", "l_tags",
+                                   "l_image_url"):
+                            st.session_state.pop(_k, None)
+                        st.rerun()
                     else:
                         st.error(f"Could not save: {res.get('error', 'unknown error')}")
         else:
