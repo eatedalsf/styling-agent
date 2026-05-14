@@ -4980,6 +4980,50 @@ def _render_shop():
 # PROFILE — mock profile screen
 # ─────────────────────────────────────────────
 
+def _render_autofill_summary(profile: dict, source_label: str) -> None:
+    """
+    Calm read-only summary of what was auto-filled into the fit
+    profile. Replaces the previous "tick a chip, click Apply" UI.
+    Values are written to disk by `fit_tool.save_fit_profile`'s
+    R8 auto-fill — this card just surfaces what got applied so the
+    user can see the source basis. Anything left empty (or anything
+    the user has explicitly edited) is reflected verbatim.
+
+    `source_label` is interpolated into the headline:
+      "Auto-filled from <source_label>" — e.g.
+        "your selection"    (manual mode)
+        "your measurements" (measurements mode)
+    """
+    body_shape = profile.get("body_shape") or "—"
+    highlights = profile.get("highlight_features") or []
+    balances   = profile.get("balance_areas") or []
+    preferred  = profile.get("preferred_fit") or "—"
+
+    def _list_or_dash(values):
+        return ", ".join(values) if values else "—"
+
+    st.markdown(
+        '<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
+        'border-radius:6px; padding:0.9rem 1.1rem 0.95rem; '
+        'margin:0.8rem 0 0.6rem; line-height:1.6;">'
+        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.45rem;">'
+        f'Auto-filled from {source_label}'
+        '</div>'
+        f'<div style="font-size:0.86rem; color:#1C1917;">'
+        f'<strong>Body shape:</strong> {body_shape.title() if isinstance(body_shape, str) else "—"}<br>'
+        f'<strong>Features to highlight:</strong> {_list_or_dash(highlights)}<br>'
+        f'<strong>Areas to balance:</strong> {_list_or_dash(balances)}<br>'
+        f'<strong>Preferred fit:</strong> {(preferred or "—").title() if isinstance(preferred, str) else "—"}'
+        f'</div>'
+        '<div style="font-size:0.7rem; color:#8E8E93; margin-top:0.55rem;">'
+        'Edit any of these in the form below. '
+        '<code style="font-size:0.7rem; color:#8E8E93;">[fit-silhouette-rules#R8]</code>'
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+
 def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> None:
     """
     Always-visible Analyze panel. Surfaces R8-grounded styling
@@ -4997,202 +5041,38 @@ def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> Non
       2. save_fit_profile() screens every value via
          check_value_for_forbidden_language() before persisting.
     """
-    try:
-        from profile_inference import (
-            suggest_profile_from_measurements,
-            apply_suggestions,
-        )
-        from fit_tool import save_fit_profile
-    except Exception:
-        # Defensive — the panel must never break the Profile page.
-        return
-
     # Sufficiency check up front so we render the right state.
     _bwh = ("bust", "waist", "hips")
     _have = {k for k in _bwh
              if isinstance(measurements.get(k), (int, float))
              and measurements.get(k, 0) > 0}
-    _ready_for_analysis = (_have == set(_bwh))
+    _ready = (_have == set(_bwh))
     _missing = [k for k in _bwh if k not in _have]
 
-    # Card frame so the panel reads as a first-class section.
+    # Slim header — one eyebrow + one line. Citation moves to the
+    # auto-fill summary card so it doesn't appear twice.
     st.markdown(
-        '<div style="background:#FFFFFF; border:2px solid #111111; '
-        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
-        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="margin-bottom:0.6rem;">'
         '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
-        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
-        'Fit profile · testing lab</div>'
-        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
-        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
-        'Analyze measurements and suggest styling profile'
-        '</div>'
-        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
-        "Preference-based, not a diagnosis. Wearly maps your bust / waist / "
-        "hip ratios to documented industry styling heuristics "
-        "<code style='font-size:0.74rem;'>[fit-silhouette-rules#R8]</code> "
-        "and shows the suggestions for your review. Nothing is saved unless "
-        "you check a chip and click Apply."
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.35rem;">'
+        'Fit profile · measurements</div>'
+        '<div style="font-size:1.05rem; color:#111111; line-height:1.3;">'
+        'Enter bust, waist, and hips below — Wearly will fill the rest.'
         '</div></div>',
         unsafe_allow_html=True,
     )
 
-    # ── EMPTY STATE: no bust/waist/hips yet ────────────────────────
-    if not _ready_for_analysis:
+    if not _ready:
         st.info(
-            "**To unlock suggestions, share at least bust, waist, and "
-            "hip measurements.** "
-            f"Missing: {', '.join(_missing) if _missing else 'all three'}. "
-            "Open *Edit your profile, preferences & measurements* below "
-            "and fill in those fields — every measurement is optional "
-            "and editable."
+            f"Add **{', '.join(_missing) if _missing else 'bust, waist, hips'}** "
+            "below to auto-fill your styling fields."
         )
         return
 
-    # ── READY: button + result ─────────────────────────────────────
-    btn_col, _spacer = st.columns([1, 2], gap="small")
-    with btn_col:
-        analyze_clicked = st.button(
-            "Analyze measurements →",
-            key="profile_analyze_btn",
-            type="primary",
-            use_container_width=True,
-            help="Compute preference-based styling suggestions from "
-                 "your measurements. Nothing is saved until you Apply.",
-        )
-
-    if analyze_clicked:
-        st.session_state["_profile_inference_result"] = \
-            suggest_profile_from_measurements(measurements, profile)
-
-    result = st.session_state.get("_profile_inference_result")
-    if not result or not result.get("available"):
-        return
-
-    suggestions = result.get("suggestions", {})
-
-    # Per-field chips with a checkbox. Each chip shows: field name,
-    # suggested value, confidence label, user-locked badge if already
-    # set, plain-English reason, and the R8 citation.
-    _CONF_COLOR = {"high": "#1D6033", "medium": "#7D5A00",
-                   "low": "#7A1D21", "weak heuristic": "#7A1D21"}
-
-    selected: list = []
-
-    def _chip_row(field_key: str, label: str, sug: dict) -> bool:
-        """Render one chip row; returns True if the checkbox is on."""
-        value_str = sug.get("value")
-        if not value_str:
-            value_str = ", ".join(sug.get("values") or [])
-        conf = sug.get("confidence", "medium")
-        conf_color = _CONF_COLOR.get(conf, "#6E6E73")
-        locked = sug.get("user_locked", False)
-        current = sug.get("current")
-        current_str = (
-            current if isinstance(current, str)
-            else (", ".join(current) if current else "—")
-        )
-
-        cols = st.columns([0.6, 5], gap="medium")
-        with cols[0]:
-            # Don't pre-check anything — the user must opt-in per chip.
-            on = st.checkbox(
-                " ", key=f"profile_sug_chk_{field_key}", value=False,
-                label_visibility="collapsed",
-            )
-        with cols[1]:
-            badge_html = (
-                f'<span style="font-size:0.6rem; color:{conf_color}; '
-                f'letter-spacing:0.08em; text-transform:uppercase; '
-                f'font-weight:600; margin-left:0.6rem;">'
-                f'{conf}</span>'
-            )
-            lock_html = (
-                '<span style="font-size:0.6rem; color:#7D5A00; '
-                'letter-spacing:0.08em; text-transform:uppercase; '
-                'font-weight:600; margin-left:0.6rem;">'
-                'YOU\'VE SET A VALUE</span>'
-                if locked else ""
-            )
-            st.markdown(
-                f'<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
-                f'border-radius:6px; padding:0.85rem 1.1rem; margin-bottom:0.6rem;">'
-                f'<div style="display:flex; align-items:baseline; flex-wrap:wrap; gap:0.3rem;">'
-                f'<span style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.12em; '
-                f'text-transform:uppercase; font-weight:600;">{label}</span>'
-                f'{badge_html}{lock_html}'
-                f'</div>'
-                f'<div style="font-family:\'DM Serif Display\',serif; font-size:1.25rem; '
-                f'color:#111111; line-height:1.1; margin:0.35rem 0;">{value_str}</div>'
-                f'<div style="font-size:0.76rem; color:#2E2E2E; line-height:1.5;">'
-                f'{sug.get("reason", "")}</div>'
-                f'<div style="font-size:0.7rem; color:#8E8E93; margin-top:0.45rem;">'
-                f'Currently saved: <strong>{current_str}</strong> &nbsp;·&nbsp; '
-                f'Source basis: <code style="font-size:0.7rem;">'
-                f'[{sug.get("rule_ref","fit#R8").replace("#","-rules#")}]</code>'
-                f'</div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        return on
-
-    field_labels = [
-        ("body_shape",         "Body shape"),
-        ("highlight_features", "Features you may choose to highlight"),
-        ("balance_areas",      "Areas you may choose to balance"),
-        ("preferred_fit",      "Preferred fit"),
-    ]
-    for fkey, flabel in field_labels:
-        if fkey in suggestions:
-            if _chip_row(fkey, flabel, suggestions[fkey]):
-                selected.append(fkey)
-
-    # Apply controls — the user must EXPLICITLY click Apply. Nothing is
-    # saved by the checkboxes alone.
-    apply_col, cancel_col, status_col = st.columns([1, 1, 4], gap="medium")
-    with apply_col:
-        apply_clicked = st.button(
-            "Apply suggestions",
-            key="profile_sug_apply_btn",
-            type="primary",
-            use_container_width=True,
-            disabled=not selected,
-            help=("Merge the checked suggestions into your profile. "
-                  "Highlight / balance lists are unioned with your "
-                  "existing choices; body_shape and preferred_fit "
-                  "replace the current value if checked."),
-        )
-    with cancel_col:
-        cancel_clicked = st.button(
-            "Discard suggestions",
-            key="profile_sug_cancel_btn",
-            use_container_width=True,
-            help="Close the panel without saving anything.",
-        )
-
-    if apply_clicked and selected:
-        updates = apply_suggestions(profile, result, selected)
-        if updates:
-            res = save_fit_profile(updates)
-            if res.get("success"):
-                # Mark body_shape provenance as user-confirmed since the
-                # user actively applied it.
-                if "body_shape" in updates:
-                    save_fit_profile({"_body_shape_source": "user"})
-                st.session_state.pop("_profile_inference_result", None)
-                st.success(
-                    f"Applied {len(updates)} suggestion"
-                    f"{'s' if len(updates) != 1 else ''} to your profile. "
-                    "You can edit any field in the form below."
-                )
-                st.rerun()
-            else:
-                st.error(
-                    f"Could not save: {res.get('error', 'unknown error')}."
-                )
-    elif cancel_clicked:
-        st.session_state.pop("_profile_inference_result", None)
-        st.rerun()
+    # Measurements are present + saved. save_fit_profile has already
+    # filled body_shape + highlight + balance + preferred_fit from the
+    # R8 table (when those fields were empty). Surface what got applied.
+    _render_autofill_summary(profile, source_label="your measurements")
 
 
 def _render_fit_profile_chooser() -> None:
@@ -5209,23 +5089,16 @@ def _render_fit_profile_chooser() -> None:
     except Exception:
         return
 
+    # Slim chooser — one eyebrow line, one short headline, three
+    # cards each with a single short sentence. Citation is a fine-
+    # print footer below the cards. One font (sans) throughout.
     st.markdown(
-        '<div style="background:#FFFFFF; border:2px solid #111111; '
-        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
-        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="margin-bottom:1.1rem;">'
         '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
-        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
-        'Fit profile · choose your path</div>'
-        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
-        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
-        'How would you like to share your fit preferences?'
-        '</div>'
-        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
-        "Every path is optional and editable. Wearly never displays "
-        "body-shape or size predictions until you choose how you want "
-        "to set them up. Body-positive vocabulary is enforced "
-        "throughout <code style='font-size:0.74rem;'>"
-        "[fit-silhouette-rules#R1, #R8]</code>."
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.35rem;">'
+        'Fit profile</div>'
+        '<div style="font-size:1.05rem; color:#111111; line-height:1.3;">'
+        'How would you like to set up your fit preferences?'
         '</div></div>',
         unsafe_allow_html=True,
     )
@@ -5233,17 +5106,13 @@ def _render_fit_profile_chooser() -> None:
     cols = st.columns(3, gap="medium")
     with cols[0]:
         st.markdown(
-            '<div style="font-family:\'DM Serif Display\',serif; '
-            'font-size:1.15rem; color:#111111; line-height:1.15; '
-            'margin-bottom:0.4rem;">Use body measurements</div>'
-            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
-            'margin-bottom:0.85rem;">'
-            "Enter bust / waist / hips. Wearly will suggest a body-shape "
-            "preference and styling fields. Predicted sizes appear here."
-            '</div>',
+            '<div style="font-size:0.95rem; color:#111111; font-weight:600; '
+            'margin-bottom:0.3rem;">Use body measurements</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.5; '
+            'margin-bottom:0.7rem;">Bust, waist, hips. Predicted sizes appear after saving.</div>',
             unsafe_allow_html=True,
         )
-        if st.button("Use measurements →",
+        if st.button("Use measurements",
                       key="fit_mode_btn_measurements",
                       type="primary", use_container_width=True):
             r = save_fit_profile({"fit_profile_mode": "measurements"})
@@ -5254,18 +5123,13 @@ def _render_fit_profile_chooser() -> None:
 
     with cols[1]:
         st.markdown(
-            '<div style="font-family:\'DM Serif Display\',serif; '
-            'font-size:1.15rem; color:#111111; line-height:1.15; '
-            'margin-bottom:0.4rem;">Choose body shape manually</div>'
-            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
-            'margin-bottom:0.85rem;">'
-            "Pick a body-shape preference from a list. Wearly will "
-            "suggest highlight / balance / fit fields based on your "
-            "choice. No measurements needed."
-            '</div>',
+            '<div style="font-size:0.95rem; color:#111111; font-weight:600; '
+            'margin-bottom:0.3rem;">Choose body shape manually</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.5; '
+            'margin-bottom:0.7rem;">Pick from a list. No measurements needed.</div>',
             unsafe_allow_html=True,
         )
-        if st.button("Choose manually →",
+        if st.button("Choose manually",
                       key="fit_mode_btn_manual",
                       use_container_width=True):
             r = save_fit_profile({"fit_profile_mode": "manual"})
@@ -5274,15 +5138,10 @@ def _render_fit_profile_chooser() -> None:
 
     with cols[2]:
         st.markdown(
-            '<div style="font-family:\'DM Serif Display\',serif; '
-            'font-size:1.15rem; color:#111111; line-height:1.15; '
-            'margin-bottom:0.4rem;">Skip for now</div>'
-            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
-            'margin-bottom:0.85rem;">'
-            "Use only your general style preferences. No body-shape "
-            "analysis, no predicted sizes, no measurement suggestions. "
-            "You can switch paths anytime."
-            '</div>',
+            '<div style="font-size:0.95rem; color:#111111; font-weight:600; '
+            'margin-bottom:0.3rem;">Skip for now</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.5; '
+            'margin-bottom:0.7rem;">Use only your general style preferences.</div>',
             unsafe_allow_html=True,
         )
         if st.button("Skip for now",
@@ -5291,6 +5150,17 @@ def _render_fit_profile_chooser() -> None:
             r = save_fit_profile({"fit_profile_mode": "skip"})
             if r.get("success"):
                 st.rerun()
+
+    # Quiet citation footer — keeps the rule visible without dominating
+    # the chooser visually.
+    st.markdown(
+        '<div style="font-size:0.7rem; color:#8E8E93; line-height:1.55; '
+        'margin-top:0.85rem;">Every path is optional and editable. '
+        'Body-positive vocabulary is enforced '
+        '<code style="font-size:0.7rem; color:#8E8E93;">[fit-silhouette-rules#R1, #R8]</code>.'
+        '</div>',
+        unsafe_allow_html=True,
+    )
 
 
 def _render_fit_profile_manual_panel(profile: dict) -> None:
@@ -5314,21 +5184,12 @@ def _render_fit_profile_manual_panel(profile: dict) -> None:
 
     # Card header
     st.markdown(
-        '<div style="background:#FFFFFF; border:2px solid #111111; '
-        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
-        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="margin-bottom:0.9rem;">'
         '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
-        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.35rem;">'
         'Fit profile · manual selection</div>'
-        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
-        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
-        'Choose a body-shape preference'
-        '</div>'
-        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
-        "Body-shape labels are an industry heuristic, not a scientific "
-        "taxonomy. Wearly uses them only as a proxy for proportion-"
-        "related styling suggestions. Suggestions cite "
-        "<code style='font-size:0.74rem;'>[fit-silhouette-rules#R8]</code>."
+        '<div style="font-size:1.05rem; color:#111111; line-height:1.3;">'
+        'Pick a body-shape preference'
         '</div></div>',
         unsafe_allow_html=True,
     )
@@ -5348,27 +5209,18 @@ def _render_fit_profile_manual_panel(profile: dict) -> None:
     cols = st.columns([2, 3], gap="medium")
     with cols[0]:
         picked = st.selectbox(
-            "Body-shape preference",
+            "Body shape",
             options=_SHAPE_OPTIONS,
             index=_SHAPE_OPTIONS.index(current_shape),
             key="fit_manual_shape",
-            help="Pick the proportion preference closest to yours. "
-                 "Edit anytime. 'Not sure' = no suggestions shown.",
-        )
-    with cols[1]:
-        st.markdown(
-            "<div style='font-size:0.78rem; color:#6E6E73; "
-            "line-height:1.55; padding-top:0.35rem;'>"
-            "Selected: <strong>" + picked.title() + "</strong> · "
-            "manually chosen by you, not predicted by Wearly. "
-            "Source basis: "
-            "<code style='font-size:0.74rem;'>"
-            "[fit-silhouette-rules#R8]</code>."
-            "</div>",
-            unsafe_allow_html=True,
+            label_visibility="collapsed",
+            help="Manually chosen by you. Edit anytime. "
+                 "'Not sure' = no suggestions shown.",
         )
 
-    # Persist the user's choice immediately (so a refresh preserves it).
+    # Persist + auto-fill on selection change. save_fit_profile is
+    # now responsible for filling highlight / balance / preferred_fit
+    # from the R8 table when they're empty — no Apply step needed.
     if picked != current_shape:
         if picked == "not sure":
             save_fit_profile({"body_shape": None,
@@ -5379,104 +5231,21 @@ def _render_fit_profile_manual_panel(profile: dict) -> None:
         st.rerun()
 
     if picked == "not sure":
-        st.info(
-            "Pick a body-shape preference above to see suggestions. "
-            "You can also switch to the measurements path or skip — "
-            "use the reset button below."
+        st.markdown(
+            "<div style='font-size:0.78rem; color:#6E6E73; "
+            "line-height:1.55; margin-top:0.6rem;'>"
+            "Pick a shape above to auto-fill your styling fields. "
+            "<code style='font-size:0.72rem; color:#8E8E93;'>"
+            "[fit-silhouette-rules#R8]</code>"
+            "</div>",
+            unsafe_allow_html=True,
         )
         return
 
-    # Generate suggestion chips for the selected shape.
-    result = suggest_profile_from_shape(picked, profile)
-    if not result.get("available"):
-        return
-
-    suggestions = result.get("suggestions", {})
-
-    # Per-field chips with checkboxes — identical UX to the
-    # measurements panel, but labels surface "manual selection" not
-    # "from measurements".
-    _CONF_COLOR = {
-        "user-selected":       "#1D6033",
-        "based-on-selection":  "#7D5A00",
-        "high":                "#1D6033",
-        "medium":              "#7D5A00",
-        "low":                 "#7A1D21",
-    }
-    selected: list = []
-
-    def _chip(field_key: str, label: str, sug: dict) -> bool:
-        value_str = sug.get("value") or ", ".join(sug.get("values") or [])
-        conf = sug.get("confidence", "based-on-selection")
-        conf_color = _CONF_COLOR.get(conf, "#6E6E73")
-        cols2 = st.columns([0.6, 5], gap="medium")
-        with cols2[0]:
-            on = st.checkbox(" ", key=f"manual_sug_chk_{field_key}",
-                              value=False, label_visibility="collapsed")
-        with cols2[1]:
-            st.markdown(
-                f'<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
-                f'border-radius:6px; padding:0.85rem 1.1rem; '
-                f'margin-bottom:0.6rem;">'
-                f'<div style="display:flex; align-items:baseline; '
-                f'flex-wrap:wrap; gap:0.3rem;">'
-                f'<span style="font-size:0.66rem; color:#8E8E93; '
-                f'letter-spacing:0.12em; text-transform:uppercase; '
-                f'font-weight:600;">{label}</span>'
-                f'<span style="font-size:0.6rem; color:{conf_color}; '
-                f'letter-spacing:0.08em; text-transform:uppercase; '
-                f'font-weight:600; margin-left:0.6rem;">'
-                f'BASED ON YOUR SELECTED BODY-SHAPE PREFERENCE</span>'
-                f'</div>'
-                f'<div style="font-family:\'DM Serif Display\',serif; '
-                f'font-size:1.25rem; color:#111111; line-height:1.1; '
-                f'margin:0.35rem 0;">{value_str}</div>'
-                f'<div style="font-size:0.76rem; color:#2E2E2E; '
-                f'line-height:1.5;">{sug.get("reason","")}</div>'
-                f'<div style="font-size:0.7rem; color:#8E8E93; '
-                f'margin-top:0.45rem;">Source basis: '
-                f'<code style="font-size:0.7rem;">'
-                f'[fit-silhouette-rules#R8]</code></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        return on
-
-    field_labels = [
-        ("highlight_features", "Features you may choose to highlight"),
-        ("balance_areas",      "Areas you may choose to balance"),
-        ("preferred_fit",      "Preferred fit"),
-    ]
-    for fkey, flabel in field_labels:
-        if fkey in suggestions:
-            if _chip(fkey, flabel, suggestions[fkey]):
-                selected.append(fkey)
-
-    apply_col, _spacer = st.columns([1, 3], gap="medium")
-    with apply_col:
-        apply_clicked = st.button(
-            "Apply suggestions",
-            key="manual_sug_apply_btn",
-            type="primary",
-            use_container_width=True,
-            disabled=not selected,
-            help=("Merge the checked suggestions into your profile. "
-                  "Your selected body shape is already saved."),
-        )
-
-    if apply_clicked and selected:
-        updates = apply_suggestions(profile, result, selected)
-        if updates:
-            r = save_fit_profile(updates)
-            if r.get("success"):
-                st.success(
-                    f"Applied {len(updates)} suggestion"
-                    f"{'s' if len(updates) != 1 else ''} based on your "
-                    f"'{picked}' selection."
-                )
-                st.rerun()
-            else:
-                st.error(r.get("error", "Could not save."))
+    # Auto-fill summary — shows what got applied from the R8 table.
+    # The values are already saved (save_fit_profile auto-fills them
+    # when empty), so this card is purely informational.
+    _render_autofill_summary(profile, source_label="your selection")
 
 
 def _render_reset_fit_profile_panel(profile: dict) -> None:

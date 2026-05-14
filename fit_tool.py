@@ -554,17 +554,28 @@ def save_fit_profile(updates: dict) -> dict:
 
         overlay[k] = v
 
-    # Auto-fill body_shape from measurements — ONLY when the user has
-    # chosen the "measurements" path through the fit-profile chooser
-    # (or hasn't chosen yet but happens to have measurements present).
-    # If the user explicitly chose "manual" or "skip", their body_shape
-    # value (or absence) is respected verbatim. This prevents the
-    # earlier contradiction where a user-selected shape would be
-    # overwritten with the measurement prediction the moment they
-    # added any measurements.
+    # ── Body-shape source-of-truth resolution (mode-aware) ────────
+    # The fit-profile chooser establishes which input is canonical:
+    #   - "measurements" : the prediction is ALWAYS canonical. A new
+    #                       set of measurements predicting "pear" must
+    #                       overwrite a stale "hourglass" left over
+    #                       from a previous session — otherwise the
+    #                       top snapshot lies about the user's pick.
+    #   - "manual"       : the user's selected body_shape is canonical.
+    #                       Measurements (if any) are ignored for
+    #                       body_shape resolution.
+    #   - None / "skip"  : legacy fill-if-empty behavior; never overwrite.
     _mode = overlay.get("fit_profile_mode")
-    if _mode in (None, "measurements"):
-        _meas = overlay.get("measurements", {}) or {}
+    _meas = overlay.get("measurements", {}) or {}
+    if _mode == "measurements":
+        _pred = predict_body_shape(_meas)
+        _pred_shape = _pred.get("shape") if _pred else None
+        if _pred_shape:
+            overlay["body_shape"] = _pred_shape
+            overlay["_body_shape_source"] = "auto"
+    elif _mode is None:
+        # Same fill-if-empty behavior as before — legacy path for
+        # profiles created before the mode field existed.
         _pred = predict_body_shape(_meas)
         _pred_shape = _pred.get("shape") if _pred else None
         if not overlay.get("body_shape"):
@@ -577,6 +588,37 @@ def save_fit_profile(updates: dict) -> dict:
                     overlay["_body_shape_source"] = "auto"
             elif _pred_shape:
                 overlay["_body_shape_source"] = "user"
+
+    # ── Auto-fill dependent fields from fit#R8 ────────────────────
+    # Once body_shape is resolved (manual pick or measurement-predicted),
+    # populate highlight_features / balance_areas / preferred_fit
+    # from the R8 mapping IF they are currently empty. This eliminates
+    # the prior "review per chip then click Apply" friction the user
+    # asked to remove. Already-set values are never overwritten —
+    # personal edits survive every subsequent save.
+    _shape = (overlay.get("body_shape") or "").strip().lower()
+    if _shape and _mode in ("measurements", "manual"):
+        try:
+            from profile_inference import _SHAPE_TABLE
+            _table = _SHAPE_TABLE.get(_shape, {})
+        except Exception:
+            _table = {}
+        # highlight_features
+        if not overlay.get("highlight_features"):
+            _hl = list(_table.get("highlight", []))
+            if _hl:
+                overlay["highlight_features"] = _hl
+        # balance_areas — only populated when the R8 table has a
+        # non-empty list (hourglass has none, by design).
+        if not overlay.get("balance_areas"):
+            _ba = list(_table.get("balance", []))
+            if _ba:
+                overlay["balance_areas"] = _ba
+        # preferred_fit — first option in the R8 list, when one exists.
+        if not overlay.get("preferred_fit"):
+            _fit_opts = list(_table.get("fit", []))
+            if _fit_opts:
+                overlay["preferred_fit"] = _fit_opts[0]
 
     on_disk = {
         "_comment": "User fit / style profile overlay. See fit_tool.py.",

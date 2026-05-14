@@ -461,6 +461,105 @@ class TestEndToEndInferenceFlow(unittest.TestCase):
                                  f"Only exercised: {seen_fits}")
 
 
+class TestAutoFillFromShape(unittest.TestCase):
+    """save_fit_profile now auto-fills highlight_features, balance_areas,
+    and preferred_fit from the R8 table whenever body_shape is set
+    AND fit_profile_mode is in ('measurements', 'manual'). User-set
+    values are never overwritten."""
+
+    def setUp(self):
+        import fit_tool, tempfile
+        self._orig_path = fit_tool.PROFILE_PATH
+        self._tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8")
+        self._tmp.close()
+        fit_tool.PROFILE_PATH = self._tmp.name
+
+    def tearDown(self):
+        import fit_tool, os
+        fit_tool.PROFILE_PATH = self._orig_path
+        try:
+            os.unlink(self._tmp.name)
+        except OSError:
+            pass
+
+    def test_manual_pear_auto_fills_dependent_fields(self):
+        from fit_tool import save_fit_profile, get_fit_profile
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "pear",
+                          "_body_shape_source": "user"})
+        p = get_fit_profile()["profile"]
+        self.assertEqual(set(p["highlight_features"]),
+                         {"neckline", "shoulders"})
+        self.assertEqual(p["balance_areas"], ["hips"])
+        self.assertEqual(p["preferred_fit"], "structured")
+
+    def test_measurements_pear_auto_fills_dependent_fields(self):
+        from fit_tool import save_fit_profile, get_fit_profile
+        save_fit_profile({"fit_profile_mode": "measurements",
+                          "measurements": PEAR_M})
+        p = get_fit_profile()["profile"]
+        self.assertEqual(p["body_shape"], "pear")
+        self.assertEqual(set(p["highlight_features"]),
+                         {"neckline", "shoulders"})
+        self.assertEqual(p["balance_areas"], ["hips"])
+        self.assertEqual(p["preferred_fit"], "structured")
+
+    def test_measurements_mode_overwrites_prior_body_shape(self):
+        """Switching to new measurements predicting a different shape
+        must overwrite the saved body_shape — this is the contradiction
+        the user reported. Without this, a 'hourglass' left over from
+        a prior session would stay even after entering pear-like
+        bust/waist/hips."""
+        from fit_tool import save_fit_profile, get_fit_profile
+        # Start: hourglass from old measurements.
+        save_fit_profile({"fit_profile_mode": "measurements",
+                          "measurements": HOURGLASS_M})
+        self.assertEqual(
+            get_fit_profile()["profile"]["body_shape"], "hourglass")
+        # Switch in pear measurements.
+        save_fit_profile({"measurements": PEAR_M})
+        p = get_fit_profile()["profile"]
+        self.assertEqual(p["body_shape"], "pear",
+                         "measurements mode must overwrite body_shape")
+
+    def test_user_edited_dependent_fields_are_preserved(self):
+        """The user explicitly sets highlight_features = ['legs'].
+        Subsequent saves must NOT overwrite this with R8 defaults."""
+        from fit_tool import save_fit_profile, get_fit_profile
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "hourglass",
+                          "highlight_features": ["legs"]})
+        p = get_fit_profile()["profile"]
+        # User's pick wins over the R8 default of [waist, neckline].
+        self.assertEqual(p["highlight_features"], ["legs"])
+
+    def test_manual_mode_does_not_auto_fill_without_shape(self):
+        """In manual mode with body_shape unset (the 'not sure'
+        state), nothing should auto-fill into the overlay."""
+        from fit_tool import save_fit_profile, _load_overlay
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": None})
+        # Check the overlay, not the merged profile — the seed owner
+        # ships preferred_fit="tailored" which would otherwise mask
+        # the auto-fill behavior we're testing.
+        ov = _load_overlay()
+        self.assertFalse(ov.get("highlight_features"))
+        self.assertFalse(ov.get("balance_areas"))
+        self.assertFalse(ov.get("preferred_fit"))
+
+    def test_skip_mode_does_not_auto_fill(self):
+        from fit_tool import save_fit_profile, _load_overlay
+        save_fit_profile({"fit_profile_mode": "skip"})
+        # Even if a body_shape is later saved while in skip mode, the
+        # R8 auto-fill must not run.
+        save_fit_profile({"body_shape": "pear"})
+        ov = _load_overlay()
+        self.assertFalse(ov.get("highlight_features"))
+        self.assertFalse(ov.get("balance_areas"))
+        self.assertFalse(ov.get("preferred_fit"))
+
+
 class TestFitProfileMode(unittest.TestCase):
     """The fit_profile_mode field controls which Profile UI path renders.
     It must round-trip through save_fit_profile, be wiped by
