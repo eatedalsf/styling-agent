@@ -209,23 +209,27 @@ class TestStoreAwareSuggestions(_ShoppingSnapshotMixin, unittest.TestCase):
         add_favorite_store("COS")
         out = store_aware_suggestions(["A blazer"])
         self.assertEqual(len(out), 2)
-        self.assertIn("COS", out[-1])
-        self.assertIn("favorite store", out[-1])
+        # Favorites are now PREPENDED so "check your store first" leads
+        # the suggestion list, with the specific item descriptor below.
+        self.assertIn("COS", out[0])
+        self.assertIn("favorite store", out[0])
+        # The fallback hint is appended to the favorites line.
+        self.assertIn("similar retailers", out[0])
 
     def test_two_favorites_use_or(self):
         add_favorite_store("COS")
         add_favorite_store("Aritzia")
         out = store_aware_suggestions(["A blazer"])
-        self.assertIn("COS or Aritzia", out[-1])
+        self.assertIn("COS or Aritzia", out[0])
 
     def test_many_favorites_join_with_commas(self):
         for s in ("COS", "Aritzia", "Mejuri"):
             add_favorite_store(s)
         out = store_aware_suggestions(["A blazer"])
-        last = out[-1]
-        self.assertIn("COS", last)
-        self.assertIn("Aritzia", last)
-        self.assertIn("Mejuri", last)
+        first = out[0]
+        self.assertIn("COS", first)
+        self.assertIn("Aritzia", first)
+        self.assertIn("Mejuri", first)
 
     def test_does_not_mutate_input_list(self):
         base = ["X"]

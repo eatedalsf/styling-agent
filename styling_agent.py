@@ -284,6 +284,14 @@ def run_agent(
 
     profile = profile_result["profile"]
     result["profile"] = profile
+    # Stamp the profile fingerprint so the UI can detect when a cached
+    # result was generated against a now-outdated profile and surface
+    # the "Profile updated — Regenerate" banner instead of stale data.
+    try:
+        from fit_tool import profile_hash as _profile_hash
+        result["profile_hash"] = _profile_hash(profile)
+    except Exception:
+        result["profile_hash"] = ""
     step2["output"] = (
         f"Owner: {profile['name']} | Body shape: {profile['body_shape']} | "
         f"Skin tone: {profile['skin_tone']} | Style: {', '.join(profile['style_preferences'])}"
@@ -846,6 +854,177 @@ def run_agent(
     step5["output"] = f"Built outfit with {len(outfit)} pieces: {', '.join(i['name'] for i in outfit)}."
     steps.append(step5)
 
+    # ── Tradeoff records for picked main pieces ──────────────────────────────
+    # When the winning item has obvious misalignments with the user's
+    # profile (color, fit, balance, modesty), surface them explicitly
+    # instead of letting the reasoning read as unconditionally positive.
+    # The same records feed Step 6's qualified-gap detection so a
+    # poorly-aligned dress still generates a wardrobe gap.
+    def _evaluate_tradeoffs(item: dict) -> list:
+        """
+        Return a list of `{dimension, severity, reason}` dicts for the
+        ways `item` is less aligned with the user's profile. Empty
+        list = the item passes all checks.
+
+        Body-positive vocabulary throughout — every `reason` describes
+        misalignment in preference-based terms (less aligned with,
+        differs from), never as a flaw of the item or the user.
+
+        Dimensions inspected:
+          color    — skin-tone vs item color (warm/cool conflict)
+          fit      — preferred_fit absent from name/tags/formality
+          balance  — user has balance_areas set but item doesn't carry
+                     a silhouette signal for any of them
+          modesty  — modesty=moderate|conservative but item shows
+                     revealing signals
+        """
+        out = []
+        if not item or not isinstance(item, dict):
+            return out
+        name = (item.get("name") or "").lower()
+        color = (item.get("color") or "").lower()
+        form  = (item.get("formality") or "").lower()
+        tags  = [t.lower() for t in (item.get("tags") or [])]
+        sil   = (item.get("silhouette") or "").lower()
+        haystack = " ".join([name, form, sil] + tags)
+
+        # 1) Color × skin tone
+        skin = (profile.get("skin_tone") or "").lower().strip()
+        if skin and color:
+            warm_cols = {"camel", "cream", "warm white", "olive",
+                          "terracotta", "rust", "gold", "tan", "brown",
+                          "burgundy", "blush"}
+            cool_cols = {"navy", "white", "black", "grey", "silver",
+                          "charcoal", "ice blue", "pearl"}
+            if "warm" in skin and any(c in color for c in cool_cols):
+                out.append({
+                    "dimension": "color",
+                    "severity":  "medium",
+                    "reason":    f"its {color} tone is less aligned with "
+                                  f"your {skin} palette",
+                })
+            elif "cool" in skin and any(c in color for c in warm_cols):
+                out.append({
+                    "dimension": "color",
+                    "severity":  "medium",
+                    "reason":    f"its {color} tone is less aligned with "
+                                  f"your {skin} palette",
+                })
+
+        # 2) Preferred-fit alignment
+        pf = (profile.get("preferred_fit") or "").lower().strip()
+        if pf:
+            _PF_FORMALITY = {
+                "tailored":   ("business", "smart_casual", "formal"),
+                "structured": ("business", "smart_casual", "formal"),
+                "fitted":     ("business", "smart_casual", "formal", "casual"),
+                "relaxed":    ("casual", "smart_casual", "athletic"),
+                "fluid":      ("casual", "smart_casual", "formal"),
+                "loose":      ("casual", "athletic"),
+            }
+            if pf not in haystack and form not in _PF_FORMALITY.get(pf, ()):
+                out.append({
+                    "dimension": "fit",
+                    "severity":  "low",
+                    "reason":    f"the cut differs from your preferred "
+                                  f"{pf} fit",
+                })
+
+        # 3) Balance areas — item should support at least one if user set them
+        balance = [a.lower() for a in (profile.get("balance_areas") or [])]
+        if balance:
+            _SIGNALS = {
+                "waist":      ("belted", "cinched", "wrap", "sheath",
+                               "fit-and-flare", "fit and flare",
+                               "peplum", "tailored", "tie-waist"),
+                "neckline":   ("v-neck", "scoop", "square neck",
+                               "boat neck", "halter", "off-shoulder",
+                               "sweetheart", "cowl"),
+                "shoulders":  ("structured shoulder", "strong shoulder",
+                               "padded shoulder", "off-shoulder",
+                               "puff sleeve", "puff-sleeve"),
+                "hips":       ("peplum", "a-line", "flared",
+                               "fit-and-flare", "wide-leg", "trumpet"),
+                "legs":       ("mini", "slit", "cropped", "tapered",
+                               "skinny", "slim-leg"),
+            }
+            _CATEGORY_AREAS = {
+                "top": {"neckline", "shoulders", "arms", "collarbone"},
+                "dress": {"neckline", "waist", "hips", "shoulders", "legs"},
+                "bottom": {"waist", "hips", "legs"},
+                "outerwear": {"shoulders", "neckline"},
+            }
+            item_type = (item.get("type") or "").lower()
+            natural = _CATEGORY_AREAS.get(item_type, set())
+            relevant_balance = [a for a in balance if a in natural]
+            if relevant_balance:
+                any_match = any(
+                    sig in haystack
+                    for area in relevant_balance
+                    for sig in _SIGNALS.get(area, ())
+                )
+                if not any_match:
+                    out.append({
+                        "dimension": "balance",
+                        "severity":  "low",
+                        "reason":    f"the silhouette doesn't strongly "
+                                      f"support balance at your "
+                                      f"{', '.join(relevant_balance)}",
+                    })
+
+        # 4) Modesty
+        modesty = (profile.get("modesty_preference") or "").lower().strip()
+        if modesty in ("moderate", "conservative"):
+            revealing = ("sleeveless", "spaghetti", "tank top", "crop",
+                          "halter", "backless", "low-cut", "deep-v",
+                          "mini ")
+            if any(sig in haystack for sig in revealing):
+                out.append({
+                    "dimension": "modesty",
+                    "severity":  "medium",
+                    "reason":    "the coverage differs from your "
+                                  f"{modesty} modesty preference",
+                })
+
+        return out
+
+    # Evaluate each picked piece. Store as a flat list of tradeoff
+    # records, each annotated with the item it came from so downstream
+    # consumers (gap detector, reasoning surface) can quote it.
+    tradeoffs: list = []
+    for _it in outfit:
+        for _td in _evaluate_tradeoffs(_it):
+            tradeoffs.append({
+                "item_id":   _it.get("id"),
+                "item_name": _it.get("name"),
+                "item_type": _it.get("type"),
+                **_td,
+            })
+    result["tradeoffs"] = tradeoffs
+
+    # Surface a one-line note per tradeoff in the reasoning trail so
+    # the user can SEE why a less-aligned item was still selected.
+    # Cites shopping-gap rules R1 (the "no better-aligned option"
+    # framing) and fit-silhouette-rules R8 for fit/balance dimensions.
+    if tradeoffs:
+        # Group tradeoffs by item to avoid one-line-per-dimension
+        # spam when an item has multiple misalignments.
+        from collections import defaultdict as _dd
+        by_item = _dd(list)
+        for _td in tradeoffs:
+            by_item[_td["item_id"]].append(_td)
+        for _iid, _tds in by_item.items():
+            _name = _tds[0]["item_name"]
+            _reasons = "; ".join(t["reason"] for t in _tds)
+            _cite = (cite("fit#R8") if any(t["dimension"] in
+                     ("fit","balance","modesty") for t in _tds)
+                     else cite("color#R2"))
+            reasoning.append(
+                f"  Note on '{_name}': selected as the best available "
+                f"option, though {_reasons}. "
+                f"This reveals a wardrobe gap. {_cite} {cite('shopping#R1')}"
+            )
+
     # ── STEP 6: Check for Gaps ────────────────────────────────────────────────
     step6 = {"step": 6, "name": "Check for Wardrobe Gaps", "status": "ok", "output": ""}
     required = REQUIRED_PIECES.get(occasion_tag, ["top", "bottom"])
@@ -866,6 +1045,103 @@ def run_agent(
     else:
         step6["output"] = "Outfit is complete — all required pieces present."
     steps.append(step6)
+
+    # ── Qualified gaps from tradeoff records ──────────────────────────────
+    # A piece is "present" in the wardrobe sense but its tradeoffs
+    # reveal that the wardrobe lacks a well-aligned option. Promote
+    # those tradeoffs to wardrobe gaps with concrete descriptors
+    # built from the user's profile, not hand-written generic copy.
+    # Cites shopping-gap rules R1 + fit-silhouette-rules R8.
+    def _palette_for_skin(skin: str) -> list:
+        skin = (skin or "").lower()
+        if "warm" in skin:
+            return ["terracotta", "olive", "burgundy", "cream",
+                    "camel", "rust"]
+        if "cool" in skin:
+            return ["navy", "ice blue", "charcoal", "silver",
+                    "pearl", "deep purple"]
+        return ["cream", "navy", "olive", "burgundy"]
+
+    def _silhouette_hint_for_shape(shape: str) -> str:
+        shape = (shape or "").lower()
+        if shape == "pear":
+            return ("neckline detail or a structured upper "
+                    "(a-line or fit-and-flare on bottom)")
+        if shape == "apple":
+            return ("a defined neckline and vertical lines through "
+                    "the midsection")
+        if shape == "hourglass":
+            return "waist-defining cuts (wrap, fit-and-flare, belted)"
+        if shape == "rectangle":
+            return "waist-creating cuts (belted, peplum, fit-and-flare)"
+        if shape == "inverted triangle":
+            return "a fluid upper paired with a structured lower (a-line)"
+        return "a silhouette that supports your preferred areas"
+
+    def _length_hint_for_modesty(modesty: str) -> str:
+        modesty = (modesty or "").lower()
+        if modesty in ("moderate", "conservative"):
+            return "midi or longer"
+        return "any length you prefer"
+
+    def _build_qualified_gap_descriptor(piece_type: str,
+                                         dims: set) -> str:
+        """Compose a one-sentence shopping descriptor from the profile,
+        using only the dimensions that had tradeoffs."""
+        parts = []
+        skin = profile.get("skin_tone") or ""
+        shape = profile.get("body_shape") or ""
+        modesty = profile.get("modesty_preference") or ""
+        pf = profile.get("preferred_fit") or ""
+
+        if "color" in dims and skin:
+            cols = _palette_for_skin(skin)[:3]
+            parts.append(
+                f"in a {skin} palette ({', '.join(cols)})"
+            )
+        if "balance" in dims or "fit" in dims:
+            if shape:
+                parts.append(_silhouette_hint_for_shape(shape))
+            if pf and "fit" in dims:
+                parts.append(f"a {pf}-leaning cut")
+        if "modesty" in dims and modesty in ("moderate", "conservative"):
+            parts.append(_length_hint_for_modesty(modesty))
+
+        if not parts:
+            return f"A {occasion_tag} {piece_type} that aligns with your profile"
+
+        return (f"A {occasion_tag} {piece_type} "
+                + ", with ".join(parts)
+                + ".")
+
+    # Group tradeoffs by piece type and dimension set, then synthesize
+    # ONE descriptor per piece type (a dress with color+fit tradeoffs
+    # generates one "warm-toned, fit-supportive dinner dress" gap,
+    # not two separate gaps).
+    if tradeoffs:
+        from collections import defaultdict as _dd2
+        dims_by_type = _dd2(set)
+        for _td in tradeoffs:
+            t = (_td.get("item_type") or "").lower()
+            if t:
+                dims_by_type[t].add(_td["dimension"])
+        for piece_type, dims in dims_by_type.items():
+            # Only promote when at least one dimension has medium+
+            # severity, OR when two or more dimensions had tradeoffs.
+            severities = [t["severity"] for t in tradeoffs
+                          if (t.get("item_type") or "").lower() == piece_type]
+            promote = (
+                any(s in ("medium", "high") for s in severities)
+                or len(dims) >= 2
+            )
+            if not promote:
+                continue
+            descriptor = _build_qualified_gap_descriptor(piece_type, dims)
+            gap_key = f"qualified:{piece_type}"
+            if gap_key not in result["gaps"]:
+                result["gaps"].append(gap_key)
+            if descriptor not in result["shopping_suggestions"]:
+                result["shopping_suggestions"].append(descriptor)
 
     # Record outerwear gap (detected in Step 5) AFTER Step 6 so we don't
     # overwrite check_gaps results, and so shopping_suggestions keeps both.

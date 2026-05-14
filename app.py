@@ -1511,12 +1511,78 @@ with st.sidebar:
 # SECTION RENDERERS
 # ─────────────────────────────────────────────
 
-def _render_outfit_result(result: dict):
+def _render_stale_profile_banner(result: dict, regenerate_key: str) -> bool:
+    """
+    Compare the profile_hash stamped onto a cached agent result with
+    the current profile's hash. If they differ, render an amber
+    "Profile updated — Regenerate" banner at the top of the panel and
+    return True so callers can decide whether to halt downstream
+    rendering (we DON'T halt — the user sees both the stale outfit
+    and the banner; the Regenerate button is theirs to press).
+
+    The banner intentionally does NOT auto-regenerate. Auto-regen
+    flickers the UI and costs LLM tokens; an honest banner is the
+    cheaper-and-clearer signal.
+    """
+    if not isinstance(result, dict):
+        return False
+    cached_hash = (result.get("profile_hash") or "").strip()
+    if not cached_hash:
+        return False  # legacy result without a stamp — let it through.
+
+    try:
+        from fit_tool import profile_hash, get_fit_profile
+        current = get_fit_profile().get("profile", {})
+        current_hash = profile_hash(current) if current else ""
+    except Exception:
+        return False
+
+    if not current_hash or cached_hash == current_hash:
+        return False
+
+    # Staleness detected. Surface a calm amber banner with one action.
+    c1, c2 = st.columns([4, 1], gap="small")
+    with c1:
+        st.markdown(
+            '<div style="background:#FBF1DD; border:1px solid #EFD9A6; '
+            'border-radius:6px; padding:0.75rem 1rem; line-height:1.55; '
+            'font-size:0.86rem; color:#7C5A22;">'
+            "<strong>Profile updated.</strong> This outfit was generated "
+            "when your profile was different — body shape, skin tone, "
+            "preferred fit, or another scoring field has changed since. "
+            "Regenerate to apply your latest preferences."
+            '</div>',
+            unsafe_allow_html=True,
+        )
+    with c2:
+        if st.button("Regenerate", key=regenerate_key,
+                     type="primary", use_container_width=True):
+            # Caller-friendly contract: clear the stored result so the
+            # next render does a fresh run. The button is identified
+            # by the caller-supplied key so multiple banners on one
+            # page (Today + Planner card) never collide.
+            st.session_state.pop("result", None)
+            st.session_state.pop("event_detail_result", None)
+            st.rerun()
+    return True
+
+
+def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
     """Render the agent's outfit result (event card, weather card,
-    outfit + color score, gaps, workflow, reasoning)."""
+    outfit + color score, gaps, workflow, reasoning).
+
+    `regenerate_key` is forwarded to the staleness-banner helper so
+    Today and Planner-event detail can each have their own Regenerate
+    button without Streamlit key collisions.
+    """
     if result.get("error"):
         st.error(f"Agent Error: {result['error']}")
         return
+
+    # Profile-version invalidation. If a profile field that affects
+    # scoring has changed since this result was stamped, surface a
+    # banner before any of the cached reasoning is rendered.
+    _render_stale_profile_banner(result, regenerate_key)
 
     event    = result.get("event", {})
     weather  = result.get("weather", {})
@@ -1742,6 +1808,32 @@ def _render_outfit_result(result: dict):
     # whenever the outfit does.
     if outfit:
         with st.expander("Reasoning graph — how this outfit emerged"):
+            # If the cached result was generated against an older
+            # profile, the User node's labels show stale body shape /
+            # skin tone / preferred fit. Tell the reader before they
+            # read any node.
+            _cached_h = (result.get("profile_hash") or "").strip()
+            if _cached_h:
+                try:
+                    from fit_tool import profile_hash as _ph, get_fit_profile as _gp
+                    _cur_h = _ph(_gp().get("profile", {}) or {})
+                except Exception:
+                    _cur_h = ""
+                if _cur_h and _cur_h != _cached_h:
+                    st.markdown(
+                        '<div style="background:#FBF1DD; border:1px solid #EFD9A6; '
+                        'border-radius:6px; padding:0.6rem 0.85rem; '
+                        'font-size:0.8rem; color:#7C5A22; line-height:1.5; '
+                        'margin-bottom:0.7rem;">'
+                        "<strong>Stale graph.</strong> This visual was built "
+                        "from a run made against an earlier profile — the "
+                        "User node labels may not match your current body "
+                        "shape, skin tone, or preferred fit. Regenerate the "
+                        "outfit above to rebuild the graph from your current "
+                        "profile."
+                        '</div>',
+                        unsafe_allow_html=True,
+                    )
             try:
                 from graph_tool import render_run_graph_html, run_graph_summary
                 summary = run_graph_summary(result)
@@ -1752,7 +1844,7 @@ def _render_outfit_result(result: dict):
                     + (f" · {summary['rejections']} rejection"
                        + ('' if summary['rejections'] == 1 else 's')
                        if summary['rejections'] else "")
-                    + " — drag nodes to rearrange, hover for details."
+                    + " — physics stops after layout settles; drag nodes to adjust."
                 )
                 html_doc = render_run_graph_html(result)
                 components.html(html_doc, height=560, scrolling=False)
@@ -3032,7 +3124,7 @@ def _render_event_detail():
     )
 
     # ── Shared outfit body (reasoning, items, gaps, graph, KG export) ──
-    _render_outfit_result(res)
+    _render_outfit_result(res, regenerate_key="regen_event_detail")
 
     st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
 
@@ -3109,7 +3201,7 @@ def _render_today():
             <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Wearly's recommendation for the next event on your calendar.</div>
         </div>
         """, unsafe_allow_html=True)
-        _render_outfit_result(res)
+        _render_outfit_result(res, regenerate_key="regen_today")
         st.markdown("<div style='height:0.6rem'></div>", unsafe_allow_html=True)
 
         if st.button("Replan from scratch", key="replan_today",
@@ -6091,7 +6183,8 @@ def _render_demo():
         st.markdown("""
         <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.6rem;">Live result</div>
         """, unsafe_allow_html=True)
-        _render_outfit_result(st.session_state["result"])
+        _render_outfit_result(st.session_state["result"],
+                              regenerate_key="regen_demo_live")
 
     # ── Schema graph (the abstract knowledge graph) ─────────
     # Sits at the bottom of the demo screen so a reviewer who's just

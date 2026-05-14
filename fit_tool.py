@@ -651,6 +651,74 @@ def save_fit_profile(updates: dict) -> dict:
 
 
 # ─────────────────────────────────────────────
+# PROFILE FINGERPRINT — for staleness detection
+# ─────────────────────────────────────────────
+
+# Fields that materially change the outfit recommendation. Editing
+# any of these should invalidate a cached agent result. Edits to
+# `name`, `timezone`, or free-text values that don't affect scoring
+# are deliberately omitted so the banner doesn't fire on cosmetic
+# saves.
+_HASH_KEYS = (
+    "body_shape",
+    "_suggested_fit",
+    "preferred_fit",
+    "skin_tone",
+    "modesty_preference",
+    "highlight_features",
+    "balance_areas",
+    "style_preferences",
+    "style_goals",
+    "comfort_needs",
+    "fit_profile_mode",
+)
+
+
+def profile_hash(profile: dict) -> str:
+    """
+    Return a short, stable fingerprint of the recommendation-affecting
+    profile fields. Two profiles with identical relevant fields produce
+    identical hashes. Edits to non-scoring fields (name, timezone) do
+    NOT change the hash.
+
+    Used by the UI to detect when a cached agent result was generated
+    against a now-outdated profile, and to surface a "Profile updated —
+    Regenerate" banner instead of silently showing stale data.
+
+    Returns a 12-char lowercase hex string. Empty / None profiles
+    return a constant non-empty sentinel so comparison never raises.
+    """
+    import hashlib
+    import json as _json
+
+    if not isinstance(profile, dict):
+        return "noprofile-00"
+
+    payload = {}
+    for k in _HASH_KEYS:
+        v = profile.get(k)
+        # Normalize empties — None, empty list, empty string all hash
+        # the same so two profile-getters that disagree on the empty
+        # representation (get_owner_profile returns None, get_fit_profile
+        # returns []) still produce identical hashes for unset fields.
+        if v is None or v == "" or v == [] or v == {}:
+            payload[k] = ""
+            continue
+        # Normalize lists so order doesn't perturb the hash. Strings
+        # lowercased and stripped so "Pear " and "pear" agree.
+        if isinstance(v, list):
+            payload[k] = sorted(
+                (s.strip().lower() if isinstance(s, str) else s) for s in v
+            )
+        elif isinstance(v, str):
+            payload[k] = v.strip().lower()
+        else:
+            payload[k] = v
+    raw = _json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:12]
+
+
+# ─────────────────────────────────────────────
 # RESET (scoped — fit-profile fields ONLY)
 # ─────────────────────────────────────────────
 

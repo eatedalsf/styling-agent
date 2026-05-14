@@ -346,19 +346,29 @@ def store_aware_suggestions(
 
     if fav_names:
         if len(fav_names) == 1:
-            line = f"Check {fav_names[0]} first — your saved favorite store."
+            line = (
+                f"Check {fav_names[0]} first — your saved favorite store. "
+                "If unavailable there, similar retailers carry equivalent pieces."
+            )
         elif len(fav_names) == 2:
             line = (
                 f"Check {fav_names[0]} or {fav_names[1]} first — "
-                "your saved favorite stores."
+                "your saved favorite stores. If unavailable there, similar "
+                "retailers carry equivalent pieces."
             )
         else:
             head = ", ".join(fav_names[:-1])
             line = (
                 f"Check {head}, or {fav_names[-1]} first — "
-                "your saved favorite stores."
+                "your saved favorite stores. If unavailable there, similar "
+                "retailers carry equivalent pieces."
             )
-        base_suggestions.append(line)
+        # PREPEND, not append — the favorites line is the most useful
+        # action for the user and should lead the suggestion list.
+        # Specific item descriptors (built upstream from the user's
+        # profile) follow underneath. Order: where to shop → what to
+        # look for → wishlist note (if applicable).
+        base_suggestions.insert(0, line)
 
     # Wishlist already-has-it line for this specific gap.
     if gap:

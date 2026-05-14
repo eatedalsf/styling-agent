@@ -175,5 +175,23 @@ class TestRunGraph(unittest.TestCase):
         self.assertIn("Wore it recently", html)
 
 
+@unittest.skipIf(not _PYVIS_AVAILABLE, "pyvis not installed")
+class TestFreezeAfterStabilization(unittest.TestCase):
+    """The rendered HTML must include the freeze-after-stabilization
+    snippet so the graph stops animating once layout settles."""
+
+    def test_run_graph_includes_freeze_snippet(self):
+        from styling_agent import run_agent
+        from graph_tool import render_run_graph_html
+        r = run_agent(mode="everyday", everyday_request="casual")
+        html = render_run_graph_html(r)
+        self.assertIn("wearly:freeze-after-stabilize", html,
+            "Run graph must inject the freeze-after-stabilization snippet")
+        self.assertIn("stabilizationIterationsDone", html,
+            "Snippet must listen for the vis.js stabilization event")
+        self.assertIn("physics: {enabled: false}", html,
+            "Snippet must disable physics on stabilization")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

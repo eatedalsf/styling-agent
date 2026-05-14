@@ -234,7 +234,57 @@ def render_schema_graph_html() -> str:
             seen_ids.add(dst)
         net.add_edge(src, dst, label=pred, title=pred)
 
-    return net.generate_html(notebook=False)
+    return _freeze_after_stabilization(net.generate_html(notebook=False))
+
+
+# ─────────────────────────────────────────────
+# Post-render: freeze layout after stabilization
+# ─────────────────────────────────────────────
+
+def _freeze_after_stabilization(html: str) -> str:
+    """
+    Inject a small JS snippet that disables physics ONCE the initial
+    stabilization completes. The result: nodes settle into a clean
+    layout and then stop moving — no perpetual jitter during the demo,
+    no extra UI controls needed. Users can still drag nodes manually
+    after freeze (dragging temporarily re-enables physics in vis.js
+    only for the dragged subset, then it stops again).
+
+    Idempotent: if the snippet is already present, returns html as-is.
+    """
+    sentinel = "/* wearly:freeze-after-stabilize */"
+    if sentinel in html:
+        return html
+
+    inject = (
+        "<script>"
+        f"{sentinel}\n"
+        "(function() {"
+        "  function tryAttach() {"
+        "    if (typeof network !== 'undefined' && network &&"
+        "        typeof network.once === 'function') {"
+        "      network.once('stabilizationIterationsDone', function() {"
+        "        try {"
+        "          network.setOptions({physics: {enabled: false}});"
+        "        } catch (e) { /* swallow */ }"
+        "      });"
+        "      return true;"
+        "    }"
+        "    return false;"
+        "  }"
+        "  if (!tryAttach()) {"
+        "    var n = 0;"
+        "    var iv = setInterval(function() {"
+        "      if (tryAttach() || ++n > 40) { clearInterval(iv); }"
+        "    }, 50);"
+        "  }"
+        "})();"
+        "</script>"
+    )
+    # Inject right before </body> so it runs after pyvis defines `network`.
+    if "</body>" in html:
+        return html.replace("</body>", inject + "</body>", 1)
+    return html + inject
 
 
 # ─────────────────────────────────────────────
@@ -386,7 +436,7 @@ def render_run_graph_html(result: Dict[str, Any]) -> str:
                      title=f"Excluded from this run: {item_name}")
         net.add_edge(fid, target_iid, label="excludes_from_pool")
 
-    return net.generate_html(notebook=False)
+    return _freeze_after_stabilization(net.generate_html(notebook=False))
 
 
 # ─────────────────────────────────────────────

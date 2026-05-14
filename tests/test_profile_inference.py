@@ -560,6 +560,61 @@ class TestAutoFillFromShape(unittest.TestCase):
         self.assertFalse(ov.get("preferred_fit"))
 
 
+class TestProfileHash(unittest.TestCase):
+    """profile_hash is the staleness fingerprint stamped onto every
+    agent result. Changing a scoring field must change the hash;
+    cosmetic edits (name, timezone) must NOT change the hash."""
+
+    def test_empty_profile_returns_sentinel(self):
+        from fit_tool import profile_hash
+        self.assertTrue(profile_hash({}))
+        self.assertTrue(profile_hash(None))
+
+    def test_same_inputs_produce_same_hash(self):
+        from fit_tool import profile_hash
+        p = {"body_shape": "pear", "skin_tone": "warm olive"}
+        self.assertEqual(profile_hash(p), profile_hash(p.copy()))
+
+    def test_changing_body_shape_changes_hash(self):
+        from fit_tool import profile_hash
+        a = profile_hash({"body_shape": "pear"})
+        b = profile_hash({"body_shape": "hourglass"})
+        self.assertNotEqual(a, b)
+
+    def test_changing_skin_tone_changes_hash(self):
+        from fit_tool import profile_hash
+        a = profile_hash({"skin_tone": "warm olive"})
+        b = profile_hash({"skin_tone": "cool fair"})
+        self.assertNotEqual(a, b)
+
+    def test_changing_preferred_fit_changes_hash(self):
+        from fit_tool import profile_hash
+        a = profile_hash({"preferred_fit": "relaxed"})
+        b = profile_hash({"preferred_fit": "structured"})
+        self.assertNotEqual(a, b)
+
+    def test_cosmetic_fields_do_not_change_hash(self):
+        """Editing `name`, `timezone`, free-text values should NOT
+        invalidate the cached agent result."""
+        from fit_tool import profile_hash
+        a = profile_hash({"body_shape": "pear",
+                          "name": "Eatedal",
+                          "timezone": "America/Chicago"})
+        b = profile_hash({"body_shape": "pear",
+                          "name": "Different Name",
+                          "timezone": "Europe/London"})
+        self.assertEqual(a, b,
+            "Cosmetic fields must not trigger result invalidation")
+
+    def test_list_order_does_not_change_hash(self):
+        """Style preferences saved in different orders should hash the
+        same — order is presentation, not meaning."""
+        from fit_tool import profile_hash
+        a = profile_hash({"style_preferences": ["classic", "elegant", "minimal"]})
+        b = profile_hash({"style_preferences": ["minimal", "classic", "elegant"]})
+        self.assertEqual(a, b)
+
+
 class TestSuggestedFitReconciliation(unittest.TestCase):
     """When the user has chosen a preferred_fit that differs from the
     R8 _suggested_fit for their body shape, both values must be

@@ -127,6 +127,47 @@ class TestRejectAndRegenerate(unittest.TestCase):
         self.assertIn("Excluded", step4["output"],
                       "Step 4 should note that rejected items were excluded.")
 
+    # ── Profile-version invalidation contract ────────────────────────
+
+    def test_run_agent_stamps_profile_hash(self):
+        """Every agent result must carry a profile_hash so the UI can
+        detect staleness when the user changes their profile."""
+        r = run_agent(mode="everyday", everyday_request="casual")
+        self.assertIn("profile_hash", r)
+        self.assertIsInstance(r["profile_hash"], str)
+        self.assertTrue(len(r["profile_hash"]) > 0)
+
+    def test_profile_hash_matches_current_profile(self):
+        """The stamped hash equals `profile_hash(current_profile)` so
+        the UI comparison is straightforward."""
+        from fit_tool import profile_hash, get_fit_profile
+        r = run_agent(mode="everyday", everyday_request="casual")
+        current_hash = profile_hash(
+            get_fit_profile().get("profile", {}) or {})
+        self.assertEqual(r["profile_hash"], current_hash)
+
+    # ── Tradeoff records contract ────────────────────────────────────
+
+    def test_result_includes_tradeoffs_key(self):
+        """Even when no tradeoffs fire, the key must exist as a list
+        so the UI can iterate without a KeyError."""
+        r = run_agent(mode="everyday", everyday_request="casual")
+        self.assertIn("tradeoffs", r)
+        self.assertIsInstance(r["tradeoffs"], list)
+
+    def test_tradeoff_records_are_well_shaped(self):
+        """If any tradeoff fires, each record must carry the four keys
+        the wardrobe-gap detector and reasoning surface depend on."""
+        r = run_agent(mode="everyday", everyday_request="dinner")
+        for td in r.get("tradeoffs", []):
+            self.assertIn("dimension", td)
+            self.assertIn("severity",  td)
+            self.assertIn("reason",    td)
+            self.assertIn("item_id",   td)
+            self.assertIn(td["dimension"],
+                          ("color", "fit", "balance", "modesty"))
+            self.assertIn(td["severity"], ("low", "medium", "high"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
