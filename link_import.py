@@ -678,19 +678,48 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
     season = season_hits if season_hits else ["all"]
 
     # Prefer JSON-LD name, then og:title, then plain <title>, then slug.
-    name = (jsonld.get("name") or "").strip()
+    # Every name source goes through the same suffix-strip so a title
+    # like "Unisex Crew Neck T-Shirt | UNIQLO US" becomes the clean
+    # product name "Unisex Crew Neck T-Shirt". Without this, the form's
+    # Name field is pre-filled with the store name appended, which the
+    # user had to manually edit on every link import.
+    def _strip_store_suffix(s: str) -> str:
+        if not s:
+            return s
+        # Common separators retailers use to pin the brand at the end.
+        parts = re.split(r"\s+[|·—–\-]\s+", s, maxsplit=1)
+        head = parts[0].strip()
+        # If head is non-empty and clearly the product (longer than 3
+        # chars), prefer it over the full string.
+        return head if len(head) >= 3 else s.strip()
+
+    name = _strip_store_suffix((jsonld.get("name") or "").strip())
     if not name:
-        name = (meta.get("og_title") or "").strip()
+        name = _strip_store_suffix((meta.get("og_title") or "").strip())
     if not name:
-        title = (meta.get("title") or "").strip()
-        if title:
-            title = re.split(r"\s+[|·—–-]\s+", title, maxsplit=1)[0].strip()
-        name = title
+        name = _strip_store_suffix((meta.get("title") or "").strip())
     if not name:
         name = slug_name
     _name_tokens = [t for t in re.split(r"\s+", name) if t]
     if _name_tokens and all(t.lower() in _NOISE_SEGMENT_WORDS for t in _name_tokens):
         name = ""
+
+    # Tags: when keyword inference produced an empty list, fall back to
+    # a minimal default derived from the inferred formality, so the
+    # item is searchable in the wardrobe filter pool out of the box.
+    # The user can edit / remove the tag in the review form.
+    final_tags = list(inferred.get("tags") or [])
+    if not final_tags:
+        if formality == "business":
+            final_tags = ["work"]
+        elif formality == "formal":
+            final_tags = ["formal"]
+        elif formality == "athletic":
+            final_tags = ["gym"]
+        elif formality == "smart_casual":
+            final_tags = ["dinner"]
+        else:  # casual, default
+            final_tags = ["casual"]
 
     # Prefer JSON-LD image when present (usually higher quality than og:image).
     image_url = jsonld.get("image") or meta.get("og_image")
@@ -703,7 +732,7 @@ def import_product_link(url: str, fetch_metadata: bool = True) -> dict:
             "name":      name,
             "category":  inferred["category"],
             "color":     inferred["color"],
-            "tags":      inferred["tags"],
+            "tags":      final_tags,
             "formality": formality,
             "season":    season,
         },
