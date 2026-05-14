@@ -897,15 +897,339 @@ def _pexels_search(query: str, key: str, per_page: int,
         return []
 
 
-def _score_candidate(photo: dict, item_type: str = "") -> float:
-    """Lower is better. Candidates whose aspect ratio falls outside the
-    per-type product band get a large penalty so they only win when
-    nothing else is on offer. Within the band, candidates are ranked
-    by distance from the type's ideal ratio.
+# ── Alt-text validation lexicons ──────────────────────────────────
+# Pexels returns an `alt` description for each photo. The PRIOR scorer
+# ignored this field entirely, so a photo of a woman posing in a
+# green silk blouse scored identically to an ivory blouse on a hanger.
+# These lexicons let _score_candidate penalize lifestyle / person-
+# focused shots and reward product-style imagery.
 
-    Larger source images get a small bonus — full-item shots tend to
-    be photographed at higher resolution than cropped detail shots,
-    so pixel count is a noisy but useful tiebreaker."""
+# Tokens that signal a person/lifestyle/editorial photo. Heavy penalty
+# when found. Word-boundary regex elsewhere so we don't false-match
+# substrings like "personal" or "modelled".
+_PERSON_TOKENS = {
+    "woman", "women", "man", "men", "person", "people",
+    "girl", "boy", "lady", "ladies", "guy", "guys",
+    "model", "models", "modeling", "modelling",
+    "portrait", "pose", "poses", "posing", "posed",
+    "wearing", "wears", "wear",
+    "barefoot", "smiling", "stands", "standing", "stand",
+    "stroll", "strolling", "exercise", "exercises", "exercising",
+    "athlete", "athletes", "performing",
+    "female", "male", "she ", "he ",
+    "selfie", "shoot", "fashion shoot", "street style", "street-style",
+    "muscular", "fitness model",
+    # Body-part close-ups — "hands in a jacket", "feet in heels" etc.
+    # These are person-centric even without naming the person.
+    "hands in", "hand in", "feet in", "foot in", "legs in", "leg in",
+    "neck in", "arms in", "arm in", "torso", "waist of",
+}
+
+# Tokens suggesting a SINGLE-product / catalog shot. Bonus when found.
+_PRODUCT_TOKENS = {
+    "flat lay", "flatlay", "on hanger", "on a hanger",
+    "hanger", "hangers", "hanging",
+    "isolated", "white background", "plain background",
+    "studio shot", "studio shots", "in studio",
+    "on display", "displayed", "showcased", "showcasing",
+    "product photo", "catalog", "catalogue", "lookbook",
+    "draped on", "draped over", "folded", "stacked",
+    "top view of", "close-up of an", "close-up of a", "macro of",
+}
+
+# Per-type required category words. A candidate's alt MUST contain at
+# least one of these tokens or it is rejected outright (heavy penalty
+# returned as "category miss"). Synonyms are listed so a "sweater"
+# can stand in for "cardigan", etc.
+_CATEGORY_TOKENS: Dict[str, Tuple[str, ...]] = {
+    "top":        ("blouse", "shirt", "top", "tee", "t-shirt", "sweater",
+                   "cardigan", "knit", "camisole", "tunic", "polo",
+                   "turtleneck", "tank"),
+    "bottom":     ("trouser", "trousers", "pants", "pant", "jeans",
+                   "skirt", "shorts", "chino", "chinos", "legging",
+                   "leggings", "slacks"),
+    "dress":      ("dress", "gown", "frock", "sundress"),
+    "outerwear":  ("coat", "jacket", "blazer", "vest", "trench",
+                   "parka", "puffer"),
+    "activewear": ("activewear", "sportswear", "athletic", "athleisure",
+                   "tee", "t-shirt", "tshirt", "training", "workout",
+                   "gym", "yoga", "sports bra", "leggings", "jogger",
+                   "joggers"),
+    "shoes":      ("shoe", "shoes", "heel", "heels", "pump", "pumps",
+                   "flat", "flats", "sneaker", "sneakers", "boot",
+                   "boots", "sandal", "sandals", "loafer", "loafers"),
+    "accessory":  ("scarf", "belt", "handbag", "bag", "tote", "clutch",
+                   "necklace", "earring", "earrings", "hoop", "stud",
+                   "chain", "accessory", "accessories"),
+}
+
+# Tokens suggesting MULTIPLE separate garments in one photo — heavy
+# penalty when the alt lists more than one clothing noun joined by
+# commas / "and". Detection regex below the lexicon.
+_MULTI_GARMENT_NOUNS = (
+    "blouse", "shirt", "tee", "t-shirt", "sweater", "cardigan",
+    "blazer", "jacket", "coat", "vest", "trench",
+    "trouser", "trousers", "pants", "jeans", "skirt", "shorts",
+    "dress", "gown",
+    "shoe", "shoes", "heel", "heels", "boot", "boots", "sneaker", "sneakers",
+    "scarf", "belt", "bag", "handbag", "tote",
+)
+
+# Color synonyms — small but covers the demo palette. Used by the alt
+# scorer to reward color matches and penalize obvious conflicts.
+_COLOR_FAMILY = {
+    "ivory":      {"ivory", "cream", "off-white", "off white", "white"},
+    "cream":      {"cream", "ivory", "off-white", "off white", "white"},
+    "white":      {"white", "ivory", "cream", "off-white"},
+    "beige":      {"beige", "tan", "nude", "sand", "khaki"},
+    "tan":        {"tan", "beige", "khaki", "camel", "nude"},
+    "nude":       {"nude", "beige", "tan", "blush"},
+    "camel":      {"camel", "tan", "caramel"},  # camel ≠ chocolate brown
+    "olive":      {"olive", "army", "khaki", "dark green", "olive green"},
+    "sage":       {"sage", "mint", "light green"},
+    "gold":       {"gold", "yellow", "mustard", "amber"},
+    "burgundy":   {"burgundy", "bordeaux", "wine", "maroon", "oxblood",
+                   "dark red"},
+    "red":        {"red", "scarlet", "crimson", "maroon", "bordeaux"},
+    "rust":       {"rust", "burnt orange", "terracotta", "russet"},
+    "terracotta": {"terracotta", "rust", "burnt orange", "clay", "brick"},
+    "forest":     {"forest", "dark green", "evergreen", "pine"},
+    "navy":       {"navy", "dark blue", "deep blue", "midnight"},
+    "blue":       {"blue", "navy", "azure", "cobalt"},
+    "black":      {"black"},
+    "charcoal":   {"charcoal", "dark grey", "dark gray", "graphite",
+                   "slate"},
+    "grey":       {"grey", "gray", "slate", "silver"},
+    "silver":     {"silver", "grey", "gray", "metallic"},
+    "brown":      {"brown", "chocolate", "espresso", "coffee"},
+    "pink":       {"pink", "rose", "blush", "fuchsia"},
+}
+
+# Universe of color words the alt scorer recognizes. If alt contains a
+# color word from THIS set that is not in the item's own family, that's
+# a soft conflict (+2). Stronger conflicts come from the disjoint-pair
+# list below.
+_ALL_COLOR_WORDS = {
+    "ivory", "cream", "off-white", "off white", "white",
+    "beige", "tan", "nude", "sand", "khaki",
+    "camel", "caramel",
+    "olive", "army", "sage", "mint",
+    "gold", "yellow", "mustard", "amber",
+    "burgundy", "bordeaux", "wine", "maroon", "oxblood",
+    "red", "scarlet", "crimson",
+    "rust", "burnt orange", "terracotta", "russet", "clay", "brick",
+    "forest", "evergreen", "pine",
+    "navy", "azure", "cobalt", "midnight",
+    "blue", "teal", "turquoise",
+    "black",
+    "charcoal", "graphite", "slate",
+    "grey", "gray", "silver",
+    "brown", "chocolate", "espresso", "coffee",
+    "pink", "rose", "blush", "fuchsia",
+    "purple", "violet", "lavender", "lilac",
+    "orange", "peach", "coral", "salmon",
+    "green",
+}
+
+# Tokens that DEFINITELY conflict — when these appear and the item's
+# color family doesn't include them, the candidate is almost certainly
+# the wrong color. Penalty is heavier (+7) than a soft conflict.
+_DISJOINT_COLOR_FAMILIES = (
+    ({"green", "olive", "sage", "forest"},
+     {"red", "burgundy", "rust", "terracotta", "wine", "scarlet",
+      "maroon", "bordeaux"}),
+    ({"green", "olive", "sage", "forest"},
+     {"blue", "navy", "azure", "cobalt"}),
+    ({"green", "olive", "sage", "forest"},
+     {"orange", "pink"}),
+    ({"black", "charcoal", "graphite"},
+     {"white", "ivory", "cream", "off-white"}),
+    ({"black"},
+     {"brown", "chocolate", "espresso", "tan", "beige", "camel"}),
+    ({"black"},
+     {"burgundy", "bordeaux", "wine", "maroon", "red"}),
+    ({"black"},
+     {"pink", "rose", "blush"}),
+    ({"camel", "tan", "beige"},
+     {"black", "navy", "burgundy", "wine"}),
+    ({"red", "burgundy", "wine", "bordeaux"},
+     {"blue", "navy", "green"}),
+    ({"orange", "terracotta", "rust"},
+     {"green", "blue", "navy"}),
+    ({"pink", "rose", "blush", "fuchsia"},
+     {"beige", "black", "navy", "olive", "green"}),
+)
+
+# Collective-noun cues — "a collection of coats", "stack of sweaters",
+# "various dresses". These signal multiple items even when only ONE
+# clothing noun appears, so the regular multi-garment check (which
+# requires ≥ 2 distinct nouns) misses them.
+_COLLECTIVE_CUES = (
+    "collection of", "stack of", "row of", "rack of", "rows of",
+    "stacks of", "stacked ", "various ", "multiple ", "several ", "many ",
+    "assortment of", "set of", "lineup of", "line up of", "array of",
+    "selection of",
+)
+
+
+def _alt_analysis(alt: str, item: Dict[str, Any]) -> Dict[str, Any]:
+    """Inspect a Pexels `alt` string and return a diagnosis used by
+    _score_candidate. Returns a dict with:
+      penalty:        float   — sum of score penalties (higher = worse)
+      bonus:          float   — sum of score bonuses   (subtracted from penalty)
+      category_match: bool    — alt contains a token for the item type
+      person_match:   bool    — alt names a person / pose / wearing-style
+      multi_match:    bool    — alt lists ≥ 2 distinct clothing nouns
+      color_match:    bool    — alt mentions the item color family
+      color_conflict: bool    — alt mentions a disjoint color family
+      product_match:  bool    — alt contains a product/catalog cue
+      reasons:        list[str] — human-readable explanation for the report
+    """
+    import re
+    a = (alt or "").lower()
+    item_type = (item.get("type") or "").lower()
+    item_color = (item.get("color") or "").lower().strip()
+
+    reasons: list = []
+    penalty = 0.0
+    bonus = 0.0
+
+    # Category check — uses WORD BOUNDARIES so "knit" doesn't match
+    # "knitting" (the prior substring check was a false-positive source
+    # — a photo of yarn and knitting needles was treated as a sweater).
+    cat_tokens = _CATEGORY_TOKENS.get(item_type, ())
+    category_match = False
+    if cat_tokens:
+        for t in cat_tokens:
+            if re.search(rf"\b{re.escape(t)}\b", a):
+                category_match = True
+                break
+    if cat_tokens and not category_match:
+        penalty += 20.0
+        reasons.append(f"alt missing required {item_type} noun")
+
+    # Person tokens — heavy penalty. Treat the alt's first ~120 chars
+    # as the meaningful subject; person tokens after that are less
+    # determinative.
+    head = a[:140]
+    person_hits = [t for t in _PERSON_TOKENS if t.strip() in head]
+    person_match = bool(person_hits)
+    if person_match:
+        # +6 per hit, capped at +12. Two-plus person tokens is almost
+        # always a portrait — make it unattractive.
+        penalty += min(12.0, 6.0 * len(person_hits))
+        reasons.append(f"person/lifestyle ({', '.join(person_hits[:3])})")
+
+    # Multi-garment listing — find 2+ distinct clothing nouns. Comma /
+    # "and" separated.
+    distinct_nouns = set()
+    for noun in _MULTI_GARMENT_NOUNS:
+        if re.search(rf"\b{re.escape(noun)}\b", a):
+            distinct_nouns.add(noun)
+    multi_match = len(distinct_nouns) >= 2
+    # Collective-noun cue ("collection of coats") — counts as multi.
+    collective_hit = next((c for c in _COLLECTIVE_CUES if c in a), "")
+    if collective_hit:
+        multi_match = True
+
+    # Comma-list heuristic: a flat-lay alt that enumerates ≥3 things
+    # via comma separators (e.g. "pink sports bra, sneakers, and yoga
+    # mat") almost always shows multiple loose items. Catches novel
+    # noun combinations the _MULTI_GARMENT_NOUNS list misses.
+    comma_list_hit = False
+    if not multi_match:
+        # Trim off the leading category clause ("Flat lay of") so we
+        # don't over-trigger on "Flat lay, top-down view, ..." style
+        # marketing copy.
+        body = a.split(" of ", 1)[-1] if " of " in a else a
+        commas = body.count(",")
+        and_count = body.count(" and ")
+        if commas >= 2 or (commas >= 1 and and_count >= 1):
+            comma_list_hit = True
+            multi_match = True
+
+    if multi_match:
+        penalty += 8.0
+        why = (collective_hit if collective_hit
+               else "comma-list" if comma_list_hit
+               else ", ".join(sorted(distinct_nouns)[:3]))
+        reasons.append(f"multi-garment ({why})")
+
+    # Color check. Four states (color_match and color_conflict can BOTH
+    # be true — e.g. "clay pot in front of GREEN dress" matches the
+    # terracotta family on "clay" but ALSO names green, which is
+    # disjoint from terracotta. Conflict takes precedence over match.)
+    color_match = False
+    color_conflict = False
+    if item_color:
+        synonyms = _COLOR_FAMILY.get(item_color, {item_color})
+        family_hit = any(c in a for c in synonyms)
+        # Disjoint check ALWAYS runs, regardless of family_hit. The
+        # earlier version skipped it after a family hit, which let
+        # "clay pot in front of green dress" slip through.
+        disjoint_hit = False
+        for fam_a, fam_b in _DISJOINT_COLOR_FAMILIES:
+            if synonyms & fam_a and any(t in a for t in fam_b):
+                disjoint_hit = True
+                break
+            if synonyms & fam_b and any(t in a for t in fam_a):
+                disjoint_hit = True
+                break
+        if disjoint_hit:
+            color_conflict = True
+            penalty += 7.0
+            reasons.append(f"color conflict (item={item_color})")
+        elif family_hit:
+            color_match = True
+            bonus += 1.5
+            reasons.append(f"color match ({item_color})")
+        else:
+            # Soft conflict: alt names ANY color word that isn't in
+            # the item's family.
+            alt_colors = {c for c in _ALL_COLOR_WORDS if c in a}
+            out_of_family = alt_colors - synonyms
+            if alt_colors and out_of_family == alt_colors:
+                penalty += 2.0
+                reasons.append(
+                    f"soft color mismatch ({sorted(out_of_family)[0]} "
+                    f"vs item {item_color})"
+                )
+
+    # Product / catalog cues — bonus.
+    product_hits = [t for t in _PRODUCT_TOKENS if t in a]
+    product_match = bool(product_hits)
+    if product_match:
+        bonus += 1.0 + 0.5 * min(3, len(product_hits))
+        reasons.append(f"product cue ({product_hits[0]})")
+
+    return {
+        "penalty":        penalty,
+        "bonus":          bonus,
+        "category_match": category_match,
+        "person_match":   person_match,
+        "multi_match":    multi_match,
+        "color_match":    color_match,
+        "color_conflict": color_conflict,
+        "product_match":  product_match,
+        "reasons":        reasons,
+    }
+
+
+def _score_candidate(photo: dict, item_type: str = "",
+                      item: Optional[Dict[str, Any]] = None) -> float:
+    """Lower is better. Combines:
+
+      - aspect-ratio fit  (per-type sweet spot)
+      - source pixel size (tiebreaker, larger is slightly better)
+      - alt-text analysis (heavy penalties for person / multi-garment /
+        wrong color / off-category; bonuses for product cues + color
+        match)
+
+    The alt-text component is the critical addition over the v2 scorer.
+    Without it, lifestyle photos were tied with product photos on
+    aspect ratio alone, and Pexels' default ranking — which favors
+    "engaging" portraits — won every tie.
+    """
     try:
         w = float(photo.get("width") or 0)
         h = float(photo.get("height") or 0)
@@ -917,20 +1241,33 @@ def _score_candidate(photo: dict, item_type: str = "") -> float:
 
     ideal, low, high = _ASPECT_BY_TYPE.get(
         (item_type or "").lower(), _DEFAULT_ASPECT)
-
     if ratio < low or ratio > high:
         base = 10.0 + abs(ratio - ideal)
     else:
         base = abs(ratio - ideal)
 
-    # Tiebreaker: prefer images >= 1500px on the long side. Cropped
-    # detail shots from Pexels tend to be served as smaller crops.
+    # Pixel-size tiebreaker.
     long_side = max(w, h)
     if long_side >= 1500:
         base -= 0.02
     elif long_side < 700:
         base += 0.10
+
+    # Alt-text adjustment.
+    if item is not None:
+        diag = _alt_analysis(photo.get("alt") or "", item)
+        base += diag["penalty"]
+        base -= diag["bonus"]
+
     return base
+
+
+# Confidence threshold: if the best candidate's score is above this,
+# the alt-text checks flagged the photo as bad — fall back to the
+# silhouette renderer rather than ship a wrong image. The value was
+# tuned against the live probe so clean product shots score ≤ 1.0
+# while typical person-focused shots score > 5.0.
+_CONFIDENCE_THRESHOLD = 4.0
 
 
 def _fetch_real_photo(
@@ -939,6 +1276,7 @@ def _fetch_real_photo(
     h: int = 500,
     timeout: float = _FETCH_TIMEOUT,
     item_type: str = "",
+    item_color: str = "",
 ) -> Tuple[bytes, str, str]:
     """
     Fetch a real, keyword-matched product photo from Pexels.
@@ -967,19 +1305,44 @@ def _fetch_real_photo(
     biases = _QUERY_BIAS_BY_TYPE.get((item_type or "").lower(),
                                       ("product photo white background", ""))
 
-    candidates: list = []
+    # Aggregate candidates across ALL bias queries (vs. taking the
+    # first non-empty result set). Pexels' first hit for "blouse flat
+    # lay full item" tends to be a portrait; the second query might
+    # surface a cleaner product shot. Pooling lets the alt-text scorer
+    # pick the best of the combined pool.
+    item_for_scoring = {"type": item_type, "color": item_color,
+                         "name": ""}
+    pooled: list = []
+    seen_ids: set = set()
+    queries_tried: list = []
     for bias in biases:
         q = f"{query} {bias}".strip() if bias else query
+        queries_tried.append(q)
         photos = _pexels_search(q, key, _CANDIDATES_PER_SEARCH, timeout)
-        if photos:
-            candidates = photos
+        for p in photos:
+            pid = p.get("id")
+            if pid not in seen_ids:
+                pooled.append(p)
+                seen_ids.add(pid)
+        # Stop early once we have plenty of candidates.
+        if len(pooled) >= 40:
             break
-    if not candidates:
+    if not pooled:
         return b"", "", ""
 
-    # Rank by per-type aspect-ratio fit; take the best.
-    candidates.sort(key=lambda p: _score_candidate(p, item_type))
-    best = candidates[0]
+    # Rank by combined aspect-ratio + alt-text scoring.
+    pooled.sort(key=lambda p: _score_candidate(p, item_type,
+                                                 item_for_scoring))
+    best = pooled[0]
+    best_score = _score_candidate(best, item_type, item_for_scoring)
+
+    # Confidence guard: if even the BEST candidate scores worse than
+    # the threshold, every candidate failed at least one alt-text
+    # check (person photo, multi-garment, wrong color, off-category).
+    # Reject the pool entirely so the loader falls back to silhouette.
+    if best_score > _CONFIDENCE_THRESHOLD:
+        return b"", "", ""
+
     src = best.get("src") or {}
     img_url = src.get("large") or src.get("medium") or src.get("original")
     if not img_url:
@@ -1276,6 +1639,7 @@ def _save_card(item: Dict[str, Any], use_photos: bool = True
         raw, photographer, photo_url = _fetch_real_photo(
             item["unsplash_query"],
             item_type=item.get("type", ""),
+            item_color=item.get("color", ""),
         )
         if raw:
             png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
@@ -1536,6 +1900,18 @@ def load_demo_wardrobe(
 
     total_after = sum(len(overlay.get(s, [])) for s in
                       ("clothing", "shoes", "accessories"))
+
+    # ── Review report ──────────────────────────────────────────
+    # Write a CSV under wardrobe_images/_pexels_review.csv listing
+    # the source decision per item. Useful both for the demo operator
+    # (spot bad images quickly) and as a regression catch (compare
+    # before / after a Pexels-pipeline tweak).
+    report_path = ""
+    try:
+        report_path = _write_review_report(all_seed_items, render_results)
+    except Exception:
+        pass
+
     return {
         "added":         added,
         "skipped":       skipped,
@@ -1544,8 +1920,61 @@ def load_demo_wardrobe(
         "silhouettes":   silhouette_count,
         "total_after":   total_after,
         "image_errors":  img_err,
+        "review_report": report_path,
         "error":         None,
     }
+
+
+def _write_review_report(all_seed_items: list,
+                          render_results: dict) -> str:
+    """Write a CSV review report listing the source decision per item.
+
+    Columns:
+      id, name, type, color, query_base, picked_source, image_path,
+      photographer, photo_url, reason
+
+    Returned path is relative to repo root. Empty string on failure.
+    """
+    import csv
+    os.makedirs(WARDROBE_IMAGES_DIR, exist_ok=True)
+    path = os.path.join(WARDROBE_IMAGES_DIR, "_pexels_review.csv")
+    try:
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                "id", "name", "type", "color", "query_base",
+                "picked_source", "image_path", "photographer",
+                "photo_url", "reason",
+            ])
+            for it in all_seed_items:
+                if not isinstance(it, dict):
+                    continue
+                iid = it.get("id", "")
+                rec = render_results.get(iid, ("", "", "", ""))
+                ipath, source, photog, photo_url = rec
+                reason = {
+                    "photo":      "Pexels accepted (passed alt-text checks)",
+                    "silhouette": "fell back — Pexels candidates failed "
+                                   "alt-text checks OR no key OR network",
+                    "override":   "manual override (image_url_override "
+                                   "or local_image_path_override)",
+                    "":           "render failed",
+                }.get(source, source)
+                writer.writerow([
+                    iid,
+                    it.get("name", ""),
+                    it.get("type", ""),
+                    it.get("color", ""),
+                    it.get("unsplash_query", ""),
+                    source or "render-failed",
+                    ipath,
+                    photog,
+                    photo_url,
+                    reason,
+                ])
+        return os.path.relpath(path, _repo_root())
+    except OSError:
+        return ""
 
 
 def unload_demo_wardrobe() -> dict:

@@ -4041,6 +4041,16 @@ def _render_wardrobe():
                             f"{len(res['image_errors'])} item(s). They still "
                             "load — just without a thumbnail."
                         )
+                    rep = res.get("review_report") or ""
+                    if rep:
+                        photos_n = res.get("photos", 0)
+                        sil_n = res.get("silhouettes", 0)
+                        st.caption(
+                            f"Pexels accepted **{photos_n}** items, "
+                            f"silhouette fallback for **{sil_n}**. "
+                            f"Per-item decision report at `{rep}` "
+                            "(open in any spreadsheet)."
+                        )
                     st.rerun()
         with cols[1]:
             if _demo_active:
