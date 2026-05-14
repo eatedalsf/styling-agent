@@ -150,10 +150,49 @@
       width: 100%; height: 100%;
       background: var(--paper);
       min-height: 500px;
+      position: relative;
     }
     .empty-state {
       padding: 1rem; color: var(--secondary); font-size: 0.84rem;
     }
+
+    /* First-time hint banner — sits inside the canvas, auto-dismisses
+       on first node click or after 10 seconds. Pattern adapted from
+       graph-lms learning-graph viewer. */
+    .first-time-hint {
+      position: absolute;
+      left: 50%;
+      top: 12px;
+      transform: translateX(-50%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.82rem;
+      color: var(--body);
+      box-shadow: 0 1px 6px rgba(28, 25, 23, 0.06);
+      z-index: 10;
+      max-width: 540px;
+      line-height: 1.5;
+      transition: opacity 250ms ease, transform 250ms ease;
+    }
+    .first-time-hint.dismissed {
+      opacity: 0;
+      transform: translate(-50%, -8px);
+      pointer-events: none;
+    }
+    .first-time-hint .hint-dismiss {
+      background: none;
+      border: none;
+      color: var(--secondary);
+      font-size: 0.82rem;
+      cursor: pointer;
+      margin-left: 0.4rem;
+      padding: 0;
+      font-family: inherit;
+    }
+    .first-time-hint .hint-dismiss:hover { color: var(--ink); }
   </style>
 </head>
 <body>
@@ -189,14 +228,18 @@
         </select>
         <label for="layoutSel">Layout</label>
         <select id="layoutSel">
-          <option value="physics">Physics (force-directed)</option>
-          <option value="hierarchical-ud">Hierarchical (top → bottom)</option>
+          <option value="hierarchical-ud" selected>Hierarchical (top → bottom)</option>
           <option value="hierarchical-lr">Hierarchical (left → right)</option>
+          <option value="physics">Physics (force-directed)</option>
         </select>
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-top:0.4rem;">
           <button id="fitBtn" title="Re-center and zoom to show every visible node.">Fit to view</button>
-          <button id="physicsBtn" title="Pause / resume the force-directed simulation. Useful for grabbing a node and pinning it where you want.">Pause physics</button>
+          <button id="physicsBtn" title="Pause / resume the force-directed simulation. Useful for grabbing a node and pinning it where you want.">Physics off</button>
         </div>
+        <button id="pathBtn" style="margin-top:0.4rem;"
+                title="Highlight one canonical chain through the graph that a first-time reader can follow end-to-end.">
+          Show suggested reading path
+        </button>
         <button id="resetBtn" style="margin-top:0.4rem;">Reset everything</button>
       </div>
 
@@ -207,7 +250,12 @@
       <div id="selected" class="empty-state">Click a node to see its summary, Bloom level, and a link to the relevant book chapter.</div>
     </div>
 
-    <div id="network"></div>
+    <div id="network">
+      <div id="firstTimeHint" class="first-time-hint" role="status" aria-live="polite">
+        <strong>Click any concept</strong> to see its prerequisites and what it unlocks · <strong>drag</strong> to rearrange · use the dropdowns to filter by category or Bloom level.
+        <button type="button" class="hint-dismiss" id="hintDismissBtn" aria-label="Dismiss hint">×</button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -505,12 +553,125 @@
       document.getElementById("searchBox").value = "";
       document.getElementById("categorySel").value = "";
       document.getElementById("bloomSel").value = "";
-      document.getElementById("layoutSel").value = "physics";
+      document.getElementById("layoutSel").value = "hierarchical-ud";
       applyFilters();
-      setLayout("physics");
-      physicsOn = true;
-      document.getElementById("physicsBtn").textContent = "Pause physics";
+      setLayout("hierarchical-ud");
+      physicsOn = false;
+      document.getElementById("physicsBtn").textContent = "Physics off";
+      clearReadingPath();
       network.fit({animation: true});
+    });
+
+    // ─────────────────────────────────────────────────────────────
+    // Initial layout — hierarchical top-down by default.
+    // McCreary's learning-graph-generator pattern: open with the
+    // layout that teaches the prerequisite chain, not the layout
+    // that looks prettiest.
+    // ─────────────────────────────────────────────────────────────
+    setLayout("hierarchical-ud");
+    physicsOn = false;
+
+    // ─────────────────────────────────────────────────────────────
+    // First-time hint banner — auto-dismisses on first node click
+    // or after 10 seconds. Helps first-time users discover the
+    // click-a-node affordance.
+    // ─────────────────────────────────────────────────────────────
+    const hintEl = document.getElementById("firstTimeHint");
+    function dismissHint() {
+      if (hintEl && !hintEl.classList.contains("dismissed")) {
+        hintEl.classList.add("dismissed");
+      }
+    }
+    document.getElementById("hintDismissBtn")
+      .addEventListener("click", dismissHint);
+    network.on("selectNode", dismissHint);
+    setTimeout(dismissHint, 10000);
+
+    // ─────────────────────────────────────────────────────────────
+    // Suggested reading path — highlights one canonical chain a
+    // first-time reader can follow end-to-end. Dim all other nodes
+    // and edges so the path stands out; clicking again restores.
+    // ─────────────────────────────────────────────────────────────
+    const READING_PATH = [
+      "personal-styling-problem",
+      "agent-not-chatbot",
+      "seven-step-workflow",
+      "outfit-construction",
+      "result-dict-contract",
+    ];
+    const PATH_SET = new Set(READING_PATH);
+    let pathActive = false;
+
+    function applyReadingPath() {
+      const ds = network.body.data.nodes;
+      ds.forEach(n => {
+        const inPath = PATH_SET.has(n.id);
+        ds.update({
+          id: n.id,
+          color: inPath
+            ? {background: "#FAF3EE", border: "#9F5A36"}
+            : {background: "#F5F0E9", border: "#D8CFC4"},
+          font: {color: inPath ? "#1C1917" : "#A8937E",
+                 size: 13, face: "DM Sans, sans-serif"},
+          borderWidth: inPath ? 3 : 1,
+        });
+      });
+      const eds = network.body.data.edges;
+      eds.forEach(e => {
+        const onPath = PATH_SET.has(e.from) && PATH_SET.has(e.to);
+        eds.update({
+          id: e.id,
+          color: {color: onPath ? "#C17F5A" : "#E8E0D8",
+                  highlight: "#C17F5A"},
+          width: onPath ? 2.4 : 1,
+        });
+      });
+    }
+    function clearReadingPath() {
+      if (!pathActive) return;
+      const ds = network.body.data.nodes;
+      const catMap = Object.fromEntries(
+        (window._wearlyCategories || []).map(c => [c.id, c])
+      );
+      ds.forEach(n => {
+        const cat = catMap[n._concept.category] ||
+                    {color: "#F5EDE3", border: "#A8937E"};
+        ds.update({
+          id: n.id,
+          color: {background: cat.color, border: cat.border},
+          font: {color: "#1C1917", size: 13, face: "DM Sans, sans-serif"},
+          borderWidth: 2,
+        });
+      });
+      const eds = network.body.data.edges;
+      eds.forEach(e => {
+        eds.update({
+          id: e.id,
+          color: {color: "#C8B8A8", highlight: "#C17F5A"},
+          width: 1,
+        });
+      });
+      pathActive = false;
+      document.getElementById("pathBtn").textContent =
+        "Show suggested reading path";
+    }
+    // Cache categories so clearReadingPath can restore per-category
+    // colors without re-fetching the JSON.
+    window._wearlyCategories = data.categories;
+
+    document.getElementById("pathBtn").addEventListener("click", function () {
+      if (pathActive) {
+        clearReadingPath();
+        return;
+      }
+      applyReadingPath();
+      pathActive = true;
+      this.textContent = "Clear path";
+      // Frame the path nicely.
+      network.fit({
+        nodes: READING_PATH,
+        animation: {duration: 400, easingFunction: "easeInOutQuad"},
+      });
     });
   })();
   </script>

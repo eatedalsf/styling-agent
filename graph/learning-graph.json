@@ -3,7 +3,7 @@
   "metadata": {
     "version": "0.1.0",
     "node_count": 28,
-    "edge_count": 38,
+    "edge_count": 39,
     "category_count": 6,
     "max_chain_length": 6,
     "rendered_by": "vis-network.js",
