@@ -347,5 +347,119 @@ class TestPreferredFitConfidence(unittest.TestCase):
         )
 
 
+class TestEndToEndInferenceFlow(unittest.TestCase):
+    """
+    Integration test: measurements → suggest → apply → save →
+    run_agent → reasoning includes [fit-silhouette-rules#R8].
+
+    This pins the contract that the inferred styling fields actually
+    flow through the recommendation engine and surface in the
+    user-visible reasoning with the correct rule citation. Without
+    this test, a regression in fit_alignment_notes or save_fit_profile
+    could silently break the citation chain.
+    """
+
+    BUCKETS = {
+        "fuller midsection": {"bust": 36.0, "waist": 34.0, "hips": 36.0},
+        "pear":              {"bust": 34.0, "waist": 28.0, "hips": 40.0},
+        "hourglass":         {"bust": 36.0, "waist": 27.0, "hips": 36.0},
+        "inverted-triangle": {"bust": 40.0, "waist": 30.0, "hips": 34.0},
+    }
+
+    def setUp(self):
+        import fit_tool
+        import tempfile
+        self._original_path = fit_tool.PROFILE_PATH
+        self._tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8")
+        self._tmp.close()
+        fit_tool.PROFILE_PATH = self._tmp.name
+
+    def tearDown(self):
+        import fit_tool, os
+        fit_tool.PROFILE_PATH = self._original_path
+        try:
+            os.unlink(self._tmp.name)
+        except OSError:
+            pass
+
+    def _run_pipeline(self, measurements: dict) -> dict:
+        """Walk the full pipeline; return the final reasoning + profile."""
+        import fit_tool
+        import profile_inference
+        import styling_agent
+
+        fit_tool.reset_fit_profile_test_data()
+        suggested = profile_inference.suggest_profile_from_measurements(
+            measurements, {})
+        updates = profile_inference.apply_suggestions(
+            {}, suggested, list(suggested["suggestions"].keys()))
+        save_res = fit_tool.save_fit_profile(
+            {"measurements": measurements, **updates})
+        self.assertTrue(save_res["success"], msg=save_res.get("error"))
+
+        agent_out = styling_agent.run_agent(
+            mode="everyday", everyday_request="work")
+        reasoning = (agent_out.get("reasoning_trail")
+                     or agent_out.get("reasoning") or [])
+        if isinstance(reasoning, str):
+            reasoning = [reasoning]
+        return {
+            "suggested":   suggested,
+            "updates":     updates,
+            "profile":     fit_tool.get_fit_profile()["profile"],
+            "reasoning":   reasoning,
+            "agent_out":   agent_out,
+        }
+
+    def test_full_pipeline_for_every_bucket(self):
+        """For each of four shape buckets, the pipeline must:
+        - produce at least preferred_fit + body_shape + highlight_features
+        - persist those values verbatim
+        - emit at least one reasoning line citing fit#R8 with capital R"""
+        for label, meas in self.BUCKETS.items():
+            with self.subTest(bucket=label):
+                out = self._run_pipeline(meas)
+                p = out["profile"]
+
+                self.assertTrue(p.get("body_shape"),
+                                f"{label}: body_shape was not saved")
+                self.assertTrue(p.get("preferred_fit"),
+                                f"{label}: preferred_fit was not saved")
+                self.assertTrue(p.get("highlight_features"),
+                                f"{label}: highlight_features was not saved")
+
+                flat = "\n".join(str(l) for l in out["reasoning"])
+                # Citation tag must keep capital R — earlier .capitalize()
+                # corrupted it to lowercase r.
+                self.assertIn(
+                    "[fit-silhouette-rules#R8]", flat,
+                    f"{label}: fit#R8 citation missing or lowercased "
+                    f"in reasoning.\nReasoning:\n{flat}",
+                )
+
+    def test_preferred_fit_note_fires_for_every_fit_value(self):
+        """Earlier the alignment note only fired for preferred_fit='tailored';
+        structured / fluid / relaxed silently dropped through. This test
+        pins that every fit value applied via Analyze surfaces a note."""
+        seen_fits = set()
+        for label, meas in self.BUCKETS.items():
+            with self.subTest(bucket=label):
+                out = self._run_pipeline(meas)
+                pf = out["profile"].get("preferred_fit", "")
+                seen_fits.add(pf)
+                flat = "\n".join(str(l) for l in out["reasoning"]).lower()
+                self.assertIn(
+                    f"preferred {pf}", flat,
+                    f"{label}: 'aligns with your preferred {pf} fit' note "
+                    "missing — fit was applied but never cited.",
+                )
+        # Across the four buckets we should have exercised at least
+        # three distinct fit values (the buckets land on tailored,
+        # structured, structured, fluid → 3 distinct values).
+        self.assertGreaterEqual(len(seen_fits), 3,
+                                 f"Only exercised: {seen_fits}")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -727,11 +727,29 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
     notes = []
 
     # Preferred fit
+    # The first branch matches when the item's name / formality literally
+    # mentions the user's chosen fit. The second branch maps the six
+    # canonical preferred_fit values onto the formality buckets they
+    # naturally suit, so a profile with preferred_fit="structured" (or
+    # "fluid", "relaxed", etc.) actually surfaces a reasoning note —
+    # not only "tailored" as the earlier special-case did.
     pf = (profile.get("preferred_fit") or "").lower().strip()
-    if pf and pf in (item.get("formality", "") + " " + item.get("name", "")).lower():
+    _formality = (item.get("formality") or "").lower()
+    _item_text = (item.get("formality", "") + " " + item.get("name", "")
+                  + " " + " ".join(item.get("tags") or [])).lower()
+    _PF_FORMALITY_MAP = {
+        # fit value -> formality buckets where the item is a natural fit
+        "tailored":   ("business", "smart_casual", "formal"),
+        "structured": ("business", "smart_casual", "formal"),
+        "fitted":     ("business", "smart_casual", "formal", "casual"),
+        "relaxed":    ("casual", "smart_casual", "athletic"),
+        "fluid":      ("casual", "smart_casual", "formal"),    # drape works dressy too
+        "loose":      ("casual", "athletic"),
+    }
+    if pf and pf in _item_text:
         notes.append(f"aligns with your preferred {pf} fit")
-    elif pf == "tailored" and item.get("formality") in ("business", "smart_casual", "formal"):
-        notes.append("aligns with your preferred tailored fit")
+    elif pf and _formality in _PF_FORMALITY_MAP.get(pf, ()):
+        notes.append(f"aligns with your preferred {pf} fit")
 
     # Style preferences (seed-owner-level — classic, elegant, minimal, etc.)
     # Previously this note only fired when the item was tagged "versatile"
@@ -795,12 +813,20 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
             notes.append(f"respects your {modesty} modesty preference")
 
     # ── Highlight / balance areas — fit-silhouette-rules.md §R8 ──
-    # The user's chosen highlight_features and balance_areas are the
-    # opt-in part of the R8 mapping. We surface a soft note when the
-    # item's silhouette obviously aligns with one of the user's chosen
-    # areas, citing R8 so the reasoning is traceable. Body-positive
-    # vocabulary only: "draws attention to" and "supports balance at",
-    # never "hide" or "minimize".
+    # Two-tier matching:
+    #   1) STRONG match — the item's silhouette / name / tags contain a
+    #      specific signal for the area (e.g. "v-neck" for neckline,
+    #      "peplum" for waist). Emits a specific note: "draws attention
+    #      to your X".
+    #   2) CATEGORY match — the item's TYPE naturally touches the area
+    #      (every top/dress has a neckline; every bottom touches hips,
+    #      etc.) and the user has set this area in their profile. Emits
+    #      a softer note: "honors your choice to highlight your X". This
+    #      guarantees that the user's stated preference (which they
+    #      applied from the Analyze panel) shows up in reasoning at
+    #      least once per outfit when a relevant piece is picked.
+    # Vocabulary is body-positive — "draws attention to", "supports
+    # balance at", "honors your choice" — never "hide" or "minimize".
     try:
         from rule_refs import cite as _cite_rule
     except Exception:  # pragma: no cover — registry is import-light
@@ -810,18 +836,35 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
     _SILHOUETTE_SIGNALS = {
         "waist":       ("belted", "cinched", "wrap", "sheath",
                         "fit-and-flare", "fit and flare", "waist-defined",
-                        "peplum", "tailored"),
+                        "peplum", "tailored", "fitted-waist", "tie-waist"),
         "neckline":    ("v-neck", "scoop", "square neck", "boat neck",
                         "halter", "off-shoulder", "off shoulder",
-                        "sweetheart", "cowl"),
+                        "sweetheart", "cowl", "crew", "round neck"),
         "shoulders":   ("structured shoulder", "strong shoulder",
-                        "padded shoulder", "off-shoulder", "halter"),
+                        "padded shoulder", "off-shoulder", "halter",
+                        "puff sleeve", "puff-sleeve", "shoulder pad"),
         "legs":        ("mini", "midi slit", "slit", "cropped pant",
-                        "cropped trouser", "tapered"),
-        "collarbone":  ("boat neck", "off-shoulder", "scoop", "v-neck"),
-        "hips":        ("peplum", "a-line", "flared", "fit-and-flare"),
-        "arms":        ("short sleeve", "sleeveless", "tank", "camisole"),
-        "back":        ("open back", "low back", "halter"),
+                        "cropped trouser", "tapered", "skinny", "slim-leg"),
+        "collarbone":  ("boat neck", "off-shoulder", "scoop", "v-neck",
+                        "deep-v"),
+        "hips":        ("peplum", "a-line", "flared", "fit-and-flare",
+                        "wide-leg", "trumpet"),
+        "arms":        ("short sleeve", "sleeveless", "tank", "camisole",
+                        "cap sleeve"),
+        "back":        ("open back", "low back", "halter", "backless"),
+    }
+
+    # Which item types NATURALLY touch each area — used by the soft
+    # category match. A "top" has a neckline + shoulders + arms; a
+    # "dress" has all of those plus a waist line + hips + legs; a
+    # "bottom" touches hips + legs + waist; etc.
+    _CATEGORY_AREAS = {
+        "top":        ("neckline", "shoulders", "arms", "collarbone"),
+        "dress":      ("neckline", "shoulders", "arms", "collarbone",
+                       "waist", "hips", "legs", "back"),
+        "bottom":     ("waist", "hips", "legs"),
+        "outerwear":  ("shoulders", "neckline", "collarbone"),
+        "activewear": ("shoulders", "arms", "legs", "waist"),
     }
 
     haystack_silhouette = (
@@ -831,26 +874,54 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
             " ".join([t.lower() for t in (item.get("tags") or [])]),
         ])
     )
+    item_type = (item.get("type") or "").lower()
+    natural_areas = set(_CATEGORY_AREAS.get(item_type, ()))
 
+    cite_tag_r8 = _cite_rule("fit#R8")
+
+    def _r8_note(verb: str, area: str) -> str:
+        tail = f" {cite_tag_r8}" if cite_tag_r8 else ""
+        return f"{verb} your {area}{tail}"
+
+    # Highlight pass: strong match first, fallback to category match.
     highlight = [a.lower() for a in (profile.get("highlight_features") or [])]
+    highlight_note_emitted = False
     for area in highlight:
         signals = _SILHOUETTE_SIGNALS.get(area, ())
         if signals and any(sig in haystack_silhouette for sig in signals):
-            cite_tag = _cite_rule("fit#R8")
-            tail = f" {cite_tag}" if cite_tag else ""
-            notes.append(f"draws attention to your {area}{tail}")
-            break  # one highlight note per item — avoids stacking
+            notes.append(_r8_note("draws attention to", area))
+            highlight_note_emitted = True
+            break
+    if not highlight_note_emitted:
+        for area in highlight:
+            if area in natural_areas:
+                notes.append(_r8_note("honors your choice to highlight",
+                                       area))
+                break
 
+    # Balance pass: same two-tier logic.
     balance = [a.lower() for a in (profile.get("balance_areas") or [])]
+    balance_note_emitted = False
     for area in balance:
         signals = _SILHOUETTE_SIGNALS.get(area, ())
         if signals and any(sig in haystack_silhouette for sig in signals):
-            cite_tag = _cite_rule("fit#R8")
-            tail = f" {cite_tag}" if cite_tag else ""
-            notes.append(f"supports balance at your {area}{tail}")
+            notes.append(_r8_note("supports balance at", area))
+            balance_note_emitted = True
             break
+    if not balance_note_emitted:
+        for area in balance:
+            if area in natural_areas:
+                notes.append(_r8_note(
+                    "honors your choice to bring balance to", area))
+                break
 
-    return [f"  {n.capitalize()}." for n in notes]
+    # Final formatting: only the FIRST character is uppercased so the
+    # rule citation tag's R8 stays uppercase. The earlier ".capitalize()"
+    # call lowercased "R8" → "r8", corrupting the citation chain.
+    def _sentence_case(s: str) -> str:
+        return (s[:1].upper() + s[1:]) if s else s
+
+    return [f"  {_sentence_case(n)}." for n in notes]
 
 
 def fit_alignment_note(item: dict, profile: dict):
