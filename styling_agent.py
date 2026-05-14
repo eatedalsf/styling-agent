@@ -757,18 +757,45 @@ def run_agent(
     if not any(i.get("type") == "dress" for i in outfit):
         if occasion_tag == "gym":
             if activewear:
-                # Score activewear too, so user-added activewear gets picked.
+                # Gym set = ONE top + ONE bottom from activewear pool,
+                # never two bottoms. Earlier behavior took activewear[:2]
+                # which produced "leggings + yoga pants" duplicates.
+                # Classify by item name so even items tagged "activewear"
+                # generically route to the right slot.
+                def _gym_slot(item):
+                    n = (item.get("name") or "").lower()
+                    t = (item.get("name") or "").lower()
+                    if any(k in n for k in (
+                        "legging", "pant", "trouser", "jogger", "short",
+                        "bottom", "skort")):
+                        return "bottom"
+                    if any(k in n for k in (
+                        "bra", "tank", "tee", "top", "shirt", "crop",
+                        "hoodie", "sweatshirt", "jacket")):
+                        return "top"
+                    # Default by activewear sub-types — fall back to top.
+                    return "top"
+
                 activewear.sort(key=lambda i: -_score_main_piece(i))
-                chosen_active = activewear[:2]
-                outfit.extend(chosen_active)
-                reasoning.append(
-                    f"Selected activewear set: "
-                    f"{', '.join(i['name'] for i in chosen_active)}. "
-                    f"{cite('occasion#R2')}"
-                )
-                for piece in chosen_active:
-                    _note = _freshness_note(piece)
-                    if _note: reasoning.append(_note)
+                gym_top = next((it for it in activewear
+                                if _gym_slot(it) == "top"), None)
+                gym_bot = next((it for it in activewear
+                                if _gym_slot(it) == "bottom"), None)
+                chosen_active = [x for x in (gym_top, gym_bot) if x]
+                if chosen_active:
+                    outfit.extend(chosen_active)
+                    reasoning.append(
+                        f"Selected activewear set: "
+                        f"{', '.join(i['name'] for i in chosen_active)}. "
+                        f"{cite('occasion#R2')}"
+                    )
+                    for piece in chosen_active:
+                        _note = _freshness_note(piece)
+                        if _note: reasoning.append(_note)
+                else:
+                    reasoning.append(
+                        "No activewear top+bottom pair found in wardrobe "
+                        "for this gym occasion.")
             else:
                 reasoning.append("No activewear found in wardrobe for this gym occasion.")
         else:
@@ -801,8 +828,38 @@ def run_agent(
                 if _note: reasoning.append(_note)
 
     # Add shoes — score so user-added shoes can win.
+    # For gym occasions, re-rank toward athletic / training silhouettes
+    # so a pair of leather sneakers ranked high by general scoring
+    # doesn't beat a proper training shoe in the pool.
     if shoes_pool:
-        shoes_sorted = sorted(shoes_pool, key=lambda i: -_score_main_piece(i))
+        _athletic_shoes_gap = False
+        if occasion_tag == "gym":
+            _athletic_keywords = (
+                "sneaker", "trainer", "training", "running", "athletic",
+                "sport", "performance", "cross-trainer",
+            )
+            _athletic_neg = ("leather", "loafer", "heel", "pump",
+                              "stiletto", "ballet", "boot")
+            def _athletic_score(it):
+                n = (it.get("name") or "").lower()
+                tags = " ".join((it.get("tags") or [])).lower()
+                hay = n + " " + tags
+                pos = sum(1 for k in _athletic_keywords if k in hay)
+                neg = sum(1 for k in _athletic_neg if k in hay)
+                # Items with athletic cues AND no negative cues lead.
+                return (pos > 0, -neg, _score_main_piece(it))
+            shoes_sorted = sorted(shoes_pool,
+                                    key=lambda i: tuple(-x for x in _athletic_score(i)))
+            if not any("sneaker" in (s.get("name") or "").lower()
+                       or "trainer" in (s.get("name") or "").lower()
+                       or "training" in (s.get("name") or "").lower()
+                       or "running" in (s.get("name") or "").lower()
+                       or "athletic" in (s.get("name") or "").lower()
+                       for s in shoes_sorted[:1]):
+                # No athletic shoe in pool — flag as a gym-specific gap.
+                _athletic_shoes_gap = True
+        else:
+            shoes_sorted = sorted(shoes_pool, key=lambda i: -_score_main_piece(i))
         outfit.append(shoes_sorted[0])
         _is_user = str(shoes_sorted[0].get("id", "")).startswith("U")
         reasoning.append(
@@ -810,8 +867,17 @@ def run_agent(
             + (" — from your wardrobe additions" if _is_user else "")
             + "."
         )
+        if _athletic_shoes_gap:
+            reasoning.append(
+                "  Note: no athletic training shoes were found in the "
+                "wardrobe — this gym pick is the best available option, "
+                f"but a dedicated training sneaker would be better. "
+                f"{cite('shopping#R1')}"
+            )
         _note = _freshness_note(shoes_sorted[0])
         if _note: reasoning.append(_note)
+    else:
+        _athletic_shoes_gap = False
 
     # Add accessories (up to 2) — score for the same reason.
     if accessories_pool:
@@ -888,9 +954,38 @@ def run_agent(
         sil   = (item.get("silhouette") or "").lower()
         haystack = " ".join([name, form, sil] + tags)
 
-        # 1) Color × skin tone
+        # 1) Color × skin tone, weighted by garment placement.
+        # A color near the face (top, dress, outerwear, scarf, necklace)
+        # has high impact on skin-tone harmony. A color on the lower
+        # body (skirt, trousers, jeans) has low impact and should not
+        # generate a tradeoff on its own. Earlier behavior flagged a
+        # white skirt as a "less aligned" tradeoff for warm olive
+        # users, which contradicted the color score.
         skin = (profile.get("skin_tone") or "").lower().strip()
-        if skin and color:
+        item_type_lc = (item.get("type") or "").lower()
+        _high_impact_types = ("top", "dress", "outerwear", "scarf")
+        _med_impact_types  = ("accessory",)  # necklaces/earrings vary
+        _low_impact_types  = ("bottom", "shoes")
+        # Necklaces / earrings / hoops sit near the face — bump them up
+        # by name even if the type is "accessory".
+        name_lower = (item.get("name") or "").lower()
+        near_face_acc = any(k in name_lower for k in
+                             ("necklace", "earring", "hoop", "scarf"))
+        if item_type_lc in _high_impact_types:
+            placement_severity = "medium"
+        elif near_face_acc:
+            placement_severity = "medium"
+        elif item_type_lc in _med_impact_types:
+            placement_severity = "low"
+        elif item_type_lc in _low_impact_types:
+            # Low-impact: a bottom that mismatches the palette does not
+            # create a tradeoff on its own. We skip the color check
+            # entirely for these placements.
+            placement_severity = None
+        else:
+            placement_severity = "low"
+
+        if skin and color and placement_severity is not None:
             warm_cols = {"camel", "cream", "warm white", "olive",
                           "terracotta", "rust", "gold", "tan", "brown",
                           "burgundy", "blush"}
@@ -899,16 +994,16 @@ def run_agent(
             if "warm" in skin and any(c in color for c in cool_cols):
                 out.append({
                     "dimension": "color",
-                    "severity":  "medium",
+                    "severity":  placement_severity,
                     "reason":    f"its {color} tone is less aligned with "
-                                  f"your {skin} palette",
+                                  f"your {skin} palette near the face",
                 })
             elif "cool" in skin and any(c in color for c in warm_cols):
                 out.append({
                     "dimension": "color",
-                    "severity":  "medium",
+                    "severity":  placement_severity,
                     "reason":    f"its {color} tone is less aligned with "
-                                  f"your {skin} palette",
+                                  f"your {skin} palette near the face",
                 })
 
         # 2) Preferred-fit alignment
@@ -1032,7 +1127,11 @@ def run_agent(
 
     if gaps:
         step6["status"] = "gap_found"
-        step6["output"] = f"Missing outfit pieces: {', '.join(gaps)}."
+        # The output is reconciled below after qualified-gap promotion
+        # so the wording covers true-missing vs qualified vs both. We
+        # set an initial value so a check_gaps()-only path still has
+        # readable copy if qualified-gap detection adds nothing.
+        step6["output"] = f"Required piece missing: {', '.join(gaps)}."
         suggestions = SHOPPING_SUGGESTIONS.get(occasion_tag, [])
         result["gaps"] = gaps
         result["shopping_suggestions"] = suggestions
@@ -1043,7 +1142,7 @@ def run_agent(
             f"{cite('shopping#R3')}"
         )
     else:
-        step6["output"] = "Outfit is complete — all required pieces present."
+        step6["output"] = "Core outfit complete — all required pieces present."
     steps.append(step6)
 
     # ── Qualified gaps from tradeoff records ──────────────────────────────
@@ -1126,14 +1225,14 @@ def run_agent(
             if t:
                 dims_by_type[t].add(_td["dimension"])
         for piece_type, dims in dims_by_type.items():
-            # Only promote when at least one dimension has medium+
-            # severity, OR when two or more dimensions had tradeoffs.
+            # Promote ONLY when at least one tradeoff has medium-or-high
+            # severity. Earlier the "two low dimensions = promote" rule
+            # over-triggered gaps for minor combined issues (e.g. a
+            # casual top that's slightly off-fit AND slightly off-balance
+            # would generate a gap even though both signals were weak).
             severities = [t["severity"] for t in tradeoffs
                           if (t.get("item_type") or "").lower() == piece_type]
-            promote = (
-                any(s in ("medium", "high") for s in severities)
-                or len(dims) >= 2
-            )
+            promote = any(s in ("medium", "high") for s in severities)
             if not promote:
                 continue
             descriptor = _build_qualified_gap_descriptor(piece_type, dims)
@@ -1149,9 +1248,12 @@ def run_agent(
         if "outerwear" not in result["gaps"]:
             result["gaps"].append("outerwear")
         if occasion_tag == "gym":
+            # Frame outerwear as a commute layer for the gym — never
+            # suggest something like a trench coat as part of the workout.
             outer_suggestion = (
-                "A lightweight athletic windbreaker or running jacket would cover "
-                "cool-weather gym transit without breaking the activewear look."
+                "Optional commute layer: a light athletic windbreaker "
+                "or running jacket would cover cool-weather travel to "
+                "and from the gym."
             )
         else:
             outer_suggestion = (
@@ -1160,6 +1262,56 @@ def run_agent(
             )
         if outer_suggestion not in result["shopping_suggestions"]:
             result["shopping_suggestions"].append(outer_suggestion)
+
+    # Gym-specific qualified gap: athletic shoes missing from pool.
+    # Surfaces alongside other gaps; the rendering layer will phrase
+    # it as a "better-aligned option" rather than "missing".
+    try:
+        _athletic_shoes_gap
+    except NameError:
+        _athletic_shoes_gap = False
+    if _athletic_shoes_gap and "qualified:shoes" not in result["gaps"]:
+        result["gaps"].append("qualified:shoes")
+        gym_shoe_suggestion = (
+            "Athletic training sneakers (cushioned cross-trainers or "
+            "running shoes) would better serve the gym than the casual "
+            "leather styles currently in your wardrobe."
+        )
+        if gym_shoe_suggestion not in result["shopping_suggestions"]:
+            result["shopping_suggestions"].append(gym_shoe_suggestion)
+
+    # ── Reconcile Step 6 output with qualified gaps ──────────────
+    # Step 6 was decided BEFORE qualified gaps were processed, so its
+    # output may say "Outfit is complete" while result["gaps"] now
+    # contains qualified:<type> entries from tradeoff promotion. Three
+    # cases need different copy:
+    #
+    #   - true_missing only        : "Required piece missing: <type>."
+    #   - qualified only           : "Core outfit complete; better-aligned
+    #                                 option(s) identified for <type>."
+    #   - true_missing + qualified : both, joined.
+    #
+    # This keeps Step 6, the wardrobe-gap card, and the reasoning
+    # trail telling the same story.
+    _all_gaps = result.get("gaps", []) or []
+    _true_missing = [g for g in _all_gaps if not str(g).startswith("qualified:")]
+    _qualified    = [str(g).split(":", 1)[1] for g in _all_gaps
+                      if str(g).startswith("qualified:")]
+    if _true_missing and _qualified:
+        step6["status"] = "gap_found"
+        step6["output"] = (
+            f"Required piece missing: {', '.join(_true_missing)}; "
+            f"better-aligned option identified for {', '.join(_qualified)}."
+        )
+    elif _qualified and not _true_missing:
+        step6["status"] = "qualified_gap"
+        step6["output"] = (
+            f"Core outfit complete; better-aligned option identified "
+            f"for {', '.join(_qualified)}."
+        )
+    elif _true_missing and not step6["output"].startswith("Required"):
+        step6["status"] = "gap_found"
+        step6["output"] = f"Required piece missing: {', '.join(_true_missing)}."
 
     # Augment suggestions with the user's favorite stores AND wishlist.
     # The store call is now gap-aware: a missing dress routes to the

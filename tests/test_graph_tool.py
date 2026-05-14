@@ -192,6 +192,18 @@ class TestFreezeAfterStabilization(unittest.TestCase):
         self.assertIn("physics: {enabled: false}", html,
             "Snippet must disable physics on stabilization")
 
+    def test_run_graph_includes_fit_to_view_call(self):
+        """After freeze, the snippet must center+fit nodes so the graph
+        opens visibly inside the canvas rather than cropped."""
+        from styling_agent import run_agent
+        from graph_tool import render_run_graph_html
+        r = run_agent(mode="everyday", everyday_request="casual")
+        html = render_run_graph_html(r)
+        self.assertIn("network.fit", html,
+            "Snippet must call network.fit() to center the graph")
+        self.assertIn("afterDrawing", html,
+            "Snippet must also fit on first draw for layout consistency")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

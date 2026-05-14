@@ -256,31 +256,47 @@ def _freeze_after_stabilization(html: str) -> str:
     if sentinel in html:
         return html
 
-    inject = (
-        "<script>"
-        f"{sentinel}\n"
-        "(function() {"
-        "  function tryAttach() {"
-        "    if (typeof network !== 'undefined' && network &&"
-        "        typeof network.once === 'function') {"
-        "      network.once('stabilizationIterationsDone', function() {"
-        "        try {"
-        "          network.setOptions({physics: {enabled: false}});"
-        "        } catch (e) { /* swallow */ }"
-        "      });"
-        "      return true;"
-        "    }"
-        "    return false;"
-        "  }"
-        "  if (!tryAttach()) {"
-        "    var n = 0;"
-        "    var iv = setInterval(function() {"
-        "      if (tryAttach() || ++n > 40) { clearInterval(iv); }"
-        "    }, 50);"
-        "  }"
-        "})();"
-        "</script>"
-    )
+    # Note: keep the JS payload as a SINGLE triple-quoted string so
+    # JS `//` comments and other syntax don't confuse the Python
+    # tokenizer when concatenated.
+    inject = """<script>
+/* wearly:freeze-after-stabilize */
+(function() {
+  function tryAttach() {
+    if (typeof network !== 'undefined' && network &&
+        typeof network.once === 'function') {
+      network.once('stabilizationIterationsDone', function() {
+        try {
+          network.setOptions({physics: {enabled: false}});
+          /* center + fit all nodes inside the visible canvas so the
+             graph never opens cropped or off-screen. animation:false
+             means no scroll-effect on initial render. */
+          network.fit({animation: false});
+        } catch (e) { /* swallow */ }
+      });
+      /* belt + suspenders: also call fit() on first draw and on
+         window resize, so the graph stays centered if the side
+         panel changes width. */
+      try {
+        network.once('afterDrawing', function() {
+          try { network.fit({animation: false}); } catch(e) {}
+        });
+      } catch (e) {}
+      window.addEventListener('resize', function() {
+        try { network.fit({animation: false}); } catch(e) {}
+      });
+      return true;
+    }
+    return false;
+  }
+  if (!tryAttach()) {
+    var n = 0;
+    var iv = setInterval(function() {
+      if (tryAttach() || ++n > 40) { clearInterval(iv); }
+    }, 50);
+  }
+})();
+</script>"""
     # Inject right before </body> so it runs after pyvis defines `network`.
     if "</body>" in html:
         return html.replace("</body>", inject + "</body>", 1)

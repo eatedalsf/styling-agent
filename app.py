@@ -1557,12 +1557,27 @@ def _render_stale_profile_banner(result: dict, regenerate_key: str) -> bool:
     with c2:
         if st.button("Regenerate", key=regenerate_key,
                      type="primary", use_container_width=True):
-            # Caller-friendly contract: clear the stored result so the
-            # next render does a fresh run. The button is identified
-            # by the caller-supplied key so multiple banners on one
-            # page (Today + Planner card) never collide.
-            st.session_state.pop("result", None)
-            st.session_state.pop("event_detail_result", None)
+            # Replay the SAME run context (mode, target_event_id, source)
+            # against the latest profile. Just popping `result` and
+            # rerunning bounces the user back to an empty state on
+            # event_detail (which requires session_state["result"] to
+            # be set). Instead, re-run the agent here with the stored
+            # last_run params, which forces get_owner_profile() to
+            # re-read the latest user_profile.json overlay.
+            last = st.session_state.get("last_run") or {}
+            try:
+                with st.spinner("Regenerating against your latest profile…"):
+                    _run_and_store(
+                        mode=last.get("mode", "calendar"),
+                        everyday_request=last.get("everyday_request"),
+                        target_event_id=last.get("target_event_id"),
+                        source=last.get("source") or "today",
+                    )
+            except Exception as _e:
+                # Defensive — if the agent crashes, still clear so the
+                # user isn't stuck on a stale view.
+                st.error(f"Regenerate failed: {_e}")
+                st.session_state.pop("result", None)
             st.rerun()
     return True
 
@@ -1701,13 +1716,34 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
 
     # ── Gaps ────────────────────────────────────────────────
     if gaps:
-        # Render the alert text as HTML, then drop interactive
-        # "Save to wishlist" buttons immediately below — Streamlit
-        # buttons can't live inside an unsafe_allow_html block.
+        # Differentiate two kinds of gaps for the headline copy:
+        #   "qualified:<type>" → piece exists but is poorly aligned
+        #                         (color / fit / balance / modesty).
+        #                         Title reads as "better-aligned <type>
+        #                         option" — never "missing", because
+        #                         the piece IS in the outfit.
+        #   plain "<type>"     → required piece-type is absent.
+        #                         Title reads as "<type> missing for
+        #                         this occasion".
+        true_missing  = [g for g in gaps if not str(g).startswith("qualified:")]
+        qualified     = [str(g).split(":", 1)[1] for g in gaps
+                          if str(g).startswith("qualified:")]
+        if true_missing and qualified:
+            title = (
+                f"Wardrobe gap · {', '.join(true_missing)} missing"
+                f" · better-aligned option for {', '.join(qualified)}"
+            )
+        elif qualified:
+            title = (
+                f"Wardrobe opportunity · better-aligned "
+                f"{', '.join(qualified)} option recommended"
+            )
+        else:
+            title = f"Wardrobe Gap · {', '.join(true_missing)} missing for this occasion"
         gap_items = "".join(f"<div class='gap-item'>→ {s}</div>" for s in shopping)
         st.markdown(f"""
         <div class="gap-alert">
-            <div class="gap-title">Wardrobe Gap · {', '.join(gaps)} missing for this occasion</div>
+            <div class="gap-title">{title}</div>
             {gap_items}
         </div>
         """, unsafe_allow_html=True)

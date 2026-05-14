@@ -168,6 +168,70 @@ class TestRejectAndRegenerate(unittest.TestCase):
                           ("color", "fit", "balance", "modesty"))
             self.assertIn(td["severity"], ("low", "medium", "high"))
 
+    # ── Color placement: bottoms don't generate skin-tone tradeoffs ─
+
+    def test_bottom_color_does_not_produce_high_severity_tradeoff(self):
+        """A bottom that mismatches the skin-tone palette should NOT
+        produce a medium/high color tradeoff, because skirts/trousers
+        are far from the face. Previously a white skirt on a warm-olive
+        profile generated a contradictory 'less aligned' warning while
+        the color score said all colors worked.
+
+        We invoke the agent with skin_tone=warm olive and verify that
+        any tradeoff on a bottom carries severity 'low' or is absent
+        entirely."""
+        r = run_agent(mode="everyday", everyday_request="casual")
+        for td in r.get("tradeoffs", []):
+            if (td.get("item_type") or "").lower() == "bottom" \
+                    and td.get("dimension") == "color":
+                self.fail(
+                    "Bottom should not generate any color tradeoff under "
+                    "placement weighting (skirts/trousers are far from the "
+                    f"face). Got: {td}"
+                )
+
+    # ── Step 6 wording adapts to qualified gaps ─────────────────────
+
+    def test_step6_uses_qualified_wording_when_only_qualified_gaps(self):
+        """When the outfit has all required pieces but a qualified gap
+        was promoted, Step 6 must NOT say 'Outfit is complete —
+        all required pieces present'."""
+        r = run_agent(mode="everyday", everyday_request="casual")
+        step6 = next((s for s in r["steps"] if s["step"] == 6), None)
+        self.assertIsNotNone(step6)
+        out = step6["output"].lower()
+        qualified = any(str(g).startswith("qualified:") for g in r.get("gaps", []))
+        true_missing = any(not str(g).startswith("qualified:")
+                            for g in r.get("gaps", []))
+        if qualified and not true_missing:
+            self.assertIn("better-aligned", out,
+                "Step 6 must surface the qualified gap when there's no "
+                "true-missing piece.")
+            self.assertNotIn("missing", out.split("better-aligned")[0],
+                "Step 6 must NOT say 'missing' before 'better-aligned' "
+                "when only qualified gaps fired.")
+
+    # ── Gym outfit composition ──────────────────────────────────────
+
+    def test_gym_outfit_has_at_most_one_bottom(self):
+        """Earlier the agent took activewear[:2] which could pick two
+        bottoms (leggings + yoga pants). The slot-aware partition
+        guarantees one bottom max."""
+        r = run_agent(mode="everyday", everyday_request="gym")
+        outfit = r.get("recommendation", []) or []
+        # Identify bottoms by name OR type. activewear-tagged items
+        # have type="activewear" but their slot is name-driven.
+        def _looks_like_bottom(it):
+            n = (it.get("name") or "").lower()
+            return any(k in n for k in (
+                "legging", "pant", "trouser", "jogger", "short",
+                "skirt", "skort",
+            ))
+        bottoms = [i for i in outfit if _looks_like_bottom(i)]
+        self.assertLessEqual(len(bottoms), 1,
+            f"Gym outfit must not contain two bottoms. Got: "
+            f"{[b.get('name') for b in bottoms]}")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
