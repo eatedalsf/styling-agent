@@ -2909,10 +2909,9 @@ def _render_routine_editor() -> None:
                     )
                     st.rerun()
                 else:
+                    # Surface the error and stop here — no rerun would
+                    # otherwise clear the message before the user sees it.
                     st.error(rd.get("error", "Could not add activity."))
-                st.rerun()
-            else:
-                st.error(res.get("error", "Could not save."))
 
 
 def _render_event_detail():
