@@ -3994,11 +3994,8 @@ def _render_wardrobe():
             "<div style='font-size:0.84rem; color:#6E6E73; "
             "line-height:1.55;'>"
             "Tops, bottoms, dresses, outerwear, activewear, shoes, "
-            "and accessories across work / smart-casual / casual / "
-            "weekend / gym / dinner / formal / travel. Each item "
-            "carries fabric, silhouette, and body-positive style "
-            "notes so the agent can demo skin-tone, fit, and "
-            "modesty reasoning."
+            "and accessories — fabric, silhouette, and style notes "
+            "for every item so the agent can demo full reasoning."
             "</div>"
             + photo_status_line
             + "</div>",
@@ -4898,21 +4895,20 @@ def _render_shop():
 
 def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> None:
     """
-    "Analyze measurements" panel — surfaces R8-grounded styling
-    suggestions when the user has shared bust+waist+hips. Nothing is
-    saved until the user picks fields and clicks "Apply suggestions".
+    Always-visible Analyze panel. Surfaces R8-grounded styling
+    suggestions when the user has shared bust + waist + hips; otherwise
+    renders an empty state with a clear "add measurements below" CTA so
+    the feature is discoverable without first having to save anything.
 
     Source basis: skills/wearly-styling-agent/fit-silhouette-rules.md
-    §R8. Every suggestion shown here carries the `[fit-silhouette-rules#R8]`
-    citation next to it; the same slug appears in `rule_refs.py`.
+    §R8. Every suggestion carries the `[fit-silhouette-rules#R8]`
+    citation; the slug is registered in `rule_refs.py`.
 
     Body-positive language contract (fit#R1) is enforced two ways:
-      1. The suggestion strings come from profile_inference, which uses
-         "highlight / balance / support" verbs only.
+      1. profile_inference uses only "highlight / balance / support"
+         vocabulary.
       2. save_fit_profile() screens every value via
-         check_value_for_forbidden_language() before persisting, so a
-         malicious profile_inference change still can't slip a
-         corrective verb through.
+         check_value_for_forbidden_language() before persisting.
     """
     try:
         from profile_inference import (
@@ -4920,75 +4916,73 @@ def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> Non
             apply_suggestions,
         )
         from fit_tool import save_fit_profile
-    except Exception as _e:
+    except Exception:
         # Defensive — the panel must never break the Profile page.
         return
 
-    # The analyze button is the explicit opt-in. We never compute
-    # suggestions on page load — the user must click. This keeps the
-    # UI calm and the "no diagnosis" framing honest.
-    btn_col, info_col = st.columns([1, 3], gap="medium")
+    # Sufficiency check up front so we render the right state.
+    _bwh = ("bust", "waist", "hips")
+    _have = {k for k in _bwh
+             if isinstance(measurements.get(k), (int, float))
+             and measurements.get(k, 0) > 0}
+    _ready_for_analysis = (_have == set(_bwh))
+    _missing = [k for k in _bwh if k not in _have]
+
+    # Card frame so the panel reads as a first-class section.
+    st.markdown(
+        '<div style="background:#FFFFFF; border:2px solid #111111; '
+        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
+        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+        'Fit profile · testing lab</div>'
+        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
+        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
+        'Analyze measurements and suggest styling profile'
+        '</div>'
+        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+        "Preference-based, not a diagnosis. Wearly maps your bust / waist / "
+        "hip ratios to documented industry styling heuristics "
+        "<code style='font-size:0.74rem;'>[fit-silhouette-rules#R8]</code> "
+        "and shows the suggestions for your review. Nothing is saved unless "
+        "you check a chip and click Apply."
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── EMPTY STATE: no bust/waist/hips yet ────────────────────────
+    if not _ready_for_analysis:
+        st.info(
+            "**To unlock suggestions, share at least bust, waist, and "
+            "hip measurements.** "
+            f"Missing: {', '.join(_missing) if _missing else 'all three'}. "
+            "Open *Edit your profile, preferences & measurements* below "
+            "and fill in those fields — every measurement is optional "
+            "and editable."
+        )
+        return
+
+    # ── READY: button + result ─────────────────────────────────────
+    btn_col, _spacer = st.columns([1, 2], gap="small")
     with btn_col:
         analyze_clicked = st.button(
-            "Analyze measurements",
+            "Analyze measurements →",
             key="profile_analyze_btn",
-            type="secondary",
+            type="primary",
             use_container_width=True,
-            help="Suggest preference-based styling profile fields from "
-                 "your measurements. Nothing is saved until you review "
-                 "and apply.",
-        )
-    with info_col:
-        st.markdown(
-            "<div style='font-size:0.78rem; color:#6E6E73; "
-            "line-height:1.55; padding-top:0.35rem;'>"
-            "Suggestions are <strong>preference-based, not a diagnosis</strong>. "
-            "Wearly never overwrites your saved choices — you review each "
-            "chip and apply only what feels right. "
-            "Grounded in <code style='font-size:0.74rem;'>fit-silhouette-rules.md §R8</code>."
-            "</div>",
-            unsafe_allow_html=True,
+            help="Compute preference-based styling suggestions from "
+                 "your measurements. Nothing is saved until you Apply.",
         )
 
-    # Persist the latest analysis in session_state so the chips remain
-    # visible across the rerun caused by selecting checkboxes / pressing
-    # Apply. Cleared by the Apply handler.
     if analyze_clicked:
         st.session_state["_profile_inference_result"] = \
             suggest_profile_from_measurements(measurements, profile)
 
     result = st.session_state.get("_profile_inference_result")
     if not result or not result.get("available"):
-        # Either the user hasn't clicked Analyze yet (no result) or
-        # they have but measurements are insufficient. The latter case
-        # gets a soft prompt.
-        if result and result.get("missing"):
-            st.info(
-                "Add at least bust, waist, and hip measurements below "
-                "to unlock preference-based styling suggestions. "
-                "Every suggestion is optional and editable."
-            )
         return
 
     suggestions = result.get("suggestions", {})
-
-    # Framing copy from profile_inference — the body-positive,
-    # not-a-diagnosis preamble. Rendered once at the top of the panel.
-    st.markdown(
-        '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
-        'border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
-        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
-        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
-        'Suggested styling profile</div>'
-        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
-        'color:#111111; line-height:1.15; margin-bottom:0.6rem;">'
-        'Preference-based, not a diagnosis'
-        '</div>'
-        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
-        + "<br>".join(result.get("notes", []))
-        + '</div></div>',
-        unsafe_allow_html=True,
-    )
 
     # Per-field chips with a checkbox. Each chip shows: field name,
     # suggested value, confidence label, user-locked badge if already
@@ -5114,6 +5108,90 @@ def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> Non
         st.rerun()
 
 
+def _render_reset_fit_profile_panel(profile: dict) -> None:
+    """
+    "Reset fit profile test data" — a scoped destructive action that
+    clears ONLY fit-profile fields (measurements, body_shape,
+    preferred_fit, highlight_features, balance_areas) plus the cached
+    inference. Wardrobe / wishlist / calendar / routine / wear history /
+    favorite stores are intentionally outside this function's reach —
+    the structural separation is documented in
+    `fit_tool.reset_fit_profile_test_data`.
+
+    The reset is two-step: first click flips a session flag, second
+    click executes. A "Cancel" button always escapes.
+    """
+    try:
+        from fit_tool import reset_fit_profile_test_data
+    except Exception:
+        return
+
+    pending_key = "_reset_fit_profile_pending"
+    pending = st.session_state.get(pending_key, False)
+
+    # Only show the panel when there's something to reset — keeps the
+    # Profile page calm for first-time users.
+    has_anything = bool(
+        profile.get("measurements") or profile.get("body_shape")
+        or profile.get("preferred_fit") or profile.get("highlight_features")
+        or profile.get("balance_areas")
+    )
+    if not has_anything and not pending:
+        return
+
+    if not pending:
+        cols = st.columns([1, 3], gap="medium")
+        with cols[0]:
+            if st.button(
+                "Reset fit profile test data",
+                key="profile_reset_btn",
+                use_container_width=True,
+                help="Clears measurements, body shape, preferred fit, "
+                     "highlight features, and balance areas. Wardrobe, "
+                     "wishlist, calendar, routine, wear history, and "
+                     "favorite stores are NOT touched.",
+            ):
+                st.session_state[pending_key] = True
+                st.rerun()
+        with cols[1]:
+            st.markdown(
+                "<div style='font-size:0.78rem; color:#6E6E73; "
+                "line-height:1.55; padding-top:0.35rem;'>"
+                "Resets <strong>only your fit profile and measurements</strong> — "
+                "not your wardrobe, wishlist, calendar, routine, "
+                "wear history, or favorite stores."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+        return
+
+    # Pending → confirmation step.
+    st.warning(
+        "**Confirm reset.** This will clear only your fit profile "
+        "and measurements (body shape, preferred fit, highlight / "
+        "balance areas, all measurements). Your wardrobe, wishlist, "
+        "calendar, routine, wear history, and favorite stores will "
+        "**not** be deleted."
+    )
+    cols = st.columns([1, 1, 3], gap="medium")
+    with cols[0]:
+        if st.button("Yes, reset", key="profile_reset_confirm_btn",
+                     type="primary", use_container_width=True):
+            r = reset_fit_profile_test_data()
+            st.session_state[pending_key] = False
+            st.session_state.pop("_profile_inference_result", None)
+            if r.get("success"):
+                st.success("Fit profile test data cleared.")
+                st.rerun()
+            else:
+                st.error(f"Could not reset: {r.get('error', 'unknown error')}.")
+    with cols[1]:
+        if st.button("Cancel", key="profile_reset_cancel_btn",
+                     use_container_width=True):
+            st.session_state[pending_key] = False
+            st.rerun()
+
+
 def _render_profile():
     # Pull the merged fit profile (seed owner + user overlay).
     try:
@@ -5146,18 +5224,15 @@ def _render_profile():
     st.markdown(f"""
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Profile</div>
-        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Prototype profile · stored locally on this device.</div>
+        <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem;">Stored locally on this device. Every field is optional and editable.</div>
     </div>
 
-    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.6rem 1.6rem 1.4rem; margin-bottom:1.1rem;">
+    <div style="background:#FFFFFF; border:1px solid #E5E5E5; border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">
         <div style="display:flex; align-items:center; gap:1rem;">
-            <div style="width:60px; height:60px; border-radius:50%; background:linear-gradient(135deg, #2E2E2E 0%, #111111 100%); color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-family:'DM Serif Display',serif; font-size:1.6rem;">
+            <div style="width:52px; height:52px; border-radius:50%; background:linear-gradient(135deg, #2E2E2E 0%, #111111 100%); color:#FFFFFF; display:flex; align-items:center; justify-content:center; font-family:'DM Serif Display',serif; font-size:1.5rem;">
                 {initial}
             </div>
-            <div>
-                <div style="font-family:'DM Serif Display',serif; font-size:1.55rem; color:#1C1917; line-height:1.1;">{name}</div>
-                <div style="font-size:0.8rem; color:#6E6E73; margin-top:0.25rem; letter-spacing:0.04em;">Wearly member · local prototype</div>
-            </div>
+            <div style="font-family:'DM Serif Display',serif; font-size:1.45rem; color:#1C1917; line-height:1.1;">{name}</div>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -5215,10 +5290,24 @@ def _render_profile():
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Analyze measurements → preference-based styling suggestions ──
+    # ALWAYS visible — has its own empty state so the user knows the
+    # feature exists even before any measurements are saved. Surfaces
+    # R8-grounded suggestions for body_shape / highlight / balance /
+    # preferred_fit derived from bust + waist + hips.
+    _meas = profile.get("measurements", {}) or {}
+    _render_measurement_analysis_panel(profile, _meas)
+
+    # ── Reset fit profile test data ──────────────────────────────
+    # Clears ONLY fit-profile fields (measurements, body_shape,
+    # preferred_fit, highlight_features, balance_areas) plus the
+    # cached inference result. Wardrobe / wishlist / calendar / routine
+    # / wear history / favorite stores are untouched.
+    _render_reset_fit_profile_panel(profile)
+
     # ── Measurements card (renders only when at least one is saved) ──
     # Display unit comes from session state ("measure_unit"), set by the
     # toggle inside the edit form. Internal storage is always inches.
-    _meas = profile.get("measurements", {}) or {}
     if any(_meas.values()):
         try:
             from fit_tool import MEASUREMENT_FIELDS as _MF, INCH_TO_CM as _IN2CM
@@ -5346,49 +5435,29 @@ def _render_profile():
                 f'color:#111111; line-height:1.1; margin-bottom:0.4rem;">{_shown_shape}</div>'
                 f'<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
                 f'{_shape_pred["reason"]}</div>'
-                f'<div style="font-size:0.74rem; color:#8E8E93; margin-top:0.9rem; line-height:1.55;">'
-                "Body-shape labels are an <em>industry heuristic, not a scientific taxonomy</em> — "
-                "Wearly uses them only as a proxy for proportion-related styling suggestions, "
-                "never as a claim about your body. Override anytime in the editor below."
-                '</div></div>',
+                '</div>',
                 unsafe_allow_html=True,
             )
 
-        # ── Analyze measurements → preference-based styling suggestions ──
-        # Surfaces R8-grounded suggestions for body_shape / highlight /
-        # balance / preferred_fit derived from bust+waist+hips. Nothing
-        # is saved until the user picks fields and clicks Apply — the
-        # rule pack (fit-silhouette-rules.md §R8) is the basis for every
-        # value shown here, and the citation is rendered next to each
-        # chip so the user can read the rule.
-        _render_measurement_analysis_panel(profile, _meas)
-
-    # ── Edit form (overlay only — never touches seed wardrobe) ──
-    # First-time users land on a blank seed and can fill in everything;
-    # returning users see their saved values pre-filled. Every field is
-    # optional. Wearly never frames a body as a problem.
+    # ── Edit form ─────────────────────────────────────────────────
+    # Auto-expand when no measurements yet so the user immediately sees
+    # WHERE to enter bust / waist / hips. After they've saved at least
+    # one measurement the form collapses by default to keep the page
+    # calm. Every field below is optional and stored locally only.
     measurements = profile.get("measurements", {}) or {}
+    _expand_edit_form = not any(measurements.values())
 
-    # Calendar connection — once-and-done setup. The user pastes a
-    # private .ics URL from Google / iCloud OR uploads an export. The
-    # agent auto-refreshes from the URL on every plan, so this lives
-    # in the Profile screen as a setup step rather than on Today.
-    _render_calendar_import()
-
-    # The weekly-routine editor — the agent's fallback when the
-    # calendar is empty for the current moment.
-    _render_routine_editor()
-
-    with st.expander("Edit your profile, preferences & measurements", expanded=False):
-        st.markdown("""
-        <div style="font-size:0.82rem; color:#6E6E73; line-height:1.55; margin-bottom:0.8rem;">
-            Every field is optional. Wearly applies a preference only when you've shared it.
-            <br><strong style="color:#111111;">Body-positive language only.</strong>
-            Wearly rejects corrective vocabulary like "hide," "fix," or "minimize" by design.
-            Measurements are private and stored locally — they help Wearly suggest pieces
-            that fit your real proportions instead of relying only on a body-shape label.
-        </div>
-        """, unsafe_allow_html=True)
+    with st.expander("Edit your profile, preferences & measurements",
+                     expanded=_expand_edit_form):
+        st.markdown(
+            "<div style='font-size:0.82rem; color:#6E6E73; "
+            "line-height:1.55; margin-bottom:0.8rem;'>"
+            "Every field is optional. Measurements are stored locally "
+            "on this device. Body-positive language is enforced — "
+            "corrective vocabulary is blocked by design."
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
         _BODY_SHAPE_OPTIONS = ["", "hourglass", "pear", "apple", "rectangle",
                                "inverted triangle", "athletic", "neat hourglass"]
@@ -5670,19 +5739,31 @@ def _render_profile():
                 else:
                     st.error(f"Could not save: {res.get('error', 'unknown error')}")
 
-    st.markdown("""
-    <p style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin-top:1rem;">
-        <strong style="color:#6E6E73; letter-spacing:0.04em;">Privacy.</strong>
-        Your profile is stored locally in this prototype. Real authentication and cloud sync are future work.
-    </p>
-    <div style="margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EEEEEE;">
-        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;">Learn more</div>
-        <p style="font-size:0.82rem; color:#2E2E2E; line-height:1.6;">
-            The <a href="https://eatedalsf.github.io/styling-agent/" target="_blank" style="color:#111111; text-decoration:underline;">Wearly Intelligent Book</a>
-            documents the agent's design principles, evidence categories, skill rules, knowledge graph, and architecture — all searchable in one place.
-        </p>
-    </div>
-    """, unsafe_allow_html=True)
+    # ── Other settings (calendar + weekly routine) ────────────────
+    # Moved below the fit-profile testing area so the Profile page
+    # opens with the most-tested feature first.
+    _render_calendar_import()
+    _render_routine_editor()
+
+    st.markdown(
+        "<p style='font-size:0.74rem; color:#6E6E73; line-height:1.55; "
+        "margin-top:1rem;'>"
+        "<strong style='color:#6E6E73; letter-spacing:0.04em;'>Privacy.</strong> "
+        "Your profile is stored locally in this prototype. Real authentication "
+        "and cloud sync are future work."
+        "</p>"
+        "<div style='margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EEEEEE;'>"
+        "<div style='font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; "
+        "text-transform:uppercase; font-weight:600; margin-bottom:0.5rem;'>"
+        "Learn more</div>"
+        "<p style='font-size:0.82rem; color:#2E2E2E; line-height:1.6;'>"
+        "The <a href='https://eatedalsf.github.io/styling-agent/' target='_blank' "
+        "style='color:#111111; text-decoration:underline;'>Wearly Intelligent Book</a> "
+        "documents the design principles, evidence, skill rules, knowledge graph, "
+        "and architecture."
+        "</p></div>",
+        unsafe_allow_html=True,
+    )
 
 
 # ─────────────────────────────────────────────

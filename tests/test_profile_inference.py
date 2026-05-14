@@ -261,6 +261,73 @@ class TestInsufficientMeasurements(unittest.TestCase):
         self.assertEqual(out["suggestions"], {})
 
 
+class TestResetFitProfileTestData(unittest.TestCase):
+    """The scoped reset wipes ONLY fit-profile fields. Wardrobe, wishlist,
+    calendar, routine, wear history, and favorite stores live in other
+    files and must NEVER be touched."""
+
+    def setUp(self):
+        import fit_tool
+        self._original_path = fit_tool.PROFILE_PATH
+        import tempfile
+        self._tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8")
+        self._tmp.close()
+        fit_tool.PROFILE_PATH = self._tmp.name
+        # Seed with a mix of fields that should and should NOT be wiped.
+        fit_tool.save_fit_profile({
+            "name":               "Test User",          # KEEP
+            "skin_tone":          "warm olive",          # KEEP
+            "style_preferences":  ["classic"],          # KEEP
+            "modesty_preference": "moderate",           # KEEP
+            "comfort_needs":      ["soft fabrics"],     # KEEP
+            "style_goals":        ["elevated"],         # KEEP
+            "preferred_fit":      "tailored",           # WIPE
+            "highlight_features": ["waist"],            # WIPE
+            "balance_areas":      ["hips"],             # WIPE
+            "measurements":       {"bust": 36.0,
+                                    "waist": 27.0,
+                                    "hips":  36.0},     # WIPE
+        })
+
+    def tearDown(self):
+        import fit_tool, os
+        fit_tool.PROFILE_PATH = self._original_path
+        try:
+            os.unlink(self._tmp.name)
+        except OSError:
+            pass
+
+    def test_reset_clears_fit_fields_and_keeps_user_expression(self):
+        from fit_tool import reset_fit_profile_test_data, _load_overlay
+        before = _load_overlay()
+        # Sanity — fit fields populated before reset.
+        self.assertTrue(before.get("measurements"))
+        self.assertTrue(before.get("highlight_features"))
+        self.assertTrue(before.get("balance_areas"))
+        self.assertTrue(before.get("preferred_fit"))
+
+        r = reset_fit_profile_test_data()
+        self.assertTrue(r["success"], msg=r.get("error"))
+
+        after = _load_overlay()
+        # WIPED — value must be empty/None.
+        self.assertFalse(after.get("measurements"),
+                         msg=f"measurements not cleared: {after.get('measurements')!r}")
+        self.assertFalse(after.get("preferred_fit"))
+        self.assertFalse(after.get("highlight_features"))
+        self.assertFalse(after.get("balance_areas"))
+        self.assertFalse(after.get("body_shape"))
+        self.assertFalse(after.get("_body_shape_source"))
+        # KEPT — user-expression fields untouched.
+        self.assertEqual(after.get("name"),               "Test User")
+        self.assertEqual(after.get("skin_tone"),          "warm olive")
+        self.assertEqual(after.get("style_preferences"),  ["classic"])
+        self.assertEqual(after.get("modesty_preference"), "moderate")
+        self.assertEqual(after.get("comfort_needs"),      ["soft fabrics"])
+        self.assertEqual(after.get("style_goals"),        ["elevated"])
+
+
 class TestPreferredFitConfidence(unittest.TestCase):
     """The preferred-fit suggestion labels confidence honestly. Shape-
     table picks are 'medium'; waist-only heuristics are 'weak'."""

@@ -582,6 +582,64 @@ def save_fit_profile(updates: dict) -> dict:
 
 
 # ─────────────────────────────────────────────
+# RESET (scoped — fit-profile fields ONLY)
+# ─────────────────────────────────────────────
+
+# Fields this reset wipes. Everything in the overlay outside this set
+# is preserved. Note that wardrobe, wishlist, calendar, routine, wear
+# history, and favorite stores live in OTHER files entirely and are
+# never touched by this function — so the safety promise is structural,
+# not just a denylist.
+_RESET_FIELDS = (
+    "body_shape",
+    "_body_shape_source",
+    "preferred_fit",
+    "highlight_features",
+    "balance_areas",
+    "measurements",
+)
+
+
+def reset_fit_profile_test_data() -> dict:
+    """
+    Clear ONLY the fit-profile fields a demo / test operator typically
+    needs to reset between scenarios:
+      - measurements
+      - inferred / declared body shape (and its provenance tag)
+      - preferred fit
+      - highlight features
+      - balance areas
+
+    Untouched (these are intentionally outside this function's reach):
+      - name, skin_tone, style_preferences, modesty_preference,
+        comfort_needs, style_goals, timezone — user-expression fields
+        the operator may want to keep between tests
+      - wardrobe.json / user_wardrobe.json    (separate files)
+      - wishlist.json                         (separate file)
+      - calendar feed / cached events         (separate state)
+      - routine.json                          (separate file)
+      - wear_history.json                     (separate file)
+      - favorite_stores.json                  (separate file)
+
+    Returns the same shape as save_fit_profile:
+        {"success": bool, "profile": dict, "error": str | None}
+    """
+    overlay = _load_overlay()
+    for k in _RESET_FIELDS:
+        overlay.pop(k, None)
+    on_disk = {
+        "_comment": "User fit / style profile overlay. See fit_tool.py.",
+        **overlay,
+    }
+    try:
+        _atomic_write_json(PROFILE_PATH, on_disk)
+    except Exception as e:
+        return {"success": False, "profile": overlay,
+                "error": f"Failed to save: {e}"}
+    return {"success": True, "profile": overlay, "error": None}
+
+
+# ─────────────────────────────────────────────
 # BODY-POSITIVE LANGUAGE CONTRACT
 # ─────────────────────────────────────────────
 
