@@ -535,6 +535,61 @@ class TestRoutineTool(_DiskSnapshot, unittest.TestCase):
         got = get_routine()["activities"][0]
         self.assertEqual(got["occasion"], "gym")
 
+    # ── get_weekly_blocks now returns ALL activities per day ────────
+
+    def test_get_weekly_blocks_returns_all_activities_per_day(self):
+        """A Monday with TWO activities (gym 7am + work 10am) must
+        produce TWO Monday entries from get_weekly_blocks(), not one.
+        Earlier behavior took blocks[0] only and silently dropped Work."""
+        from routine_tool import add_activity, get_weekly_blocks
+        add_activity({"name": "gym",  "days": ["Monday"],
+                      "start": "7:00",  "end": "8:00"})
+        add_activity({"name": "Work", "days": ["Monday"],
+                      "start": "10:00", "end": "17:00"})
+        weekly = get_weekly_blocks()
+        monday = [b for b in weekly if b.get("weekday") == "monday"
+                   and not b.get("empty")]
+        self.assertEqual(
+            len(monday), 2,
+            "Monday must produce two blocks when two activities exist; "
+            f"got {[b.get('label') for b in monday]}",
+        )
+        # Chronological order
+        self.assertEqual(monday[0]["start"], "07:00")
+        self.assertEqual(monday[1]["start"], "10:00")
+        # block_index stamped 0, 1
+        self.assertEqual(monday[0]["block_index"], 0)
+        self.assertEqual(monday[1]["block_index"], 1)
+        # blocks_for_day matches
+        self.assertEqual(monday[0]["blocks_for_day"], 2)
+        self.assertEqual(monday[1]["blocks_for_day"], 2)
+
+    def test_get_weekly_blocks_empty_day_still_returns_placeholder(self):
+        """Empty days continue to return one empty placeholder so
+        the UI can render a 'no routine today' card."""
+        from routine_tool import add_activity, get_weekly_blocks
+        add_activity({"name": "gym", "days": ["Monday"],
+                      "start": "7:00", "end": "8:00"})
+        weekly = get_weekly_blocks()
+        tuesday = [b for b in weekly if b.get("weekday") == "tuesday"]
+        self.assertEqual(len(tuesday), 1)
+        self.assertTrue(tuesday[0]["empty"])
+
+    def test_get_weekly_blocks_sorts_blocks_by_start_time(self):
+        """When activities are added out of order, get_weekly_blocks
+        returns them chronologically within each day."""
+        from routine_tool import add_activity, get_weekly_blocks
+        # Add work first (later in the day), then gym (earlier)
+        add_activity({"name": "Work", "days": ["Wednesday"],
+                      "start": "10:00", "end": "17:00"})
+        add_activity({"name": "gym", "days": ["Wednesday"],
+                      "start": "7:00", "end": "8:00"})
+        weekly = get_weekly_blocks()
+        wed = [b for b in weekly if b.get("weekday") == "wednesday"
+                and not b.get("empty")]
+        self.assertEqual(wed[0]["label"], "gym")
+        self.assertEqual(wed[1]["label"], "Work")
+
 
 class TestCalendarSubscription(_DiskSnapshot, unittest.TestCase):
     """URL-subscription save/load/disconnect behavior (no network)."""

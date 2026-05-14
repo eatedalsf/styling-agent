@@ -1586,12 +1586,21 @@ def plan_routine_week() -> list:
 
     weekly = get_weekly_blocks() or []
     plans: list = []
+    # Soft rotation across the week: items picked for earlier blocks
+    # are passed as `rejected_ids` to later blocks so the agent
+    # rotates to different pieces. Falls back to the same items when
+    # the wardrobe is too small to rotate (run_agent's rejected_ids
+    # is a SOFT preference, not a hard filter — it down-ranks rather
+    # than excludes when nothing else fits).
+    seen_this_week: list = []
     for blk in weekly:
         weekday = blk.get("weekday")
         if blk.get("empty"):
             plans.append({
-                "weekday": weekday,
-                "empty":   True,
+                "weekday":      weekday,
+                "empty":        True,
+                "block_index":  blk.get("block_index", 0),
+                "blocks_for_day": blk.get("blocks_for_day", 0),
                 "event":   {"title": "No routine block",
                             "type":  "casual",
                             "date":  ""},
@@ -1612,11 +1621,18 @@ def plan_routine_week() -> list:
                 mode="everyday",
                 everyday_request=blk.get("label") or blk.get("occasion") or "casual",
                 todays_context=todays_ctx,
+                # Pass week-so-far picks as soft rejections to encourage
+                # rotation. Wear-history isn't updated until the user
+                # actually wears something, so this is the only signal
+                # that varies the picks across the seven plans.
+                rejected_ids=list(seen_this_week) if seen_this_week else None,
             )
         except Exception as e:
             plans.append({
-                "weekday": weekday,
-                "empty":   False,
+                "weekday":     weekday,
+                "empty":       False,
+                "block_index": blk.get("block_index", 0),
+                "blocks_for_day": blk.get("blocks_for_day", 0),
                 "event":   {"title": blk.get("label") or blk.get("occasion"),
                             "type":  blk.get("occasion"),
                             "date":  ""},
@@ -1631,8 +1647,10 @@ def plan_routine_week() -> list:
         # these cards) renders "Outfit for <activity>" instead of
         # "Today's outfit". Routine-sourced results get source=routine.
         if isinstance(r, dict):
-            r["source"]  = "routine"
-            r["weekday"] = weekday
+            r["source"]       = "routine"
+            r["weekday"]      = weekday
+            r["block_index"]  = blk.get("block_index", 0)
+            r["blocks_for_day"] = blk.get("blocks_for_day", 0)
             # Surface the routine metadata on the event object so the
             # UI can render the activity name + location.
             ev = r.get("event") or {}
@@ -1642,5 +1660,10 @@ def plan_routine_week() -> list:
             ev["location"]  = blk.get("location") or ""
             ev["note"]      = blk.get("note") or ""
             r["event"] = ev
+            # Record this plan's picks so later days try different items.
+            for it in (r.get("recommendation") or []):
+                iid = it.get("id")
+                if iid and iid not in seen_this_week:
+                    seen_this_week.append(iid)
         plans.append(r)
     return plans

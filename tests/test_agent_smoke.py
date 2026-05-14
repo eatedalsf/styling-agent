@@ -261,6 +261,45 @@ class TestRejectAndRegenerate(unittest.TestCase):
             "information that already appears in the gap card.",
         )
 
+    # ── plan_routine_week contract ──────────────────────────────
+
+    def test_plan_routine_week_returns_one_plan_per_block(self):
+        """When a day has two routine activities, plan_routine_week
+        must return two plans for that day — not one. This pins
+        the per-block fan-out that replaced the old 'first block
+        only' behavior."""
+        # Snapshot + restore routine state so the test is hermetic.
+        from routine_tool import (ROUTINE_PATH, add_activity,
+                                    save_routine, DAYS)
+        import os, json
+        _backup = None
+        if os.path.exists(ROUTINE_PATH):
+            with open(ROUTINE_PATH) as f:
+                _backup = f.read()
+        try:
+            # Reset to a clean schedule then add the two-activity Monday.
+            save_routine({d: [] for d in DAYS})
+            add_activity({"name": "gym", "days": ["Monday"],
+                          "start": "7:00", "end": "8:00"})
+            add_activity({"name": "Work", "days": ["Monday"],
+                          "start": "10:00", "end": "17:00"})
+            from styling_agent import plan_routine_week
+            plans = plan_routine_week()
+            monday_plans = [p for p in plans
+                             if (p.get("weekday") or "").lower() == "monday"
+                             and not p.get("empty")]
+            self.assertEqual(
+                len(monday_plans), 2,
+                "Monday with two activities must produce two plans; "
+                f"got {[p.get('event', {}).get('title') for p in monday_plans]}",
+            )
+        finally:
+            if _backup is not None:
+                with open(ROUTINE_PATH, "w") as f:
+                    f.write(_backup)
+            elif os.path.exists(ROUTINE_PATH):
+                os.remove(ROUTINE_PATH)
+
     def test_gym_outfit_has_at_most_one_bottom(self):
         """Earlier the agent took activewear[:2] which could pick two
         bottoms (leggings + yoga pants). The slot-aware partition

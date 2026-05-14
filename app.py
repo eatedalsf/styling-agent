@@ -2947,6 +2947,22 @@ def _render_routine_editor() -> None:
                 meta_line = " · ".join(meta_bits)
                 row = st.columns([6, 1], gap="small")
                 with row[0]:
+                    # Display the activity name title-cased. Only render
+                    # the uppercase occasion tag when it adds info — when
+                    # the user named the activity the same as its occasion
+                    # (e.g. activity "gym", occasion "gym"), the tag is
+                    # pure duplication ("gym GYM"). Skip in that case.
+                    _name_disp = (a.get("name") or "—").strip().title() or "—"
+                    _occasion  = (a.get("occasion") or "casual").strip()
+                    _show_occ_tag = (
+                        _occasion
+                        and _occasion.lower() != (a.get("name") or "").strip().lower()
+                    )
+                    _occ_html = (
+                        f"<div style='font-size:0.72rem; color:#8E8E93; "
+                        f"letter-spacing:0.06em;'>{_occasion.upper()}</div>"
+                        if _show_occ_tag else ""
+                    )
                     st.markdown(
                         "<div style='background:#FFFFFF; border:1px solid #E5E5E5; "
                         "border-radius:6px; padding:0.7rem 0.95rem; "
@@ -2954,10 +2970,9 @@ def _render_routine_editor() -> None:
                         "<div style='display:flex; align-items:baseline; "
                         "gap:0.6rem; flex-wrap:wrap;'>"
                         f"<div style='font-size:0.94rem; color:#1C1917; "
-                        f"font-weight:500;'>{a.get('name','—')}</div>"
-                        f"<div style='font-size:0.72rem; color:#8E8E93; "
-                        f"letter-spacing:0.06em;'>{a.get('occasion','casual').upper()}"
-                        f"</div></div>"
+                        f"font-weight:500;'>{_name_disp}</div>"
+                        + _occ_html +
+                        f"</div>"
                         f"<div style='font-size:0.82rem; color:#6E6E73; "
                         f"margin-top:0.25rem;'>"
                         f"{days_pretty} · {start12} – {end12}"
@@ -3576,9 +3591,7 @@ def _render_routine_week() -> None:
     <div style="margin-top:0.2rem; margin-bottom:1.1rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.9rem; color:#1C1917; line-height:1.1;">Routine week</div>
         <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem; line-height:1.55;">
-            Outfits for your normal weekly rhythm — work / gym / class /
-            errands. Wearly only consults this when your calendar has no
-            event for that moment. Edit your routine activities in
+            Used when your calendar has no event for that moment. Edit activities in
             <a href="?section=profile" target="_self" style="color:#111111; font-weight:500;">Profile</a>.
         </div>
     </div>
@@ -3642,9 +3655,24 @@ def _render_routine_week() -> None:
 
         ev = p.get("event") or {}
         rec = p.get("recommendation") or []
-        title = ev.get("title") or "Routine"
+        raw_title = ev.get("title") or "Routine"
+        # Title-case for display (e.g. user typed "gym" → renders "Gym").
+        title = (raw_title or "").strip().title() or "Routine"
         time_pretty = format_time_12h(ev.get("time") or "")
         location = ev.get("location") or ""
+        # Drop location from the meta line when it duplicates the
+        # activity title (e.g. activity "gym" with location "gym" used
+        # to render "7:00 AM · gym" — the location adds no information).
+        if location and location.strip().lower() == raw_title.strip().lower():
+            location = ""
+
+        def _truncate_chip(s: str, limit: int = 28) -> str:
+            """Truncate long names with an ellipsis; full name lives in
+            the tooltip via the `title=` attribute (see chip HTML below)."""
+            if not s:
+                return "—"
+            s = s.strip()
+            return s if len(s) <= limit else s[: limit - 1].rstrip() + "…"
 
         items_html = ""
         for it in rec[:5]:
@@ -3653,18 +3681,26 @@ def _render_routine_week() -> None:
                 hex_color = color_to_swatch(color) if color else "#FAFAFA"
             except Exception:
                 hex_color = "#FAFAFA"
+            nm_full  = it.get("name", "—") or "—"
+            nm_short = _truncate_chip(nm_full)
+            # Escape any quotes in the full name for the title attribute.
+            tooltip = nm_full.replace('"', "&quot;").replace("'", "&#39;")
             items_html += (
-                "<div style='display:inline-flex; align-items:center; "
+                "<div title=\"" + tooltip + "\" "
+                "style='display:inline-flex; align-items:center; "
                 "gap:0.45rem; padding:0.32rem 0.75rem; background:#FFFFFF; "
                 "border:1px solid #E5E5E5; border-radius:99px; "
                 "font-size:0.78rem; color:#3D332D; margin:0 0.35rem 0.35rem 0;'>"
                 f"<span style='width:12px; height:12px; border-radius:50%; "
                 f"background:{hex_color}; border:1px solid rgba(28,25,23,0.10); "
                 f"display:inline-block;'></span>"
-                f"{it.get('name','—')}</div>"
+                f"{nm_short}</div>"
             )
 
-        # The day card.
+        # The day card. When a day has multiple routine blocks, we
+        # render each as its own card; the day label repeats so the
+        # user can tell where each block belongs.
+        block_index = p.get("block_index", 0) or 0
         cols = st.columns([5, 1], gap="small")
         with cols[0]:
             st.markdown(
@@ -3687,7 +3723,9 @@ def _render_routine_week() -> None:
         with cols[1]:
             if st.button(
                 "Plan in detail →",
-                key=f"routine_detail_{weekday}",
+                # Include block_index so a day with multiple activities
+                # produces unique button keys (would otherwise collide).
+                key=f"routine_detail_{weekday}_{block_index}",
                 use_container_width=True,
             ):
                 # Stamp source="routine" so the dedicated event_detail

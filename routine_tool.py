@@ -700,28 +700,41 @@ def get_weekly_blocks() -> List[Dict]:
     needs to plan an outfit. Used by `plan_routine_week()` in
     styling_agent.py.
 
-    For days with multiple blocks we return the FIRST chronological
-    block — that's the "main" activity of the day. Days with no
-    routine block contribute an empty placeholder so the UI can
-    render a "no routine today" card if it wants.
+    Returns ONE entry per (weekday, block) pair, sorted by start time
+    within each day. A user with both a 7 AM gym block AND a 10 AM
+    work block on Monday gets two entries with weekday="monday" —
+    earlier behavior returned only the gym block, hiding work.
+
+    Days with no routine block contribute an empty placeholder so the
+    UI can render a "no routine today" card if it wants.
+
+    Each non-empty entry carries `block_index` (0-based position
+    within its day) so callers can group / separate them in the UI.
     """
     res = get_routine()
     schedule = res.get("schedule") or {}
     out: List[Dict] = []
     for d in DAYS:
-        blocks = schedule.get(d) or []
+        blocks = list(schedule.get(d) or [])
         if not blocks:
-            out.append({"weekday": d, "empty": True})
+            out.append({"weekday": d, "empty": True, "block_index": 0,
+                        "blocks_for_day": 0})
             continue
-        b = blocks[0]
-        out.append({
-            "weekday":  d,
-            "start":    b.get("start"),
-            "end":      b.get("end"),
-            "occasion": b.get("occasion") or "casual",
-            "label":    b.get("label") or "",
-            "location": b.get("location") or "",
-            "note":     b.get("note") or "",
-            "empty":    False,
-        })
+        # Sort by start time so the day's earliest activity leads.
+        # `start` is "HH:MM" — string sort is correct.
+        blocks_sorted = sorted(blocks,
+                                key=lambda b: (b.get("start") or "99:99"))
+        for idx, b in enumerate(blocks_sorted):
+            out.append({
+                "weekday":         d,
+                "start":           b.get("start"),
+                "end":             b.get("end"),
+                "occasion":        b.get("occasion") or "casual",
+                "label":           b.get("label") or "",
+                "location":        b.get("location") or "",
+                "note":            b.get("note") or "",
+                "empty":           False,
+                "block_index":     idx,
+                "blocks_for_day":  len(blocks_sorted),
+            })
     return out
