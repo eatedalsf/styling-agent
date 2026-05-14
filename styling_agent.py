@@ -522,6 +522,26 @@ def run_agent(
         _fit_profile_full = profile  # fall back to seed owner from step 2
         def fit_alignment_notes(*_a, **_k): return []  # type: ignore[assignment]
 
+    # ── Reasoning-trail dedup ────────────────────────────────────────
+    # `fit_alignment_notes()` runs per picked item. Many items in the
+    # outfit produce the SAME note (e.g. four pieces all "align with
+    # your preferred relaxed fit"). Surfacing the same sentence four
+    # times reads as spam. We track the set of fit-note texts that
+    # have already been appended to the reasoning trail and suppress
+    # repeats so each unique alignment statement is said once.
+    _emitted_fit_notes: set = set()
+    def _emit_fit_notes_for(item: dict) -> None:
+        """Append fit_alignment_notes for `item` to the reasoning
+        trail, skipping any note already said for an earlier item."""
+        for _line in fit_alignment_notes(item, _fit_profile_full):
+            # Normalize whitespace so leading-space variants ("  aligns…")
+            # and unindented copies dedup as the same line.
+            _key = " ".join(_line.split()).lower()
+            if _key in _emitted_fit_notes:
+                continue
+            _emitted_fit_notes.add(_key)
+            reasoning.append(_line)
+
     def _by_freshness(items):
         return sorted(items, key=lambda x: -get_freshness(x.get("id", ""), _history))
 
@@ -595,18 +615,24 @@ def run_agent(
     def _profile_alignment_bonus(item: dict) -> float:
         """
         How well does this item align with the user's stated
-        profile? Returns a 0..~0.6 weight that nudges selection
-        toward items the user said they want, BEFORE reasoning.
+        profile? Returns a weight in roughly [-0.12, +0.70] that
+        nudges selection toward items the user said they want.
 
-        Signals (each capped, additive, never negative):
-          +0.20 preferred fit appears in name/formality
-          +0.15 style preference appears in tags / name
-          +0.10 style goal aligns with item formality
-          +0.10 comfort need matches the item's tags
-          +0.10 modesty preference compatible with the item
-          +0.08 item color complements skin tone
-          +0.08 wishlist signal: same color OR same category OR
-                same formality bucket as what the user has saved
+        Signals (each capped):
+          +0.25 / +0.18 / −0.12  preferred-fit match / bucket / opposite
+          +0.15  style preference appears in tags / name
+          +0.10  style goal aligns with item formality
+          +0.10  comfort need matches the item's tags
+          +0.10  modesty preference compatible with the item
+          +0.08  item color complements skin tone
+          +0.08  wishlist signal: same color OR same category OR
+                 same formality bucket as what the user has saved
+
+        Negative values are now possible (preferred-fit opposite). The
+        single penalty is small enough never to bring the score below
+        the level of a candidate with NO profile signal at all, but
+        large enough to break ties decisively in favor of an item
+        whose formality matches the user's preferred fit.
 
         Language contract: this function's results are CONSUMED by
         the selector. The visible reasoning lines are still written
@@ -619,14 +645,43 @@ def run_agent(
         item_tags  = [t.lower() for t in (item.get("tags") or [])]
         item_haystack = " ".join([item_name, item_form] + item_tags)
 
-        # --- preferred fit (e.g. "tailored", "relaxed", "loose") ---
+        # --- preferred fit (e.g. "tailored", "structured", "relaxed",
+        # "fluid", "loose", "fitted") ---
+        # The bonus and the symmetric penalty together make
+        # preferred_fit a *decisive* signal: changing the profile from
+        # "relaxed" to "structured" actually shifts selection ranking,
+        # not just the displayed reasoning copy. The fallback covers
+        # all six canonical PF values (earlier only "tailored" and
+        # "relaxed" had a formality-bucket fallback, so switching to
+        # "structured" was silently a no-op).
+        _PF_NATURAL = {
+            "tailored":   ("business", "smart_casual", "formal"),
+            "structured": ("business", "smart_casual", "formal"),
+            "fitted":     ("business", "smart_casual", "formal", "casual"),
+            "relaxed":    ("casual", "smart_casual", "athletic"),
+            "fluid":      ("casual", "smart_casual", "formal"),
+            "loose":      ("casual", "athletic"),
+        }
+        _PF_OPPOSITE_BUCKETS = {
+            "tailored":   ("casual", "athletic"),
+            "structured": ("casual", "athletic"),
+            "fitted":     ("athletic",),
+            "relaxed":    ("business", "formal"),
+            "fluid":      ("athletic",),
+            "loose":      ("business", "formal"),
+        }
         if _pref_fit:
             if _pref_fit in item_haystack:
-                s += 0.20
-            elif _pref_fit == "tailored" and item_form in ("business", "smart_casual", "formal"):
-                s += 0.15
-            elif _pref_fit == "relaxed" and item_form in ("casual",):
-                s += 0.15
+                s += 0.25    # direct match: name/tags/formality say it
+            elif item_form in _PF_NATURAL.get(_pref_fit, ()):
+                s += 0.18    # formality bucket fits the PF — softer signal
+            elif item_form in _PF_OPPOSITE_BUCKETS.get(_pref_fit, ()):
+                # Opposite-formality item: a structured-preference user
+                # against a casual-formality item. Penalty pushes the
+                # selector toward a less-mismatched alternative when
+                # one exists. Kept conservative so we never starve the
+                # pool when the wardrobe genuinely has no better option.
+                s -= 0.12
 
         # --- style preferences (e.g. "classic", "elegant", "minimal") ---
         for pref in _style_prefs[:3]:
@@ -767,8 +822,7 @@ def run_agent(
             + (" — from your own wardrobe additions" if _is_user_item else "")
             + f". {cite('occasion#R3')}"
         )
-        for _fnote in fit_alignment_notes(dresses[0], _fit_profile_full):
-            reasoning.append(_fnote)
+        _emit_fit_notes_for(dresses[0])
         _note = _freshness_note(dresses[0])
         if _note: reasoning.append(_note)
 
@@ -828,8 +882,7 @@ def run_agent(
                     + (" — from your own wardrobe additions" if _is_user else "")
                     + f". {cite('wardrobe#R3')}"
                 )
-                for _fnote in fit_alignment_notes(tops_sorted[0], _fit_profile_full):
-                    reasoning.append(_fnote)
+                _emit_fit_notes_for(tops_sorted[0])
                 _note = _freshness_note(tops_sorted[0])
                 if _note: reasoning.append(_note)
             if bottoms:
@@ -841,8 +894,7 @@ def run_agent(
                     + (" — from your own wardrobe additions" if _is_user else "")
                     + f". {cite('occasion#R2')}"
                 )
-                for _fnote in fit_alignment_notes(bottoms_sorted[0], _fit_profile_full):
-                    reasoning.append(_fnote)
+                _emit_fit_notes_for(bottoms_sorted[0])
                 _note = _freshness_note(bottoms_sorted[0])
                 if _note: reasoning.append(_note)
 
@@ -944,6 +996,29 @@ def run_agent(
     # instead of letting the reasoning read as unconditionally positive.
     # The same records feed Step 6's qualified-gap detection so a
     # poorly-aligned dress still generates a wardrobe gap.
+    # Item types eligible for FIT / BALANCE / MODESTY tradeoffs. Earrings,
+    # handbags, jewelry, and most accessories have no meaningful "cut"
+    # axis against the user's preferred fit — flagging "the cut differs
+    # from your preferred relaxed fit" on a gold hoop earring is a copy
+    # bug, not styling reasoning. Shoes get a different axis entirely
+    # (occasion-fit, see below), not the preferred-fit dimension.
+    _FIT_RELEVANT_TYPES = {
+        "dress", "top", "bottom", "outerwear", "activewear",
+        "skirt", "pants", "jeans", "shorts",     # bottom synonyms
+    }
+
+    # Item types eligible for COLOR tradeoffs at all. Bottoms / shoes are
+    # already filtered to placement_severity = None inside the function
+    # body; this set is the outer gate. Handbags get no color tradeoff
+    # because they're a separate carried object, not garment.
+    _COLOR_RELEVANT_TYPES = {
+        "dress", "top", "bottom", "outerwear", "activewear",
+        "skirt", "pants", "jeans", "shorts",
+        "shoes",           # eligible but capped to low impact below
+        "accessory",       # eligible; near-face check bumps severity
+        "scarf",
+    }
+
     def _evaluate_tradeoffs(item: dict) -> list:
         """
         Return a list of `{dimension, severity, reason}` dicts for the
@@ -954,13 +1029,34 @@ def run_agent(
         misalignment in preference-based terms (less aligned with,
         differs from), never as a flaw of the item or the user.
 
-        Dimensions inspected:
-          color    — skin-tone vs item color (warm/cool conflict)
-          fit      — preferred_fit absent from name/tags/formality
-          balance  — user has balance_areas set but item doesn't carry
-                     a silhouette signal for any of them
-          modesty  — modesty=moderate|conservative but item shows
-                     revealing signals
+        Dimensions inspected (gated by item type so accessories /
+        handbags / jewelry don't get fit-or-modesty tradeoffs that
+        only make sense for garments):
+
+          color        — skin-tone vs item color (warm/cool conflict).
+                         Garment placement weighting:
+                           * tops / dresses / outerwear / scarf → medium
+                           * accessories near face (necklace / earring /
+                             hoop / scarf) → medium
+                           * other accessories → low
+                           * bottoms / shoes → skipped (placement_severity = None)
+          fit          — preferred_fit vs item formality bucket.
+                         Only fires on fit-relevant item types
+                         (dress / top / bottom / outerwear / activewear).
+                         Severity is escalated to *medium* when the item's
+                         formality bucket is the *opposite* of the user's
+                         preferred fit (a structured user in a casual item,
+                         or a relaxed user in a business item) so the
+                         qualified-gap promotion fires.
+          balance      — user has balance_areas set but item doesn't
+                         carry a silhouette signal. Only fires on garment
+                         types that naturally affect those areas.
+          modesty      — modesty=moderate|conservative + revealing
+                         signals. Only fires on dress / top / bottom /
+                         outerwear / activewear.
+          occasion_fit — shoes-only. Fires when the shoe style is a
+                         poor match for the current occasion
+                         (e.g. sneakers at a formal event).
         """
         out = []
         if not item or not isinstance(item, dict):
@@ -971,6 +1067,9 @@ def run_agent(
         tags  = [t.lower() for t in (item.get("tags") or [])]
         sil   = (item.get("silhouette") or "").lower()
         haystack = " ".join([name, form, sil] + tags)
+        item_type_lc = (item.get("type") or "").lower()
+        type_eligible_for_fit  = item_type_lc in _FIT_RELEVANT_TYPES
+        type_eligible_for_color = item_type_lc in _COLOR_RELEVANT_TYPES
 
         # 1) Color × skin tone, weighted by garment placement.
         # A color near the face (top, dress, outerwear, scarf, necklace)
@@ -980,19 +1079,28 @@ def run_agent(
         # white skirt as a "less aligned" tradeoff for warm olive
         # users, which contradicted the color score.
         skin = (profile.get("skin_tone") or "").lower().strip()
-        item_type_lc = (item.get("type") or "").lower()
         _high_impact_types = ("top", "dress", "outerwear", "scarf")
         _med_impact_types  = ("accessory",)  # necklaces/earrings vary
-        _low_impact_types  = ("bottom", "shoes")
+        _low_impact_types  = ("bottom", "shoes",
+                              "skirt", "pants", "jeans", "shorts",
+                              "activewear")  # leggings = lower-body
         # Necklaces / earrings / hoops sit near the face — bump them up
-        # by name even if the type is "accessory".
+        # by name even if the type is "accessory". Handbags / belts /
+        # rings sit AWAY from the face — leave them at low.
         name_lower = (item.get("name") or "").lower()
         near_face_acc = any(k in name_lower for k in
-                             ("necklace", "earring", "hoop", "scarf"))
+                             ("necklace", "earring", "hoop", "scarf",
+                              "choker", "pendant"))
+        # A handbag / clutch / bag never affects skin-tone harmony.
+        is_bag = any(k in name_lower for k in
+                       ("handbag", "clutch", " bag", "tote", "purse",
+                        "backpack", "satchel"))
         if item_type_lc in _high_impact_types:
             placement_severity = "medium"
         elif near_face_acc:
             placement_severity = "medium"
+        elif is_bag:
+            placement_severity = None     # bags don't affect skin tone
         elif item_type_lc in _med_impact_types:
             placement_severity = "low"
         elif item_type_lc in _low_impact_types:
@@ -1002,6 +1110,10 @@ def run_agent(
             placement_severity = None
         else:
             placement_severity = "low"
+
+        # Outer gate: item types that never get a color tradeoff at all.
+        if not type_eligible_for_color:
+            placement_severity = None
 
         if skin and color and placement_severity is not None:
             # Single source of truth: call color_tool.color_tier_for —
@@ -1026,9 +1138,20 @@ def run_agent(
                                   f"your {skin} palette near the face",
                 })
 
-        # 2) Preferred-fit alignment
+        # 2) Preferred-fit alignment — only on fit-relevant types.
+        # An earring, handbag, or shoe has no meaningful "cut" axis
+        # against the user's preferred fit; that misalignment is a
+        # garment property.
         pf = (profile.get("preferred_fit") or "").lower().strip()
-        if pf:
+        if pf and type_eligible_for_fit:
+            # Each fit value names the formality buckets where it
+            # naturally lives. An item whose formality is in the
+            # complementary set is *neutral* (no tradeoff). An item
+            # whose formality is in the OPPOSITE set is a *medium*
+            # severity mismatch — strong enough to promote to a
+            # qualified gap so the user gets a concrete shopping
+            # opportunity. Anything in between is *low* severity
+            # (visible tradeoff but no qualified-gap promotion).
             _PF_FORMALITY = {
                 "tailored":   ("business", "smart_casual", "formal"),
                 "structured": ("business", "smart_casual", "formal"),
@@ -1037,17 +1160,34 @@ def run_agent(
                 "fluid":      ("casual", "smart_casual", "formal"),
                 "loose":      ("casual", "athletic"),
             }
+            _PF_OPPOSITE = {
+                "tailored":   ("casual", "athletic"),
+                "structured": ("casual", "athletic"),
+                "fitted":     ("athletic",),
+                "relaxed":    ("business", "formal"),
+                "fluid":      ("athletic",),
+                "loose":      ("business", "formal"),
+            }
             if pf not in haystack and form not in _PF_FORMALITY.get(pf, ()):
+                opposite = form in _PF_OPPOSITE.get(pf, ())
                 out.append({
                     "dimension": "fit",
-                    "severity":  "low",
+                    # MEDIUM when the item is in the opposite-formality
+                    # bucket (e.g. a structured-preference user picking
+                    # up a casual-formality piece). LOW otherwise. The
+                    # medium severity triggers qualified-gap promotion
+                    # so the user sees a concrete "structured X option
+                    # would round out your wardrobe" suggestion.
+                    "severity":  "medium" if opposite else "low",
                     "reason":    f"the cut differs from your preferred "
                                   f"{pf} fit",
                 })
 
-        # 3) Balance areas — item should support at least one if user set them
+        # 3) Balance areas — item should support at least one if user set them.
+        # Only fires on fit-relevant garment types; an earring doesn't
+        # support hip balance.
         balance = [a.lower() for a in (profile.get("balance_areas") or [])]
-        if balance:
+        if balance and type_eligible_for_fit:
             _SIGNALS = {
                 "waist":      ("belted", "cinched", "wrap", "sheath",
                                "fit-and-flare", "fit and flare",
@@ -1087,9 +1227,9 @@ def run_agent(
                                       f"{', '.join(relevant_balance)}",
                     })
 
-        # 4) Modesty
+        # 4) Modesty — garment-only (earrings / shoes have no coverage axis).
         modesty = (profile.get("modesty_preference") or "").lower().strip()
-        if modesty in ("moderate", "conservative"):
+        if modesty in ("moderate", "conservative") and type_eligible_for_fit:
             revealing = ("sleeveless", "spaghetti", "tank top", "crop",
                           "halter", "backless", "low-cut", "deep-v",
                           "mini ")
@@ -1099,6 +1239,45 @@ def run_agent(
                     "severity":  "medium",
                     "reason":    "the coverage differs from your "
                                   f"{modesty} modesty preference",
+                })
+
+        # 5) Shoes-only: occasion-appropriate-style.
+        # Replaces the inappropriate fit/cut axis for footwear. The
+        # underlying signal is the same one a stylist would use:
+        # sneaker-style shoe at a formal event reads as casual; a
+        # dressy heel at a gym reads as the wrong tool for the job.
+        # We never penalize comfort — a comfort tag never triggers
+        # this. The dimension is body-positive ("a casual style for a
+        # dressier setting") and the severity is calibrated so
+        # genuine mismatches promote to qualified gaps.
+        if item_type_lc == "shoes":
+            sneaker_signals = ("sneaker", "trainer", "athletic",
+                               "running", "tennis", "court", "canvas")
+            dress_signals   = ("heel", "pump", "stiletto", "oxford",
+                               "loafer", "dress")
+            is_sneaker = any(s in haystack for s in sneaker_signals)
+            is_dressy  = any(s in haystack for s in dress_signals)
+            occ = (occasion_tag or "").lower()
+            if occ in ("formal", "dinner") and is_sneaker and not is_dressy:
+                out.append({
+                    "dimension": "occasion_fit",
+                    "severity":  "medium",
+                    "reason":    f"a more polished shoe style would "
+                                  f"better suit a {occ} setting",
+                })
+            elif occ == "gym" and is_dressy and not is_sneaker:
+                out.append({
+                    "dimension": "occasion_fit",
+                    "severity":  "medium",
+                    "reason":    "a training-style sneaker would better "
+                                  "suit the activity",
+                })
+            elif occ == "work" and is_sneaker and not is_dressy and form == "casual":
+                out.append({
+                    "dimension": "occasion_fit",
+                    "severity":  "low",
+                    "reason":    "a polished flat or loafer would "
+                                  "better suit a work setting",
                 })
 
         return out
@@ -1117,6 +1296,24 @@ def run_agent(
             })
     result["tradeoffs"] = tradeoffs
 
+    # Pre-compute which item TYPES will be promoted to qualified gaps.
+    # A type is promoted when at least one of its tradeoffs has medium
+    # or high severity. The reasoning trail uses this to write
+    # promotion-aware copy: items whose type IS promoted say "this
+    # signals a wardrobe opportunity"; items whose type is NOT
+    # promoted say "selected as the best available option" without
+    # claiming a wardrobe gap exists. Earlier behavior emitted "this
+    # reveals a wardrobe gap" for every tradeoff (even low-severity
+    # ones that never appeared in result["gaps"]), which contradicted
+    # the gap card, Step 6, and the live reasoning graph.
+    _promoted_types: set = set()
+    if tradeoffs:
+        for _td in tradeoffs:
+            if _td.get("severity") in ("medium", "high"):
+                _t = (_td.get("item_type") or "").lower()
+                if _t:
+                    _promoted_types.add(_t)
+
     # Surface a one-line note per tradeoff in the reasoning trail so
     # the user can SEE why a less-aligned item was still selected.
     # Cites shopping-gap rules R1 (the "no better-aligned option"
@@ -1130,15 +1327,29 @@ def run_agent(
             by_item[_td["item_id"]].append(_td)
         for _iid, _tds in by_item.items():
             _name = _tds[0]["item_name"]
+            _itype = (_tds[0].get("item_type") or "").lower()
             _reasons = "; ".join(t["reason"] for t in _tds)
             _cite = (cite("fit#R8") if any(t["dimension"] in
-                     ("fit","balance","modesty") for t in _tds)
+                     ("fit","balance","modesty","occasion_fit")
+                     for t in _tds)
                      else cite("color#R2"))
-            reasoning.append(
-                f"  Note on '{_name}': selected as the best available "
-                f"option, though {_reasons}. "
-                f"This reveals a wardrobe gap. {_cite} {cite('shopping#R1')}"
-            )
+            if _itype in _promoted_types:
+                # Tradeoff promoted to a qualified gap. Honest framing:
+                # the item was the best available; the wardrobe has an
+                # opportunity for a better-aligned alternative.
+                reasoning.append(
+                    f"  Note on '{_name}': selected as the best available "
+                    f"option, though {_reasons}. This signals a wardrobe "
+                    f"opportunity for a better-aligned {_itype}. "
+                    f"{_cite} {cite('shopping#R1')}"
+                )
+            else:
+                # Tradeoff NOT promoted (low-severity, single-dimension).
+                # The note is informational; no wardrobe-gap claim.
+                reasoning.append(
+                    f"  Note on '{_name}': selected as the best available "
+                    f"option, though {_reasons}. {_cite}"
+                )
 
     # ── STEP 6: Check for Gaps ────────────────────────────────────────────────
     step6 = {"step": 6, "name": "Check for Wardrobe Gaps", "status": "ok", "output": ""}
@@ -1197,39 +1408,102 @@ def run_agent(
             return "a fluid upper paired with a structured lower (a-line)"
         return "a silhouette that supports your preferred areas"
 
-    def _length_hint_for_modesty(modesty: str) -> str:
+    def _length_hint(piece_type: str, modesty: str) -> str:
+        """Category-aware coverage / length hint.
+
+        "Midi or longer" is meaningful for dresses and skirts; it's
+        nonsense for tops. Earlier copy applied the same string to
+        every piece type, producing user-visible bugs like
+        "A casual top midi or longer".
+        """
         modesty = (modesty or "").lower()
-        if modesty in ("moderate", "conservative"):
+        pt = (piece_type or "").lower()
+        if modesty not in ("moderate", "conservative"):
+            return ""
+        if pt in ("dress", "skirt"):
             return "midi or longer"
-        return "any length you prefer"
+        if pt == "top":
+            return "longer relaxed length with more coverage"
+        if pt in ("bottom", "pants", "jeans"):
+            return "trouser-length or full-length"
+        if pt == "outerwear":
+            return "longer coverage cut"
+        if pt == "activewear":
+            return "longer relaxed athletic length"
+        return ""
+
+    # User-facing display noun for the descriptor's opening clause.
+    # The raw item-type word is sometimes wrong English ("A casual shoes
+    # …") or unclear ("A casual accessory …"), so each type maps to a
+    # nominal phrase that reads cleanly.
+    _DISPLAY_NOUN = {
+        "shoes":     "pair of shoes",
+        "dress":     "dress",
+        "top":       "top",
+        "bottom":    "bottom",
+        "skirt":     "skirt",
+        "pants":     "pants",
+        "jeans":     "jeans",
+        "outerwear": "outer layer",
+        "activewear": "athletic piece",
+        "accessory": "accessory",
+        "scarf":     "scarf",
+    }
 
     def _build_qualified_gap_descriptor(piece_type: str,
                                          dims: set) -> str:
         """Compose a one-sentence shopping descriptor from the profile,
-        using only the dimensions that had tradeoffs."""
+        using only the dimensions that had tradeoffs.
+
+        Category-aware: the length hint is meaningful only for
+        dresses / skirts / outerwear; the noun phrase reads correctly
+        across item types. Fit hints fire only when the dimension was
+        actually triggered (never volunteered on item types we can't
+        evaluate fit on, e.g. shoes).
+        """
         parts = []
         skin = profile.get("skin_tone") or ""
         shape = profile.get("body_shape") or ""
         modesty = profile.get("modesty_preference") or ""
         pf = profile.get("preferred_fit") or ""
+        pt = (piece_type or "").lower()
+        display = _DISPLAY_NOUN.get(pt, pt or "item")
 
         if "color" in dims and skin:
             cols = _palette_for_skin(skin)[:3]
             parts.append(
                 f"in a {skin} palette ({', '.join(cols)})"
             )
-        if "balance" in dims or "fit" in dims:
+        # Fit / balance hints apply to garments. Shoes have no
+        # silhouette axis; their tradeoff dimension is occasion_fit,
+        # which generates its own descriptor branch below.
+        if ("balance" in dims or "fit" in dims) and pt in (
+                "dress", "top", "bottom", "outerwear", "activewear",
+                "skirt", "pants", "jeans"):
             if shape:
                 parts.append(_silhouette_hint_for_shape(shape))
             if pf and "fit" in dims:
                 parts.append(f"a {pf}-leaning cut")
-        if "modesty" in dims and modesty in ("moderate", "conservative"):
-            parts.append(_length_hint_for_modesty(modesty))
+        if "modesty" in dims:
+            hint = _length_hint(pt, modesty)
+            if hint:
+                parts.append(hint)
+        if "occasion_fit" in dims and pt == "shoes":
+            # Shoes-only branch: describe the right STYLE for the
+            # occasion, not the cut.
+            if occasion_tag in ("formal", "dinner"):
+                parts.append("polished style (dress shoe, heel, or "
+                              "dressy flat)")
+            elif occasion_tag == "gym":
+                parts.append("training-style sneaker with cushioned support")
+            elif occasion_tag == "work":
+                parts.append("polished flat or loafer")
 
         if not parts:
-            return f"A {occasion_tag} {piece_type} that aligns with your profile"
+            return (f"A {occasion_tag} {display} that aligns with "
+                    f"your profile.")
 
-        return (f"A {occasion_tag} {piece_type} "
+        return (f"A {occasion_tag} {display} "
                 + ", with ".join(parts)
                 + ".")
 

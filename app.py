@@ -1949,14 +1949,14 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
             fname = f"wearly-outfit-{_dt_local.datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
             st.markdown("<div style='height:0.4rem'></div>", unsafe_allow_html=True)
             st.download_button(
-                label="Export today's reasoning as a compact knowledge graph",
+                label="Export today's reasoning as a compact reasoning graph",
                 data=kg_blob,
                 file_name=fname,
                 mime="application/json",
                 use_container_width=True,
                 key="compact_kg_dl",
                 help="One outfit → one small JSON graph. Same shape as graph/schema.md. "
-                     "Open it in the in-book Knowledge-Graph viewer or share it with a stylist.",
+                     "Open it in the in-book Reasoning Graph viewer or share it with a stylist.",
             )
         except Exception as _e:
             st.caption(f"Compact-KG export unavailable: {_e}")
@@ -6318,7 +6318,7 @@ def _render_demo():
         _render_outfit_result(st.session_state["result"],
                               regenerate_key="regen_demo_live")
 
-    # ── Schema graph (the abstract knowledge graph) ─────────
+    # ── Schema graph (the abstract reasoning graph) ─────────
     # Sits at the bottom of the demo screen so a reviewer who's just
     # seen the live agent run can step up one level of abstraction and
     # see HOW the system models the world. Read alongside the live-run
@@ -6329,7 +6329,7 @@ def _render_demo():
         How Wearly models your day
     </div>
     <div style="font-size:0.86rem; color:#6E6E73; margin-top:0.3rem; margin-bottom:0.7rem; line-height:1.55;">
-        The knowledge graph below shows the entity types and relations Wearly
+        The reasoning graph below shows the entity types and relations Wearly
         reasons over. Every recommendation traces through this graph — the
         live-run graph inside an outfit result shows one specific traversal.
     </div>
@@ -6354,7 +6354,7 @@ def _render_demo():
                 pass
             st.caption(
                 "Canonical source: `graph/graph.json` and `graph/schema.md`. "
-                "Read more in the **Knowledge Graph** section of the "
+                "Read more in the **Reasoning Graph** section of the "
                 "[Intelligent Book](https://eatedalsf.github.io/styling-agent/). "
                 "For library, layout, and node-size meanings, see "
                 "`docs/knowledge-graph-faq.md`."
