@@ -3914,10 +3914,16 @@ def _render_wardrobe():
         load_demo_wardrobe = unload_demo_wardrobe = None  # type: ignore
 
     if load_demo_wardrobe is not None:
+        # Auto-expanded when the demo isn't loaded yet, so the
+        # "Load demo wardrobe" button is immediately visible —
+        # the previous default (collapsed) was easy to miss.
+        # Collapses to a quiet expander after loading so the
+        # active Wardrobe page isn't dominated by it.
         with st.expander(
             ("Demo wardrobe (loaded — 48 curated items)"
-             if _demo_active else "Demo wardrobe (load 48 curated items)"),
-            expanded=False,
+             if _demo_active
+             else "✨  Demo wardrobe — load 48 curated items in one click"),
+            expanded=(not _demo_active),
         ):
             st.markdown(
                 "<div style='font-size:0.82rem; color:#2E2E2E; "
