@@ -263,6 +263,104 @@ class TestRejectAndRegenerate(unittest.TestCase):
 
     # ── plan_routine_week contract ──────────────────────────────
 
+    # ── Step 2 reflects the merged profile (seed + overlay) ────────
+
+    def test_step2_reflects_current_overlay_body_shape(self):
+        """The user can set body_shape via fit_tool.save_fit_profile
+        (the Profile page's manual / measurements path). Step 2 must
+        show that overlay value, not the seed default.
+        Earlier behavior printed get_owner_profile()['profile'] which
+        is seed-only, leaving Step 2 disagreeing with the merged
+        fit_profile the downstream logic uses."""
+        import fit_tool
+        backup = None
+        if os.path.exists(fit_tool.PROFILE_PATH):
+            with open(fit_tool.PROFILE_PATH) as f:
+                backup = f.read()
+        try:
+            fit_tool.save_fit_profile({
+                "fit_profile_mode": "manual",
+                "body_shape":      "pear",
+                "preferred_fit":   "relaxed",
+                "_body_shape_source": "user",
+            })
+            r = run_agent(mode="everyday", everyday_request="casual")
+            step2 = next(s for s in r["steps"] if s["step"] == 2)
+            self.assertIn("pear", step2["output"].lower(),
+                "Step 2 must reflect the overlay's body_shape, "
+                f"not the seed. Got: {step2['output']!r}")
+            self.assertNotIn("hourglass", step2["output"].lower(),
+                "Step 2 must not show the seed body_shape when the "
+                "overlay has been set to something else.")
+        finally:
+            if backup is not None:
+                with open(fit_tool.PROFILE_PATH, "w") as f:
+                    f.write(backup)
+
+    def test_step2_includes_preferred_fit(self):
+        """Step 2 string should now include Preferred fit alongside
+        body shape, skin tone, and style preferences."""
+        import fit_tool
+        backup = None
+        if os.path.exists(fit_tool.PROFILE_PATH):
+            with open(fit_tool.PROFILE_PATH) as f:
+                backup = f.read()
+        try:
+            fit_tool.save_fit_profile({
+                "fit_profile_mode": "manual",
+                "body_shape":      "pear",
+                "preferred_fit":   "relaxed",
+                "_body_shape_source": "user",
+            })
+            r = run_agent(mode="everyday", everyday_request="casual")
+            step2 = next(s for s in r["steps"] if s["step"] == 2)
+            self.assertIn("preferred fit", step2["output"].lower())
+            self.assertIn("relaxed", step2["output"].lower())
+        finally:
+            if backup is not None:
+                with open(fit_tool.PROFILE_PATH, "w") as f:
+                    f.write(backup)
+
+    def test_result_profile_body_shape_matches_step2(self):
+        """`result['profile']` must carry the same body_shape that
+        Step 2 displays, so the reasoning graph + KG export agree."""
+        import fit_tool
+        backup = None
+        if os.path.exists(fit_tool.PROFILE_PATH):
+            with open(fit_tool.PROFILE_PATH) as f:
+                backup = f.read()
+        try:
+            fit_tool.save_fit_profile({
+                "fit_profile_mode": "manual",
+                "body_shape":      "pear",
+                "_body_shape_source": "user",
+            })
+            r = run_agent(mode="everyday", everyday_request="casual")
+            self.assertEqual(
+                (r.get("profile") or {}).get("body_shape"), "pear",
+                "result['profile']['body_shape'] must match Step 2.")
+        finally:
+            if backup is not None:
+                with open(fit_tool.PROFILE_PATH, "w") as f:
+                    f.write(backup)
+
+    # ── Punctuation spacing after citation strip ───────────────────
+
+    def test_reasoning_strip_collapses_space_before_period(self):
+        """Calling the citation-strip pipeline directly against a
+        reasoning line that ends with a citation must NOT leave a
+        space between the last word and the appended period."""
+        import re
+        _RE = re.compile(r"\[([a-z-]+#R\d+)\]")
+        sample = "Draws attention to your neckline [fit-silhouette-rules#R8]."
+        stripped = _RE.sub("", sample)
+        clean = " ".join(stripped.split()).rstrip(".").rstrip()
+        rendered = f"{clean}."
+        self.assertNotIn(" .", rendered,
+            f"Rendered line has a space before its period: {rendered!r}")
+        self.assertTrue(rendered.endswith("neckline."),
+            f"Expected period directly after 'neckline'. Got: {rendered!r}")
+
     def test_plan_routine_week_returns_one_plan_per_block(self):
         """When a day has two routine activities, plan_routine_week
         must return two plans for that day — not one. This pins

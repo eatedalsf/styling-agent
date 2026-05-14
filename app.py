@@ -2437,14 +2437,31 @@ def _render_reasoning_story(lines: list, recommendation: list = None) -> None:
         for line in bucket:
             # Split out any rule citations into pills shown below the line.
             tags = _REASONING_CITATION_RE.findall(line)
-            clean = _REASONING_CITATION_RE.sub("", line).strip().rstrip(".")
+            # Strip citations, then COLLAPSE the whitespace the brackets
+            # left behind. Order matters: collapse first (so the lone
+            # space before ']'-removed becomes nothing), then strip
+            # trailing periods, then strip any residual whitespace.
+            # Without this collapse, lines like
+            #   "Draws attention to your neckline [fit-silhouette-rules#R8]."
+            # rendered as "Draws attention to your neckline ." with a
+            # visible gap before the period.
+            _stripped = _REASONING_CITATION_RE.sub("", line)
+            clean = " ".join(_stripped.split()).rstrip(".").rstrip()
             pills_html = ""
             if tags:
-                pills_html = "".join(
+                # JOIN with a literal space so adjacent chips never look
+                # fused (e.g. "color-coordination-rules#R2 shopping-gap-
+                # rules#R1" instead of running together). Each chip gets
+                # explicit display:inline-block + a slightly bigger
+                # margin to guarantee breathing room inside any parent.
+                pills_html = " ".join(
                     f'<span style="font-size:0.66rem; color:#111111; '
                     f'background:#FAFAFA; border:1px solid #EEEEEE; '
-                    f'padding:1px 9px; border-radius:99px; margin-right:0.35rem; '
-                    f'letter-spacing:0.04em; font-family:DM Mono, monospace;">'
+                    f'padding:1px 9px; border-radius:99px; '
+                    f'margin:0 0.45rem 0.25rem 0; '
+                    f'letter-spacing:0.04em; '
+                    f'font-family:DM Mono, monospace; '
+                    f'display:inline-block;">'
                     f'{t}</span>'
                     for t in tags
                 )

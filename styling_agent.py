@@ -282,7 +282,23 @@ def run_agent(
         steps.append(step2)
         return result
 
+    # Use the MERGED profile (seed + user_profile.json overlay) as the
+    # canonical source for Step 2's display string AND for result["profile"]
+    # — the same source the fit/balance/color logic uses later in the run.
+    # `get_owner_profile()` alone returns seed-only and silently drops the
+    # user's overlay edits (body_shape, preferred_fit, etc.), causing
+    # Step 2 to disagree with the rest of the reasoning.
     profile = profile_result["profile"]
+    try:
+        from fit_tool import get_fit_profile as _gfp
+        _merged = (_gfp() or {}).get("profile") or {}
+        if _merged:
+            # Preserve a sensible name when the overlay didn't set one.
+            if not _merged.get("name"):
+                _merged["name"] = profile.get("name", "You")
+            profile = _merged
+    except Exception:
+        pass
     result["profile"] = profile
     # Stamp the profile fingerprint so the UI can detect when a cached
     # result was generated against a now-outdated profile and surface
@@ -293,8 +309,11 @@ def run_agent(
     except Exception:
         result["profile_hash"] = ""
     step2["output"] = (
-        f"Owner: {profile['name']} | Body shape: {profile['body_shape']} | "
-        f"Skin tone: {profile['skin_tone']} | Style: {', '.join(profile['style_preferences'])}"
+        f"Owner: {profile.get('name','You')} | "
+        f"Body shape: {profile.get('body_shape') or '—'} | "
+        f"Preferred fit: {profile.get('preferred_fit') or '—'} | "
+        f"Skin tone: {profile.get('skin_tone') or '—'} | "
+        f"Style: {', '.join(profile.get('style_preferences') or []) or '—'}"
     )
     steps.append(step2)
 

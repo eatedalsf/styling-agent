@@ -288,23 +288,33 @@ def infer_wishlist_taste() -> dict:
 
     # Narrative summary. Conservative claims; only mention signals we
     # actually have. Body-positive language (no "flatter", "hide").
+    # Phrasing reads as a list ("interest in X, Y, and Z"); store
+    # names are title-cased so "aritzia" → "Aritzia".
     bits: list = []
     if categories:
-        bits.append(
-            f"{'a preference for ' if len(categories) == 1 else 'preferences toward '}"
-            f"{', '.join(categories[:3])}"
-        )
+        bits.append(f"interest in {', '.join(categories[:3])}")
+    if pref_formality:
+        bits.append(f"{pref_formality.replace('_',' ').replace('-',' ')} pieces")
     if colors:
         bits.append(f"colors like {', '.join(colors[:3])}")
-    if pref_formality:
-        bits.append(f"a {pref_formality.replace('_',' ')} vibe")
     if stores:
-        bits.append(f"saved from {', '.join(stores[:3])}")
+        pretty_stores = [s.strip().title() for s in stores[:3] if s and s.strip()]
+        if pretty_stores:
+            bits.append(f"items from {', '.join(pretty_stores)}")
 
-    if bits:
-        summary = "Your wishlist suggests " + " and ".join(bits) + "."
-    else:
+    # Oxford-style join — "X", "X and Y", "X, Y, and Z".
+    if not bits:
         summary = ""
+    elif len(bits) == 1:
+        summary = f"Your wishlist suggests {bits[0]}."
+    elif len(bits) == 2:
+        summary = f"Your wishlist suggests {bits[0]} and {bits[1]}."
+    else:
+        summary = (
+            "Your wishlist suggests "
+            + ", ".join(bits[:-1])
+            + f", and {bits[-1]}."
+        )
 
     return {
         "categories":          categories,
