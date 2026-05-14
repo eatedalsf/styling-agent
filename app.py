@@ -3896,6 +3896,98 @@ def _render_wardrobe():
     </div>
     """, unsafe_allow_html=True)
 
+    # ── Demo wardrobe loader (curated 48-item seed) ─────────────
+    # One-click button to populate a polished demo closet — useful
+    # before recording a demo or showing the project to a reviewer.
+    # Items are tagged `source: "demo"` with stable DM-* IDs so a
+    # second click is a safe no-op and a separate "Remove demo"
+    # button undoes the load. User-added items (UC###/US###/UA###)
+    # are never touched. Local card images live under
+    # wardrobe_images/DM-*.png.
+    try:
+        from demo_wardrobe import (
+            load_demo_wardrobe, unload_demo_wardrobe, is_demo_loaded,
+        )
+        _demo_active = is_demo_loaded()
+    except Exception as _e:
+        _demo_active = False
+        load_demo_wardrobe = unload_demo_wardrobe = None  # type: ignore
+
+    if load_demo_wardrobe is not None:
+        with st.expander(
+            ("Demo wardrobe (loaded — 48 curated items)"
+             if _demo_active else "Demo wardrobe (load 48 curated items)"),
+            expanded=False,
+        ):
+            st.markdown(
+                "<div style='font-size:0.82rem; color:#2E2E2E; "
+                "line-height:1.55; margin-bottom:0.7rem;'>"
+                "One click adds 48 curated wardrobe pieces — tops, "
+                "bottoms, dresses, outerwear, activewear, shoes, "
+                "accessories — across work / smart-casual / casual / "
+                "weekend / gym / dinner / formal / travel. Each item "
+                "carries fabric, silhouette, and body-positive style "
+                "notes so the agent can demo skin-tone, fit, and "
+                "modesty reasoning out of the box. A polished colored "
+                "card image is generated for each item locally — "
+                "nothing fetched from a retailer at runtime."
+                "</div>",
+                unsafe_allow_html=True,
+            )
+            cols = st.columns([1, 1], gap="small")
+            with cols[0]:
+                if st.button(
+                    "↻ Reload demo wardrobe" if _demo_active else "Load demo wardrobe",
+                    key="demo_load_btn",
+                    type="primary", use_container_width=True,
+                ):
+                    with st.spinner("Loading demo wardrobe + generating card images…"):
+                        res = load_demo_wardrobe()
+                    if res.get("error"):
+                        st.error(res["error"])
+                    else:
+                        if res["added"]:
+                            st.success(
+                                f"Added {len(res['added'])} demo items. "
+                                f"Skipped {len(res['skipped'])} (already loaded). "
+                                f"Wardrobe now totals {res['total_after']}."
+                            )
+                        else:
+                            st.info(
+                                f"Demo already fully loaded — "
+                                f"{len(res['skipped'])} item(s) already present."
+                            )
+                        if res.get("image_errors"):
+                            st.warning(
+                                f"Could not render card image for "
+                                f"{len(res['image_errors'])} item(s). They still "
+                                "load — just without a thumbnail."
+                            )
+                        st.rerun()
+            with cols[1]:
+                if _demo_active:
+                    if st.button(
+                        "Remove demo wardrobe",
+                        key="demo_unload_btn",
+                        use_container_width=True,
+                        help="Removes every DM-* item and its card image. Your own added pieces stay.",
+                    ):
+                        with st.spinner("Removing demo items…"):
+                            ur = unload_demo_wardrobe()
+                        if ur.get("error"):
+                            st.error(ur["error"])
+                        else:
+                            st.success(
+                                f"Removed {len(ur['removed'])} demo items. "
+                                "Your own added items are untouched."
+                            )
+                            st.rerun()
+                else:
+                    st.caption(
+                        "Once loaded, a button to remove the demo set appears here. "
+                        "User-added items are never affected."
+                    )
+
     # ── Backup & Restore ────────────────────────────────────────
     # The persistence path. On localhost, files persist on disk and the
     # backup is for portability / safekeeping. On Streamlit Cloud, the
