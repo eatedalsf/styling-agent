@@ -1740,7 +1740,28 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
             )
         else:
             title = f"Wardrobe Gap · {', '.join(true_missing)} missing for this occasion"
-        gap_items = "".join(f"<div class='gap-item'>→ {s}</div>" for s in shopping)
+        # Dedupe wishlist messaging. The structured "✓ '<gap>' is
+        # already on your wishlist" chip is rendered below by
+        # gap_is_on_wishlist(...). The shopping suggestions list
+        # ALSO carries a long "Your wishlist already has '<item>'
+        # from <store>..." line appended by store_aware_suggestions.
+        # Both saying the same thing on the same card is noise — we
+        # keep the chip and drop the long line.
+        primary_gap_for_dedup = (
+            true_missing[0] if true_missing
+            else (qualified[0] if qualified else None)
+        )
+        shopping_filtered = list(shopping)
+        try:
+            from shopping_tool import gap_is_on_wishlist as _giw
+            if primary_gap_for_dedup and _giw(primary_gap_for_dedup):
+                shopping_filtered = [
+                    s for s in shopping_filtered
+                    if "wishlist already has" not in s.lower()
+                ]
+        except Exception:
+            pass
+        gap_items = "".join(f"<div class='gap-item'>→ {s}</div>" for s in shopping_filtered)
         st.markdown(f"""
         <div class="gap-alert">
             <div class="gap-title">{title}</div>
@@ -1759,10 +1780,13 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
         except ImportError:
             _shopping_ok = False
 
-        if _shopping_ok and shopping:
+        if _shopping_ok and shopping_filtered:
             # Use the FIRST gap type as the canonical linked_gap. Outerwear
             # gaps come from Step 5 (always type 'outerwear'); required-piece
             # gaps come from Step 6 (type matches REQUIRED_PIECES entries).
+            # Pass shopping_filtered downstream so the Save buttons match
+            # the rendered list.
+            shopping = shopping_filtered
             primary_gap = gaps[0]
             occ_tag = (result.get("event") or {}).get("type", "casual") or "casual"
 
@@ -1833,7 +1857,11 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
     # rather than inline brackets — same data, much more readable.
     with st.expander("Why this outfit — the agent's reasoning",
                      expanded=False):
-        _render_reasoning_story(reasons)
+        # Pass the recommendation list so the TL;DR can use full item
+        # names (including apostrophes like "Women's …") instead of
+        # mining quoted strings out of the reasoning trail with a
+        # regex that breaks on the first internal apostrophe.
+        _render_reasoning_story(reasons, recommendation=outfit)
 
     # ── Reasoning graph (live, interactive — built from THIS result) ──────────
     # This is the "agent, not chatbot" feature in graph form. The schema view
@@ -2246,7 +2274,7 @@ def _render_home():
 _REASONING_CITATION_RE = __import__("re").compile(r"\[([a-z-]+#R\d+)\]")
 
 
-def _render_reasoning_story(lines: list) -> None:
+def _render_reasoning_story(lines: list, recommendation: list = None) -> None:
     """
     Render the reasoning trail as a clean, grouped, story-style panel.
 
@@ -2275,18 +2303,30 @@ def _render_reasoning_story(lines: list) -> None:
         return
 
     # ── Top-of-panel TL;DR — "Why this outfit?" ──
-    # Build a single sentence by mining the trail for picks (Selected
-    # / Added) and stating the dominant reason class. This gives the
-    # user a body-positive headline before they scroll the details.
+    # Build a single sentence by reading picks from result['recommendation']
+    # (when provided) and stating the dominant reason class. Reading
+    # the recommendation list directly avoids the older
+    # regex-mining-from-quoted-strings approach, which truncated names
+    # at the first internal apostrophe (e.g. "Women's …" → "Women").
     picks: list = []
+    if recommendation:
+        for it in recommendation:
+            nm = (it or {}).get("name")
+            if nm and nm not in picks:
+                picks.append(nm)
+            if len(picks) >= 3:
+                break
     has_color_note = False
     has_fit_note   = False
     has_wishlist   = False
     has_rotation   = False
     for ln in raw_lines:
         low = ln.lower().lstrip()
-        if low.startswith(("selected", "added")):
-            # pull the quoted item name
+        # Legacy fallback: if no recommendation list was provided, mine
+        # picks from quoted strings as before. The regex still has the
+        # apostrophe truncation issue, but callers should prefer the
+        # recommendation list.
+        if not recommendation and low.startswith(("selected", "added")):
             import re as _re
             m = _re.search(r"['\"]([^'\"]+)['\"]", ln)
             if m and m.group(1) not in picks:

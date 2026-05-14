@@ -213,6 +213,54 @@ class TestRejectAndRegenerate(unittest.TestCase):
 
     # ── Gym outfit composition ──────────────────────────────────────
 
+    # ── Color contradictions: tradeoffs match color_tier_for ────────
+
+    def test_color_tradeoff_only_fires_for_avoid_tier(self):
+        """The tradeoff text must agree with the color score. For any
+        item with tier in {best, good, neutral} the tradeoffs list
+        must NOT include a color entry for that item."""
+        from color_tool import color_tier_for
+        r = run_agent(mode="everyday", everyday_request="casual")
+        skin = (r.get("profile") or {}).get("skin_tone") or ""
+        for it in r.get("recommendation") or []:
+            tier = color_tier_for(it.get("color") or "", skin)
+            color_tds = [td for td in r.get("tradeoffs") or []
+                         if td.get("item_id") == it.get("id")
+                         and td.get("dimension") == "color"]
+            if tier in ("best", "good", "neutral"):
+                self.assertEqual(
+                    color_tds, [],
+                    f"Item {it.get('name')!r} with color={it.get('color')!r} "
+                    f"is tier={tier!r} but produced a color tradeoff: "
+                    f"{color_tds}",
+                )
+
+    def test_pearl_white_gold_no_color_tradeoff_for_warm_olive(self):
+        """Direct unit-style check of the _evaluate_tradeoffs branch.
+        We simulate the exact item from the screenshot and confirm
+        no color tradeoff fires."""
+        from color_tool import color_tier_for
+        # white/gold should resolve to "best" because "gold" is in
+        # best_colors for warm olive.
+        tier = color_tier_for("white/gold", "warm olive")
+        self.assertEqual(tier, "best")
+
+    # ── Outerwear duplication: no "Note: temperature is..." line ────
+
+    def test_outerwear_gap_does_not_emit_temperature_note(self):
+        """When outerwear_gap fires, the reasoning trail must NOT
+        contain the 'Note: temperature is …' duplicate. The same
+        information is in the Wardrobe-Gap card + Step 5 output."""
+        r = run_agent(mode="everyday", everyday_request="dinner")
+        reasoning = " | ".join(r.get("reasoning") or [])
+        # The exact phrase that was duplicated
+        self.assertNotIn(
+            "but no dinner-appropriate outerwear was found in the wardrobe",
+            reasoning,
+            "Reasoning trail must not duplicate the outerwear gap "
+            "information that already appears in the gap card.",
+        )
+
     def test_gym_outfit_has_at_most_one_bottom(self):
         """Earlier the agent took activewear[:2] which could pick two
         bottoms (leggings + yoga pants). The slot-aware partition

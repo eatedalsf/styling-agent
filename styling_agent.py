@@ -908,14 +908,13 @@ def run_agent(
                 f"{temp}°F and {weather['layer_advice']} {cite('weather#R4')}"
             )
         else:
-            # No outerwear matches this occasion. Don't force a wrong-style coat
-            # onto the outfit; flag it as a wardrobe gap instead.
+            # No outerwear matches this occasion. Don't force a wrong-
+            # style coat onto the outfit; flag it as a wardrobe gap
+            # instead. The Wardrobe-Gap card AND Step 6 already convey
+            # this same information, so we do NOT add a duplicate
+            # "Note: temperature is …" line to the reasoning trail —
+            # previously the same fact appeared in three surfaces.
             outerwear_gap = True
-            reasoning.append(
-                f"Note: temperature is {temp}°F, but no {occasion_tag}-appropriate "
-                f"outerwear was found in the wardrobe. Skipping outerwear rather "
-                f"than forcing a mismatched coat. {cite('shopping#R2')}"
-            )
 
     step5["output"] = f"Built outfit with {len(outfit)} pieces: {', '.join(i['name'] for i in outfit)}."
     steps.append(step5)
@@ -986,19 +985,21 @@ def run_agent(
             placement_severity = "low"
 
         if skin and color and placement_severity is not None:
-            warm_cols = {"camel", "cream", "warm white", "olive",
-                          "terracotta", "rust", "gold", "tan", "brown",
-                          "burgundy", "blush"}
-            cool_cols = {"navy", "white", "black", "grey", "silver",
-                          "charcoal", "ice blue", "pearl"}
-            if "warm" in skin and any(c in color for c in cool_cols):
-                out.append({
-                    "dimension": "color",
-                    "severity":  placement_severity,
-                    "reason":    f"its {color} tone is less aligned with "
-                                  f"your {skin} palette near the face",
-                })
-            elif "cool" in skin and any(c in color for c in warm_cols):
+            # Single source of truth: call color_tool.color_tier_for —
+            # the same lookup that drives Step 7's color score. Only
+            # "avoid" tier (the same colors that get the ⚠ flag in
+            # the color check) generates a tradeoff. "best", "good",
+            # and "neutral" never fire here. Previously this branch
+            # used a hardcoded local set where "white", "black",
+            # "pearl", "silver" were all "cool", which contradicted
+            # the JSON-backed nuance (e.g. for warm-olive, gold is
+            # best and black is good — neither should be a tradeoff).
+            try:
+                from color_tool import color_tier_for
+                tier = color_tier_for(color, skin)
+            except Exception:
+                tier = "neutral"
+            if tier == "avoid":
                 out.append({
                     "dimension": "color",
                     "severity":  placement_severity,
