@@ -6,21 +6,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <script src="https://unpkg.com/p5@1.9.4/lib/p5.min.js"></script>
 <style>
+  /*
+    Shared book design system — kept in sync with the freshness +
+    learning-graph sims so all four pages read as one Intelligent
+    Book. The legacy --ivory / --warm-ivory / --terracotta / --rust
+    aliases stay defined below for any older references in this file,
+    but the page-level surfaces now use the shared --paper / --card /
+    --accent variables.
+  */
   :root {
-    --ivory: #F4EFE8;
-    --warm-ivory: #F1E7D6;
-    --terracotta: #C17F5A;
-    --rust: #A85A3C;
-    --ink: #1C1917;
-    --muted: #6B5F55;
-    --line: #E8E0D8;
+    --paper:       #F8F4ED;
+    --card:        #FDFAF7;
+    --ink:         #1C1917;
+    --body:        #4A3D36;
+    --muted:       #7C6F64;
+    --line:        #E8E0D8;
+    --accent:      #C17F5A;
+    --accent-deep: #9F5A36;
+
+    /* legacy aliases for any rule inside this file that still
+       references them — kept for compatibility, not for new code. */
+    --ivory:       var(--paper);
+    --warm-ivory:  #F1E7D6;
+    --terracotta:  var(--accent);
+    --rust:        var(--accent-deep);
   }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
     padding: 0;
     font-family: "DM Sans", system-ui, -apple-system, Segoe UI, sans-serif;
-    background: var(--ivory);
+    background: var(--paper);
     color: var(--ink);
   }
   .wrap {

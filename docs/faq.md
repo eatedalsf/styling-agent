@@ -120,13 +120,17 @@ never leaves the device. See
 
 ### There are two graphs — what's the difference?
 
-The **runtime knowledge graph** (`graph/graph.json`, schema in
-[`graph/schema.md`](../graph/schema.md)) models wardrobe items, outfits,
-and the agent's reasoning at runtime. The **learning graph**
+The **Reasoning Graph** (`graph/graph.json`, schema in
+[`graph/schema.md`](../graph/schema.md), viewer at
+[reasoning graph](sims/knowledge-graph/index.md)) models wardrobe items,
+outfits, and the agent's reasoning at runtime. The **Learning Graph**
 (`graph/learning-graph.json`, viewer at
-[learning-graph](sims/learning-graph/index.md)) models the *reader's*
+[learning graph](sims/learning-graph/index.md)) models the *reader's*
 path through this book — what concepts depend on what. Same library
-(vis-network.js), different purposes.
+(vis-network.js), different purposes. The Reasoning Graph was called
+the "Knowledge Graph" in earlier drafts; the name was changed on display
+surfaces to avoid colliding with McCreary's *knowledge graph = concept
+graph* convention. File paths and the JSON are unchanged.
 
 ### Does the learning graph show Bloom levels?
 

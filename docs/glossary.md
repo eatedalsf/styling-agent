@@ -97,10 +97,19 @@ fabricated citations; the user is the final reviewer. See
 
 ## K
 
-**Knowledge graph (runtime)** — Wardrobe entities + relations the agent
-reasons over at runtime. Modeled in `graph/graph.json` with the schema in
-[`graph/schema.md`](../graph/schema.md). Distinct from the **learning
-graph** (the reader's concept graph).
+**Knowledge graph (runtime)** — *See* **Reasoning Graph**. The earlier
+name "knowledge graph" was retired on display surfaces because
+McCreary's framework uses *knowledge graph* and *concept graph*
+interchangeably for the *reader's* concept DAG; we now call Wearly's
+runtime entity graph the Reasoning Graph to avoid the clash. File
+paths and the JSON source are unchanged.
+
+**Reasoning Graph** — The wardrobe entities and typed relations the
+agent reasons over at runtime (User → CalendarEvent →
+OutfitRecommendation → WardrobeItem → ShoppingSuggestion / Feedback).
+Modeled in `graph/graph.json` with the schema in
+[`graph/schema.md`](../graph/schema.md). Distinct from the **Learning
+Graph** (the reader's concept DAG).
 
 ## L
 

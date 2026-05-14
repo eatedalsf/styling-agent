@@ -1,8 +1,16 @@
 # Wear-history freshness — micro-sim
 
-> **What you're looking at.** Wearly's tie-breaker for "should I pick this item today?" A score in `[0.40, 1.00]` derived from two signals: how many times you've worn the piece, and how recently. The agent uses this only to break ties between otherwise-equally-eligible items — a much-loved favorite never gets exiled (the floor is 0.40), and a fresh alternative wins when the two are equivalent on every other axis.
+> **Learning objective.** After working through this sim, you will be
+> able to explain why a much-loved item is never exiled from rotation,
+> how the 0.4 floor and 3-day recency window cooperate, and where the
+> score sits in the agent's selection logic (a tie-breaker, never a
+> filter).
 >
-> The sim renders the actual formula from `history_tool.get_freshness`. Move the sliders, watch the score and the layer-by-layer breakdown.
+> **What you're looking at.** Wearly's tie-breaker for "should I pick
+> this item today?" — a score in `[0.40, 1.00]` derived from two
+> signals: how many times you've worn the piece, and how recently. The
+> sim renders the actual formula from `history_tool.get_freshness`.
+> Move the sliders; watch the score and the layer-by-layer breakdown.
 
 <iframe
   src="main.html"
@@ -44,4 +52,56 @@ The same number also drives the **reasoning trail line** "you haven't worn this 
 
 ## Why a sim, not just docs
 
-You can write "the freshness floor is 0.40" in prose and reviewers will read past it. A slider that *visibly* refuses to drop below the floor — even at worn_count = 100, days = 0 — makes the contract real. The intelligent-textbook pattern is: every important rule earns a micro-sim, not just a paragraph.
+You can write "the freshness floor is 0.40" in prose and a reader will
+skim past it. A slider that *visibly* refuses to drop below the floor —
+even at `worn_count = 100, days = 0` — makes the contract real. The
+intelligent-textbook pattern is: every rule the agent applies at
+runtime is also a sim, not just a paragraph.
+
+---
+
+## What to notice
+
+- **The floor holds.** Push `worn_count` to 100 with `days = 0` and the
+  bar refuses to dip below 0.40. The clamp is the line.
+- **Recency penalty is binary.** It's not a gradient — the −0.25 hit
+  applies inside the 3-day window and disappears the moment
+  `days_since_last` crosses 3.
+- **Frequency penalty caps at 4 wears.** A fifth wear changes nothing
+  about the score; a much-loved black blouse stops getting punished
+  past that point.
+- **A never-worn item is 1.00.** No penalty, no breakdown — the agent
+  reaches for it first on ties.
+
+## Try this
+
+1. **Set worn_count = 0, days_since_last = 0.**
+   **What you should see:** score = 1.00. No penalties apply when
+   nothing has been worn yet — there's no recency *or* frequency signal
+   to charge against.
+2. **Set worn_count = 4, days_since_last = 2.**
+   **What you should see:** both penalties fire (−0.25 frequency,
+   −0.25 recency), score lands at 0.50 — clearly above the floor.
+3. **Now slide days_since_last to 3.**
+   **What you should see:** recency drops off, score jumps back to
+   0.75. The 3-day window is a hard edge, not a gradient.
+4. **Push worn_count to 100 with days = 0.**
+   **What you should see:** the math wants to go below 0.40 but the
+   bar clamps at exactly 0.40 — the rule's "no exile" guarantee.
+
+## Self-check
+
+1. *(Remember)* What is the floor on the freshness score, and at which
+   `worn_count` value does the frequency penalty stop growing?
+2. *(Understand)* Why is freshness a *tie-breaker* rather than a
+   filter — what would change if it were applied earlier in Step 4?
+3. *(Apply)* A user wore their navy blazer once, 5 days ago. Compute
+   the freshness by hand and explain which penalties apply.
+
+## Linked concept
+
+- *Learning-graph concept:* **[freshness score (0.4 floor)](../learning-graph/index.md)**
+  (id `freshness-score`, Bloom level *Analyze*).
+- *Rule citations:* `[wear-history-rules#R2]`,
+  `[wear-history-rules#R4]` — see
+  [`wear-history-rules.md`](../../../skills/wearly-styling-agent/wear-history-rules.md).
