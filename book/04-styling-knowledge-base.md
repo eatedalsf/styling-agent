@@ -1,5 +1,7 @@
 # 04 · Styling knowledge base
 
+*The app applies these rules at runtime; this chapter is the reference layer that explains each rule pack and the data it reads.*
+
 Wearly's decisions aren't learned from photos — they're driven by a small, **inspectable knowledge base**. This chapter documents what's in it and why.
 
 ## Three rule systems

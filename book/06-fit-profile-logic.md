@@ -1,5 +1,7 @@
 # 06 · Fit-profile logic
 
+*The app reads the fit profile every run; this chapter explains how body-positive personalization is encoded and enforced.*
+
 This is the **body-positive** chapter. The language and the logic both matter — the way Wearly talks about the user's body is part of the product.
 
 ## What the fit profile is

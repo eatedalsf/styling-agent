@@ -1,9 +1,11 @@
 # Glossary
 
-> A single place to look up every domain term Wearly uses across the
-> Intelligent Book, the Skill rule packs, and the running app. Definitions
-> are short on purpose — each entry links to the chapter or rule file
-> where the term is introduced in context.
+> A single place to look up every domain term Wearly uses. The glossary
+> unifies vocabulary across the two layers of the project: the
+> **styling-agent prototype** (the working app) and the **Intelligent
+> Book** (its learning and reference companion). Definitions are short
+> on purpose — each entry links to the chapter or rule file where the
+> term is introduced in context.
 >
 > Inspired by the `glossary-generator` skill in
 > [dmccreary/claude-skills](https://github.com/dmccreary/claude-skills),

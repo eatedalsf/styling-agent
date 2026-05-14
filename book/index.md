@@ -4,10 +4,34 @@
 
 # The Wearly Intelligent Book
 
-> A mini Intelligent Book documenting how Wearly reasons.
-> Inspired by [intelligent-textbooks](https://dmccreary.github.io/intelligent-textbooks/) — Markdown chapters that together form a navigable, structured explanation of the system behind the app.
+> **Wearly's Intelligent Book is the learning and reference companion
+> for the styling-agent prototype.** The app shows what Wearly does;
+> the book explains how and why it reasons that way.
+>
+> This is an *intelligent textbook about AI-powered personal styling*,
+> using Wearly as the working case study — not app documentation, not
+> a generic styling guide. Inspired by
+> [intelligent-textbooks](https://dmccreary.github.io/intelligent-textbooks/).
 
-The book **supports** the working product; it does not replace it. The product is the live Streamlit app; this book documents the reasoning, the data, the trade-offs, and the future.
+## What this book is — and how it relates to the app
+
+Wearly ships as seven coordinated layers. The app is one of them; the
+book is the reference layer that explains every other one.
+
+| Layer | What it is | Where it lives |
+|---|---|---|
+| **App (prototype)** | The agent running end-to-end on a real wardrobe. | `streamlit run app.py` |
+| **Book chapters** | The reasoning behind every step the app takes. | `book/01-vision.md` … `book/12-evidence-and-references.md` |
+| **Skill rules** | The operational rules the agent applies at runtime. | [`skills/wearly-styling-agent/`](../skills/wearly-styling-agent/SKILL.md) |
+| **Evidence & references** | The verified sources the rules trace back to. | [`docs/evidence-and-references.md`](../docs/evidence-and-references.md), [References](../docs/references.md) |
+| **Learning Graph** | The concept DAG that teaches the reader the path through the book. | [Learning Graph](../docs/sims/learning-graph/index.md) |
+| **Reasoning Graph** | The runtime entity model — what the agent knows and connects during a recommendation. | [Reasoning Graph](../docs/sims/knowledge-graph/index.md) |
+| **MicroSims** | Interactive widgets that let the reader try one rule or concept hands-on. | [MicroSims](../docs/sims/index.md) |
+
+A reader who only opens the app sees outcomes. A reader who only
+opens the book sees structure. Reading them together is the
+intelligent-textbook pattern: the prototype demonstrates the agent in
+motion; the book explains every line of its reasoning.
 
 ---
 
@@ -19,7 +43,7 @@ a concept-graph–driven, MicroSim-equipped, evidence-citable companion to
 the running prototype. That framing is concrete — Wearly ships the
 artifacts a Level-2 book is expected to ship:
 
-- a **[concept learning graph](../docs/sims/learning-graph/index.md)** — 28 concepts, 38 prerequisite edges, every node Bloom-tagged (Remember → Understand → Apply → Analyze);
+- a **[concept learning graph](../docs/sims/learning-graph/index.md)** — 28 concepts, 39 prerequisite edges, every node Bloom-tagged (Remember → Understand → Apply → Analyze);
 - **[MicroSims](../docs/sims/index.md)** — small interactive simulations for color harmony, freshness, and the two graphs;
 - a project-wide **[Glossary](../docs/glossary.md)**, **[FAQ](../docs/faq.md)**, and **[References](../docs/references.md)**;
 - per-chapter **Key terms** and **Self-check** footers (Bloom-tiered);

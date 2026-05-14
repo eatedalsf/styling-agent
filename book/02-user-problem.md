@@ -1,5 +1,7 @@
 # 02 · The user problem
 
+*The app responds to a 15-minute closet decision; this chapter explains why that decision is the design constraint everything else follows.*
+
 ## The fifteen-minute closet
 
 Most people spend somewhere around **fifteen minutes** every morning standing in front of their closet. The decision is small, the friction is significant: the user juggles four streams of context at once —

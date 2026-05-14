@@ -1,5 +1,7 @@
 # 12 · Evidence and references
 
+*The app applies rules; this chapter explains the evidence base those rules trace back to and what still needs verification.*
+
 Wearly's recommendation logic is **evidence-informed, design-informed, and user-preference-driven** — never described as exact or objectively correct. This chapter explains *what* informs the agent's reasoning and *how* the project handles the gap between "general practice" and "verified citations."
 
 The canonical, structured version of this material lives in [`docs/evidence-and-references.md`](../docs/evidence-and-references.md). This chapter is the readable summary.

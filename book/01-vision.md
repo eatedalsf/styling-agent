@@ -1,5 +1,7 @@
 # 01 · Product vision
 
+*The app is the styling agent in motion; this chapter explains what it is, who it serves, and what it deliberately isn't.*
+
 ## What Wearly is
 
 Wearly is a **mobile-first personal styling agent**. It picks complete outfits using the user's real calendar, the day's weather, their actual wardrobe, and their personal style profile — and it explains every choice it makes.

@@ -1,5 +1,7 @@
 # 11 · Product roadmap
 
+*The app is the prototype state; this chapter explains where the agent goes next and why each phase is ordered the way it is.*
+
 Where Wearly is going. Mirrors the roadmap in `Wearly_Product_Brief.md` §13 but explains each phase in product-engineering terms.
 
 ## Status today

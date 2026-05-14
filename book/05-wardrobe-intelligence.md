@@ -1,5 +1,7 @@
 # 05 · Wardrobe intelligence
 
+*The app filters and builds outfits from this data model; this chapter explains how items become candidates and candidates become outfits.*
+
 How Wearly models, filters, and reasons about the user's actual closet.
 
 ## Item model

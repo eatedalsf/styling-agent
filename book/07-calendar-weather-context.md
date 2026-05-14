@@ -1,5 +1,7 @@
 # 07 · Calendar & weather context
 
+*The app reads two external context sources; this chapter explains how each one steers the recommendation.*
+
 Two external context streams enter the agent every run. This chapter documents both.
 
 ## Calendar

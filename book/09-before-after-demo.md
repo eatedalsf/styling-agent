@@ -1,5 +1,7 @@
 # 09 · Before / after demo
 
+*The app demonstrates the time delta in real time; this chapter explains what "before / after" means and what it doesn't claim.*
+
 The single most important visual moment in the 10-minute presentation.
 
 ## The framing

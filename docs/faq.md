@@ -12,6 +12,17 @@
 
 ## Product
 
+### What is the Intelligent Book vs. the app?
+
+**Wearly's Intelligent Book is the learning and reference companion
+for the styling-agent prototype.** The app shows what Wearly does;
+the book explains how and why it reasons that way. The app is a
+Streamlit prototype you run locally; the book is the MkDocs-built
+site you're reading now, with chapters, a glossary, a learning graph,
+a reasoning graph, and interactive MicroSims. The two are meant to be
+read together — the prototype demonstrates the agent in action; the
+book is the structured explanation behind every line of its reasoning.
+
 ### What is Wearly, in one sentence?
 
 An evidence-informed, body-positive personal styling agent that reads

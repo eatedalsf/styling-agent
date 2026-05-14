@@ -1,9 +1,12 @@
 # MicroSims
 
 > **What's on this page.** The four interactive simulations and graphs
-> that make Wearly's reasoning *touchable*. Each one targets one
-> concept, declares its learning objective at the top, and ends with a
-> short self-check.
+> that make Wearly's reasoning *touchable*. Each one targets a single
+> rule or concept the styling-agent prototype applies at runtime,
+> declares its learning objective at the top, and ends with a short
+> self-check. The sims are the hands-on surface of the Intelligent
+> Book — the app demonstrates the agent in action; the sims let you
+> try the same rules yourself, in isolation.
 
 ## Why a MicroSim?
 

@@ -1,5 +1,7 @@
 # 10 · Privacy & security
 
+*The app keeps data local; this chapter explains the privacy stance the prototype implements today and what production would look like.*
+
 Wearly handles calendar events, location data, wardrobe photos (in production), measurements, and personal preferences. This chapter documents how those are handled today and how they would be handled in production.
 
 ## Today (prototype)

@@ -1,7 +1,11 @@
 # References
 
 > A flat, numbered bibliography of every work Wearly's Intelligent Book
-> draws on. Sources are listed in the order they appear in
+> draws on. The references support the Skill rules, and the Skill
+> rules are what the styling-agent prototype applies at runtime — so
+> this page is the deepest layer of the citation chain:
+> **reference → evidence category → rule pack → reasoning line in the
+> app.** Sources are listed in the order they appear in
 > [evidence-and-references.md](evidence-and-references.md). Each entry
 > includes the section it supports and the rule pack(s) it informs.
 >

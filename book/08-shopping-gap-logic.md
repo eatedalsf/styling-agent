@@ -1,5 +1,7 @@
 # 08 · Shopping-gap logic
 
+*The app surfaces gaps when an occasion needs a piece you don't own; this chapter explains the gap-detection logic and its body-positive tone rules.*
+
 When Wearly says *"you don't own this yet,"* that's a deliberate design decision, not a missing feature. This chapter explains the logic.
 
 ## When a gap is detected
