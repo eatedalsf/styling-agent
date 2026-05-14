@@ -24,17 +24,26 @@ behavior — gym needs activewear, formal needs a dress (or formal
 separates), work needs a top + bottom, etc.
 
 Each tag declares its **required pieces** — the minimum type-set the
-outfit must contain:
+outfit must contain. The actual table in `styling_agent.py:63`:
 
 ```python
 REQUIRED_PIECES = {
-    "work":    {"top", "bottom"},
-    "gym":     {"top", "bottom"},        # activewear-tagged
-    "dinner":  {"top", "bottom"},        # or "dress" via S3 branching
-    "formal":  {"dress"},                # or formal "top" + "bottom"
-    "casual":  {"top", "bottom"},
+    "work":   ["top", "bottom"],
+    "dinner": ["top", "bottom"],
+    "gym":    ["activewear", "activewear"],   # two activewear pieces
+    "formal": ["dress"],                       # or top+bottom via the branch
+    "casual": ["top", "bottom"],
 }
 ```
+
+The *gym* entry is the only one that uses a non-generic type:
+`activewear` is a dedicated garment-type tag carried on every
+gym-suitable item in the wardrobe model. Step 4's filter excludes any
+item without an activewear tag from the gym pool, so the agent never
+recommends a button-down for a workout. *Formal* defaults to a single
+dress; the dress-vs-separates branch (see
+[§S5 · Wardrobe construction](S5-wardrobe-construction.md)) lets the
+agent fall through to a formal top+bottom if no dress survives Step 4.
 
 A type missing from the candidate pool is what Step 6 detects as a
 *wardrobe gap* (see [§S7 · Honest gaps](S7-honest-gaps.md)).

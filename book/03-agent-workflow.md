@@ -24,7 +24,7 @@ The implementation lives in `styling_agent.py` · `run_agent()`. The per-step de
 3. Check Weather             ← live Open-Meteo with seasonal fallback
 4. Filter Wardrobe           ← occasion + season + (rejected items excluded)
 5. Build Outfit              ← dress vs separates; activewear; outerwear if cold
-6. Check Wardrobe Gaps       ← detect missing required pieces
+6. Check for Wardrobe Gaps   ← detect missing required pieces
 7. Color Coordination Check  ← 0–100 score against skin tone
 ```
 

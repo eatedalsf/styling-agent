@@ -3,7 +3,7 @@
 > A small, inspectable graph modeling the relationships between the contexts and decisions Wearly reasons across.
 > Demonstrates that Wearly reasons through **connected context**, not random prompts.
 
-The graph is intentionally minimal — 9 entity types, 14 relation types. Small enough to render on one page, expressive enough to cover every reasoning step in `styling_agent.py`.
+The graph is intentionally minimal — 9 entity types, 17 relation types. Small enough to render on one page, expressive enough to cover every reasoning step in `styling_agent.py`.
 
 ---
 

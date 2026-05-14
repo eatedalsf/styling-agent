@@ -166,6 +166,7 @@ nav:
     - "Glossary": docs/glossary.md
     - "FAQ": docs/faq.md
     - "References (bibliography)": docs/references.md
+    - "Audit · book ↔ app (May 2026)": docs/audit-2026-05.md
 
   - Evidence:
     - "Evidence & references (canonical)": docs/evidence-and-references.md

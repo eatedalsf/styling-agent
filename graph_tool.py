@@ -75,26 +75,32 @@ _NODE_STYLES: Dict[str, Dict[str, Any]] = {
 _MAX_ITEM_NODES_PER_RUN = 12
 
 
-def _new_network(height_px: int = 520):
-    """Construct a pyvis Network configured with Wearly's palette + physics."""
+def _new_network(height_px: int = 520, layout: str = "hierarchical"):
+    """Construct a pyvis Network configured with Wearly's palette.
+
+    Two layouts are supported, matching the Learning Graph viewer in
+    `docs/sims/learning-graph/main.html`:
+
+    - ``layout="hierarchical"`` (default) — top-down DAG layout
+      (vis-network `UD` with `sortMethod: directed`). The User-down
+      provenance chain reads at a glance: User → Event/Weather →
+      Outfit → Items/Gaps. This is the layout McCreary's
+      learning-graph-generator pattern opens with, because the
+      hierarchical view is the one that *teaches* the prerequisite /
+      provenance chain.
+    - ``layout="physics"`` — the legacy forceAtlas2Based simulation,
+      kept for any caller that wants the organic blob look (e.g. the
+      schema graph where the entity types form a cluster rather than
+      a strict chain).
+    """
     from pyvis.network import Network
     net = Network(
         height=f"{height_px}px", width="100%",
         bgcolor=_PALETTE["paper"], font_color=_PALETTE["ink"],
         notebook=False, cdn_resources="in_line", directed=True,
     )
-    # Physics retuned for ~10–25-node graphs:
-    #   - Stronger repulsion (-6500) so nodes don't crowd each other.
-    #   - Longer springs (190) so edges read clearly between roles.
-    #   - Heavier damping (0.6) so the simulation settles fast and
-    #     stays put, instead of drifting after the user releases a node.
-    #   - solver: forceAtlas2Based feels less twitchy than barnesHut on
-    #     the medium-sized graphs Wearly renders.
-    # Edges use curved smoothing so multi-hop paths don't overlap.
-    # Node labels get a white stroke so they're readable on top of
-    # neighbouring nodes when the layout briefly crowds during settle.
-    net.set_options("""
-    {
+
+    common_styling = """
       "nodes": {
         "borderWidth": 2,
         "font": {"size": 14, "face": "DM Sans, sans-serif", "color": "#111111",
@@ -103,33 +109,70 @@ def _new_network(height_px: int = 520):
         "margin": 10
       },
       "edges": {
-        "smooth": {"type": "cubicBezier", "forceDirection": "horizontal", "roundness": 0.4},
+        "smooth": {"type": "cubicBezier", "forceDirection": "vertical", "roundness": 0.35},
         "arrows": {"to": {"enabled": true, "scaleFactor": 0.55}},
         "color": {"color": "#D1D1D6", "highlight": "#111111", "hover": "#111111"},
         "font":  {"size": 11, "color": "#6E6E73", "strokeWidth": 3, "strokeColor": "#FFFFFF",
                   "align": "middle"},
         "width": 1.2
       },
-      "physics": {
-        "enabled": true,
-        "solver": "forceAtlas2Based",
-        "forceAtlas2Based": {
-          "gravitationalConstant": -110,
-          "centralGravity": 0.02,
-          "springLength": 170,
-          "springConstant": 0.06,
-          "damping": 0.7,
-          "avoidOverlap": 0.85
-        },
-        "stabilization": {"enabled": true, "iterations": 320, "fit": true},
-        "minVelocity": 0.5
-      },
       "interaction": {
         "hover": true, "tooltipDelay": 120, "navigationButtons": false,
         "zoomView": true, "dragView": true, "multiselect": false
       }
-    }
-    """)
+    """
+
+    if layout == "hierarchical":
+        # Hierarchical DAG. Physics is OFF — vis-network's hierarchical
+        # layout is deterministic, so the graph never jitters or
+        # re-flows after render. `sortMethod: directed` reads edge
+        # direction (User → Event → Outfit → Items) and stacks levels
+        # accordingly. `levelSeparation` and `nodeSpacing` are tuned
+        # for the 8–15-node graphs the live runs typically produce.
+        net.set_options("""
+        {
+          %s,
+          "layout": {
+            "hierarchical": {
+              "enabled": true,
+              "direction": "UD",
+              "sortMethod": "directed",
+              "shakeTowards": "roots",
+              "levelSeparation": 130,
+              "nodeSpacing": 170,
+              "treeSpacing": 220,
+              "blockShifting": true,
+              "edgeMinimization": true,
+              "parentCentralization": true
+            }
+          },
+          "physics": {"enabled": false}
+        }
+        """ % common_styling)
+    else:
+        # Physics fallback — preserved for the schema-graph render
+        # (entity types form a cluster, not a chain), and for any
+        # caller who explicitly wants the legacy look.
+        net.set_options("""
+        {
+          %s,
+          "physics": {
+            "enabled": true,
+            "solver": "forceAtlas2Based",
+            "forceAtlas2Based": {
+              "gravitationalConstant": -110,
+              "centralGravity": 0.02,
+              "springLength": 170,
+              "springConstant": 0.06,
+              "damping": 0.7,
+              "avoidOverlap": 0.85
+            },
+            "stabilization": {"enabled": true, "iterations": 320, "fit": true},
+            "minVelocity": 0.5
+          }
+        }
+        """ % common_styling)
+
     return net
 
 
@@ -206,7 +249,11 @@ def render_schema_graph_html() -> str:
             f'border-radius:6px;">Schema graph unavailable: {e}</div>'
         )
 
-    net = _new_network(height_px=560)
+    # Schema graph keeps the legacy physics layout — the entity-type
+    # vocabulary forms a tight cluster around User/Outfit rather than
+    # a strict provenance chain, and the force-directed view shows
+    # that clustering naturally.
+    net = _new_network(height_px=560, layout="physics")
     seen_ids = set()
 
     for ent in data.get("entities", []):

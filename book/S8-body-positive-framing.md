@@ -26,16 +26,33 @@ The discipline is enforced at two levels.
 
 The function `fit_tool.check_reasoning_for_forbidden_language()`
 inspects every reasoning line the agent emits and refuses any line
-that contains a forbidden token. The list today:
+that contains a forbidden token. The contract is organized around
+**root concepts** — the words and phrases the styling literature
+uses to frame body features as flaws — with **spelling and dialect
+variants** of each one also banned so a contributor can't slip past
+the check with British spelling or a synonym.
+
+The root concepts (with their currently-enforced variants in
+parentheses):
 
 ```
-flaw, fix, hide, minimize, correct, problem area, slimming, shameful
+flaw           (flaw, flaws)
+fix            (fix)
+hide           (hide)
+minimize       (minimize, minimise)
+correct        (correct, corrective)
+problem area   (problem area, problem-area, problem_area, problem zone)
+trouble area   (trouble area, trouble-area)
+slimming       (slimming, slimmer)
+shameful       (shameful)
 ```
 
-A reasoning line that trips the check fails CI; a developer cannot
-ship copy that violates the contract without removing it from this
-list deliberately. The list grows when a reviewer surfaces a token
-that should be banned and the team agrees.
+That's 17 actual strings the runtime scans for, across the nine
+families above. A reasoning line that trips the check fails CI; a
+developer cannot ship copy that violates the contract without
+removing it from `fit_tool.FORBIDDEN_TOKENS` deliberately. The list
+grows when a reviewer surfaces a new corrective phrase and the team
+agrees.
 
 ### Level 2 — static documentation check
 
@@ -119,7 +136,7 @@ Wearly's body-positive framing is structural for three reasons:
 
 - **Body-positive language contract** — the runtime + documentation rule that forbids corrective vocabulary. See [Glossary](../docs/glossary.md).
 - **Honesty contract** — the four rules that govern every claim Wearly makes; body-positive language is one of them. See [Glossary](../docs/glossary.md).
-- **Forbidden tokens** — the eight tokens (`flaw, fix, hide, minimize, correct, problem area, slimming, shameful`) that fail CI.
+- **Forbidden tokens** — the 17 runtime strings (across nine root concept families: `flaw, fix, hide, minimize, correct, problem area, trouble area, slimming, shameful`) that fail CI when they appear in a reasoning line.
 
 ## Self-check
 

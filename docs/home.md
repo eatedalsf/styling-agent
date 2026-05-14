@@ -40,7 +40,7 @@ The repository itself: **[github.com/eatedalsf/styling-agent](https://github.com
 Four rules govern everything Wearly claims:
 
 1. **Styling is not an exact science.** Wearly says *"tends to work well,"* not *"is correct."*
-2. **Body-positive language is non-negotiable.** Enforced at runtime (`fit_tool.check_reasoning_for_forbidden_language()`) and across documentation (`tests/test_documentation_integrity.py`). Forbidden tokens: `flaw / fix / hide / minimize / correct / problem area / slimming`.
+2. **Body-positive language is non-negotiable.** Enforced at runtime (`fit_tool.check_reasoning_for_forbidden_language()`) and across documentation (`tests/test_documentation_integrity.py`). Forbidden root concepts: `flaw / fix / hide / minimize / correct / problem area / trouble area / slimming / shameful` (the runtime expands each into variants — see [§S8](book/S8-body-positive-framing.md) for the full enforcement list).
 3. **No fabricated citations.** Categories are named when they're textbook common knowledge; specific authors, papers, and findings appear only after verification.
 4. **The user is the final reviewer.** Reject-and-regenerate, the editable fit profile, and the "Wear this outfit today" confirmation all exist because no rule system can be authoritative about personal taste.
 

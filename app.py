@@ -1908,7 +1908,8 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
                     + (f" · {summary['rejections']} rejection"
                        + ('' if summary['rejections'] == 1 else 's')
                        if summary['rejections'] else "")
-                    + " — physics stops after layout settles; drag nodes to adjust."
+                    + " — hierarchical top-down layout: User → Event → Outfit → Items. "
+                    "Drag any node to adjust; scroll to zoom."
                 )
                 html_doc = render_run_graph_html(result)
                 components.html(html_doc, height=560, scrolling=False)
