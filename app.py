@@ -1114,17 +1114,42 @@ def _render_user_items_list(items: list) -> None:
                 'font-size:0.7rem; color:#8E8E93;">img</div>'
             )
 
+        # Pexels attribution — required by their API guidelines when
+        # we display a real photographer's work. Rendered as a tiny
+        # caption line at the bottom of the row.
+        credit_html = ""
+        cr_name = it.get("photo_credit_name")
+        cr_url  = it.get("photo_credit_url")
+        cr_src  = it.get("photo_credit_source") or "Pexels"
+        if cr_name:
+            if cr_url:
+                credit_html = (
+                    f'<div style="font-size:0.66rem; color:#8E8E93; '
+                    f'margin-top:0.25rem; margin-left:84px;">Photo: '
+                    f'<a href="{cr_url}" target="_blank" '
+                    f'style="color:#8E8E93; text-decoration:none;">'
+                    f'{cr_name}</a> · {cr_src}</div>'
+                )
+            else:
+                credit_html = (
+                    f'<div style="font-size:0.66rem; color:#8E8E93; '
+                    f'margin-top:0.25rem; margin-left:84px;">'
+                    f'Photo: {cr_name} · {cr_src}</div>'
+                )
+
         # Row container — markdown for the visual, Streamlit columns for buttons.
         st.markdown(
             f'<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
-            f'border-radius:6px; padding:0.7rem 1rem; margin-bottom:0.6rem; '
-            f'display:flex; align-items:center; gap:0.7rem;">'
+            f'border-radius:6px; padding:0.7rem 1rem; margin-bottom:0.6rem;">'
+            f'<div style="display:flex; align-items:center; gap:0.7rem;">'
             f'{thumb_html}'
             f'<span class="item-swatch" style="background:{swatch}"></span>'
             f'<span style="font-weight:500; color:#1C1917;">{it.get("name","—")}</span>'
             f'<span style="font-size:0.74rem; color:#6E6E73; margin-left:auto; text-align:right;">'
             f'{it.get("type","—")} · {it.get("formality","—")}'
             f'</span>'
+            f'</div>'
+            f'{credit_html}'
             f'</div>',
             unsafe_allow_html=True,
         )

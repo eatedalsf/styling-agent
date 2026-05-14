@@ -798,62 +798,127 @@ _DRAW_BY_TYPE = {
 
 # ── Real-photo fetcher (Unsplash Source, no API key) ─────
 
-def _fetch_real_photo(
-    query: str,
-    w: int = 400,
-    h: int = 500,
-    timeout: float = _FETCH_TIMEOUT,
-) -> bytes:
-    """
-    Fetch a real, keyword-matched product photo from Pexels.
-    Returns image bytes on success, empty bytes on any failure
-    (no API key, network error, no result, decode error, rate
-    limit). NEVER raises — the loader falls back to silhouette
-    on empty.
+# Per-type query suffixes — biased toward catalog / product / flat-lay
+# imagery. "clothing flat lay" and "product photo" are the two terms
+# that most reliably surface e-commerce-style shots on Pexels; "on
+# white background" reinforces the catalog look. Accessories and
+# shoes get their own tighter biases. The order matters — the loader
+# tries them in sequence and stops at the first non-empty result set.
+_QUERY_BIAS_BY_TYPE: Dict[str, Tuple[str, ...]] = {
+    "top":        ("clothing flat lay",  "product photo", ""),
+    "bottom":     ("clothing flat lay",  "product photo", ""),
+    "dress":      ("dress on hanger",    "product photo", ""),
+    "outerwear":  ("coat on hanger",     "product photo", ""),
+    "activewear": ("activewear flat lay","product photo", ""),
+    "shoes":      ("shoes product photo","studio shot",   ""),
+    "accessory":  ("product photo",      "studio shot",   ""),
+}
 
-    Why not free, no-key services?
-      * `source.unsplash.com/featured/...` — 503 since the 2024
-        Unsplash Source deprecation.
-      * loremflickr — returns random tag-matched photos. Tested
-        with "terracotta wrap dress" and got a cat statue. Loose
-        matching is worse than the silhouette renderer.
-      * picsum.photos — random photos, no keyword filter.
-      * Real Unsplash REST API — works but needs an API key too.
+# A "product shape" is approximately portrait, between 0.55 (tall and
+# narrow, e.g. dress on hanger) and 0.95 (near-square catalog tile)
+# in width/height ratio. Lifestyle / editorial portraits tend to be
+# narrower (people are tall) or much wider (landscape group shots
+# that slipped past the orientation filter). We rank candidates by
+# distance from the sweet spot 0.75, then take the closest.
+_PRODUCT_ASPECT_LOW   = 0.55
+_PRODUCT_ASPECT_HIGH  = 0.95
+_PRODUCT_ASPECT_IDEAL = 0.75
+_CANDIDATES_PER_SEARCH = 15
 
-    Pexels gives accurate keyword-matched fashion photos with a
-    free tier generous enough for a demo (200 req/h, 20 000 /
-    month). Set $env:PEXELS_API_KEY (Windows) or
-    `export PEXELS_API_KEY=...` (bash) and click Reload.
-    """
-    key = _pexels_api_key()
+
+def _pexels_search(query: str, key: str, per_page: int,
+                   timeout: float) -> list:
+    """Run one Pexels search. Returns the `photos` list (possibly empty)
+    on success, [] on any failure. Never raises."""
     if not key or not query:
-        return b""
-
+        return []
     params = {
         "query":       query.replace(",", " "),
-        "per_page":    1,
+        "per_page":    per_page,
         "orientation": "portrait",
     }
-    search_url = f"{_PEXELS_BASE}?{urllib.parse.urlencode(params)}"
+    url = f"{_PEXELS_BASE}?{urllib.parse.urlencode(params)}"
     try:
-        req = urllib.request.Request(search_url, headers={
+        req = urllib.request.Request(url, headers={
             "Authorization": key,
             "User-Agent":    _FETCH_UA,
             "Accept":        "application/json",
         })
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.loads(resp.read(2 * 1024 * 1024))
-        photos = data.get("photos") or []
-        if not photos:
-            return b""
-        # Take the medium-large URL (Pexels' "large" is 940 wide —
-        # plenty for our 400x500 cards).
-        src = photos[0].get("src") or {}
-        img_url = src.get("large") or src.get("medium") or src.get("original")
-        if not img_url:
-            return b""
+        return data.get("photos") or []
     except Exception:
-        return b""
+        return []
+
+
+def _score_candidate(photo: dict) -> float:
+    """Lower is better. Candidates whose aspect ratio falls outside the
+    product band [0.55, 0.95] get a large penalty so they only win
+    when nothing else is available."""
+    try:
+        w = float(photo.get("width") or 0)
+        h = float(photo.get("height") or 0)
+        if w <= 0 or h <= 0:
+            return 99.0
+        ratio = w / h
+    except Exception:
+        return 99.0
+    if ratio < _PRODUCT_ASPECT_LOW or ratio > _PRODUCT_ASPECT_HIGH:
+        return 10.0 + abs(ratio - _PRODUCT_ASPECT_IDEAL)
+    return abs(ratio - _PRODUCT_ASPECT_IDEAL)
+
+
+def _fetch_real_photo(
+    query: str,
+    w: int = 400,
+    h: int = 500,
+    timeout: float = _FETCH_TIMEOUT,
+    item_type: str = "",
+) -> Tuple[bytes, str, str]:
+    """
+    Fetch a real, keyword-matched product photo from Pexels.
+
+    Returns ``(image_bytes, photographer, photo_url)``. On any failure
+    (no key, network error, no result, decode error, rate limit) returns
+    ``(b"", "", "")`` — the loader falls back to silhouette.
+
+    Strategy:
+      1. Try the query with a product-bias suffix derived from item_type
+         ("clothing flat lay", "shoes product photo", etc.).
+      2. If that returns zero results, fall back to the raw query.
+      3. From the candidate pool, pick the photo whose aspect ratio is
+         closest to a typical e-commerce product tile (~0.75 portrait).
+         Wider lifestyle / model shots get a heavy penalty so they only
+         win when the query produced nothing else.
+
+    Pexels requires attribution; the returned photographer name + photo
+    page URL are stored on the wardrobe record so the UI can render
+    "Photo: <Name> · Pexels" under each demo card.
+    """
+    key = _pexels_api_key()
+    if not key or not query:
+        return b"", "", ""
+
+    biases = _QUERY_BIAS_BY_TYPE.get((item_type or "").lower(),
+                                      ("product photo", ""))
+
+    candidates: list = []
+    for bias in biases:
+        q = f"{query} {bias}".strip() if bias else query
+        photos = _pexels_search(q, key, _CANDIDATES_PER_SEARCH, timeout)
+        if photos:
+            candidates = photos
+            break
+    if not candidates:
+        return b"", "", ""
+
+    # Rank by aspect-ratio fit; take the best.
+    candidates.sort(key=_score_candidate)
+    best = candidates[0]
+    src = best.get("src") or {}
+    img_url = src.get("large") or src.get("medium") or src.get("original")
+    if not img_url:
+        return b"", "", ""
 
     try:
         req = urllib.request.Request(img_url, headers={
@@ -861,14 +926,21 @@ def _fetch_real_photo(
             "Accept":     "image/jpeg, image/png, image/webp",
         })
         with urllib.request.urlopen(req, timeout=timeout) as resp:
-            return resp.read(4 * 1024 * 1024)
+            raw = resp.read(4 * 1024 * 1024)
     except Exception:
-        return b""
+        return b"", "", ""
+
+    photographer = (best.get("photographer") or "").strip()
+    photo_url    = (best.get("url") or "").strip()
+    return raw, photographer, photo_url
 
 
 # Back-compat alias — old callers / tests might still import the
-# Unsplash name; map it to the new working implementation.
-_fetch_unsplash_photo = _fetch_real_photo
+# Unsplash name; map it to the new working implementation. Drops the
+# attribution tuple for the legacy bytes-only signature.
+def _fetch_unsplash_photo(query: str, w: int = 400, h: int = 500,
+                          timeout: float = _FETCH_TIMEOUT) -> bytes:
+    return _fetch_real_photo(query, w, h, timeout)[0]
 
 
 def _resize_for_card(
@@ -1030,31 +1102,36 @@ def _generate_card_image(
     return out.getvalue()
 
 
-def _save_card(item: Dict[str, Any], use_photos: bool = True) -> Tuple[str, str]:
+def _save_card(item: Dict[str, Any], use_photos: bool = True
+               ) -> Tuple[str, str, str, str]:
     """
-    Save a card image for a demo item. Returns (relative_path, source)
-    where source is one of:
-      - "photo"       → real Unsplash photo, resized + cached
-      - "silhouette"  → fall-back PIL illustration
-      - ""            → save failed entirely (path is also empty)
+    Save a card image for a demo item. Returns
+    ``(relative_path, source, photographer, photo_url)`` where:
+      - source ∈ {"photo", "silhouette", ""}
+      - photographer / photo_url are populated only when source=="photo"
+        so the UI can render "Photo: <Name> · Pexels" attribution.
 
-    When `use_photos=True` (default), tries Unsplash first using
-    item["unsplash_query"]. On any failure (no query, network error,
-    decode error, resize error), falls back to the silhouette
-    renderer — the demo still loads, just without that one photo.
+    When `use_photos=True` (default), tries Pexels first using
+    item["unsplash_query"] biased by item["type"]. On any failure,
+    falls back to the silhouette renderer.
     """
     os.makedirs(WARDROBE_IMAGES_DIR, exist_ok=True)
     item_id = item.get("id", "")
     if not item_id:
-        return "", ""
+        return "", "", "", ""
 
     png_bytes = b""
     source = ""
+    photographer = ""
+    photo_url = ""
 
     # `unsplash_query` is the canonical field name on each demo
     # item; the keywords drive whichever real-photo source we use.
     if use_photos and item.get("unsplash_query"):
-        raw = _fetch_real_photo(item["unsplash_query"])
+        raw, photographer, photo_url = _fetch_real_photo(
+            item["unsplash_query"],
+            item_type=item.get("type", ""),
+        )
         if raw:
             png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
             if png_bytes:
@@ -1064,17 +1141,19 @@ def _save_card(item: Dict[str, Any], use_photos: bool = True) -> Tuple[str, str]
         png_bytes = _generate_card_image(item)
         if png_bytes:
             source = "silhouette"
+            photographer = ""
+            photo_url = ""
 
     if not png_bytes:
-        return "", ""
+        return "", "", "", ""
 
     out_path = os.path.join(WARDROBE_IMAGES_DIR, f"{item_id}.png")
     try:
         with open(out_path, "wb") as f:
             f.write(png_bytes)
     except OSError:
-        return "", ""
-    return f"wardrobe_images/{item_id}.png", source
+        return "", "", "", ""
+    return f"wardrobe_images/{item_id}.png", source, photographer, photo_url
 
 
 # ── Loader / unloader ─────────────────────────────────────
@@ -1216,7 +1295,7 @@ def load_demo_wardrobe(
             items_to_render.append(item)
             new_items.append(item)
 
-    render_results: Dict[str, Tuple[str, str]] = {}
+    render_results: Dict[str, Tuple[str, str, str, str]] = {}
     if items_to_render:
         with ThreadPoolExecutor(max_workers=_PARALLEL_FETCH) as pool:
             futures = {
@@ -1228,7 +1307,7 @@ def load_demo_wardrobe(
                 try:
                     render_results[iid] = fut.result()
                 except Exception:
-                    render_results[iid] = ("", "")
+                    render_results[iid] = ("", "", "", "")
 
     # Now apply the results in the original (deterministic) order.
     for item in all_seed_items:
@@ -1242,19 +1321,34 @@ def load_demo_wardrobe(
         if iid in existing_ids:
             skipped.append(iid)
             if regenerate_images:
-                new_path, source = render_results.get(iid, ("", ""))
+                new_path, source, photographer, photo_url = \
+                    render_results.get(iid, ("", "", "", ""))
                 if new_path:
                     refreshed.append(iid)
                     if source == "photo":
                         photo_count += 1
                     elif source == "silhouette":
                         silhouette_count += 1
+                    # Update attribution on the existing record.
+                    for sec in ("clothing", "shoes", "accessories"):
+                        for rec in overlay.get(sec, []):
+                            if isinstance(rec, dict) and rec.get("id") == iid:
+                                if source == "photo" and photographer:
+                                    rec["photo_credit_name"]   = photographer
+                                    rec["photo_credit_url"]    = photo_url
+                                    rec["photo_credit_source"] = "Pexels"
+                                else:
+                                    rec.pop("photo_credit_name", None)
+                                    rec.pop("photo_credit_url", None)
+                                    rec.pop("photo_credit_source", None)
+                                break
                 else:
                     img_err.append(iid)
             continue
 
         # New-item path.
-        image_path, source = render_results.get(iid, ("", ""))
+        image_path, source, photographer, photo_url = \
+            render_results.get(iid, ("", "", "", ""))
         if not image_path:
             img_err.append(iid)
         else:
