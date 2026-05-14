@@ -919,10 +919,22 @@ _PERSON_TOKENS = {
     "female", "male", "she ", "he ",
     "selfie", "shoot", "fashion shoot", "street style", "street-style",
     "muscular", "fitness model",
-    # Body-part close-ups — "hands in a jacket", "feet in heels" etc.
-    # These are person-centric even without naming the person.
+    # Body-part close-ups — "hands in a jacket", "feet in heels",
+    # "hand holding shoes" etc. Person-centric even without naming
+    # the person.
     "hands in", "hand in", "feet in", "foot in", "legs in", "leg in",
     "neck in", "arms in", "arm in", "torso", "waist of",
+    "hand holding", "hands holding", "holding shoes", "holding a",
+    "holding the",
+    # Influencer / presenter / dancer alts — common Pexels lifestyle
+    # category that v6 missed: "fashion vlogger presents", "ballerina
+    # holding shoes", etc.
+    "vlogger", "blogger", "influencer", "ballerina", "dancer",
+    "presents", "presenting", "showcases a", "showcasing a",
+    # Age-mismatch cues — children's/baby/kid alts pollute the adult
+    # wardrobe demo. "Cute children's blouse" sneaked past v6.
+    "child", "children", "children's", "childs", "baby", "babies",
+    "kid", "kids", "kid's", "teen", "teenager", "teenagers",
 }
 
 # Tokens suggesting a SINGLE-product / catalog shot. Bonus when found.
@@ -938,13 +950,19 @@ _PRODUCT_TOKENS = {
 }
 
 # Per-type required category words. A candidate's alt MUST contain at
-# least one of these tokens or it is rejected outright (heavy penalty
-# returned as "category miss"). Synonyms are listed so a "sweater"
-# can stand in for "cardigan", etc.
+# least one of these tokens or it is rejected outright (+20 penalty,
+# "category miss"). Synonyms are listed so a "sweater" can stand in
+# for "cardigan", etc.
+#
+# CAREFUL with ambiguous words. "top" was originally in here but it
+# matched "Top view of scented candles" (Pexels alts very commonly
+# start with "Top view of"). Removed to prevent that false positive.
+# "flat" / "flats" are kept for shoes only — there's no off-category
+# reading. Same for "knit" (word-boundary regex blocks "knitting").
 _CATEGORY_TOKENS: Dict[str, Tuple[str, ...]] = {
-    "top":        ("blouse", "shirt", "top", "tee", "t-shirt", "sweater",
+    "top":        ("blouse", "shirt", "tee", "t-shirt", "sweater",
                    "cardigan", "knit", "camisole", "tunic", "polo",
-                   "turtleneck", "tank"),
+                   "turtleneck", "tank top"),
     "bottom":     ("trouser", "trousers", "pants", "pant", "jeans",
                    "skirt", "shorts", "chino", "chinos", "legging",
                    "leggings", "slacks"),
@@ -961,6 +979,39 @@ _CATEGORY_TOKENS: Dict[str, Tuple[str, ...]] = {
     "accessory":  ("scarf", "belt", "handbag", "bag", "tote", "clutch",
                    "necklace", "earring", "earrings", "hoop", "stud",
                    "chain", "accessory", "accessories"),
+}
+
+# Non-garment props common in lifestyle flat lays. When a garment is
+# the named category match BUT one of these props also appears, the
+# photo's main subject is probably the prop (a flat lay sells the
+# mood, not the garment). Heavy penalty.
+_PROP_TOKENS = {
+    # Personal-care
+    "skincare", "perfume", "fragrance", "cosmetic", "cosmetics",
+    "makeup", "lipstick", "mascara", "lotion", "moisturizer",
+    # Decorative
+    "candle", "candles", "bouquet", "roses", "rose petals",
+    "flower", "flowers", "petal", "petals",
+    "plant", "plants", "leafy",
+    "vase", "tray",
+    # Food / drink
+    "coffee", "tea", "teacup", "mug", "wine glass", "wine glasses",
+    "champagne", "cocktail",
+    # Stationery / lifestyle
+    "magazine", "magazines", "book", "books", "notebook", "notebooks",
+    "art supplies", "instant camera",
+    # Tech
+    "earphone", "earphones", "headphones", "smartphone",
+    "yoga mat", "wedding ring", "wedding rings",
+    # Containers (very common prop in skincare-flat-lay alts)
+    "container", "containers", "bottle", "bottles", "jar", "jars",
+    # Wedding/bridal context — implicitly white, conflicts with most
+    # demo items (DM-D006 black dress picked "wedding dress in bridal
+    # shop"). Penalize unless the item itself is white/ivory/cream.
+    # (Implementation note: the prop check fires unconditionally; if
+    # the alt color also matches the item family, the bonuses can
+    # outweigh.)
+    "wedding", "bridal", "wedding dress",
 }
 
 # Tokens suggesting MULTIPLE separate garments in one photo — heavy
@@ -1050,6 +1101,13 @@ _DISJOINT_COLOR_FAMILIES = (
      {"burgundy", "bordeaux", "wine", "maroon", "red"}),
     ({"black"},
      {"pink", "rose", "blush"}),
+    # Burgundy / wine / oxblood items vs the white/ivory family.
+    ({"burgundy", "bordeaux", "wine", "maroon", "oxblood"},
+     {"white", "ivory", "cream", "off-white"}),
+    # Camel / tan / beige vs orange/red (DM-B002 picked an orange
+    # jacket as a camel trouser).
+    ({"camel", "tan", "beige"},
+     {"orange", "red", "scarlet"}),
     ({"camel", "tan", "beige"},
      {"black", "navy", "burgundy", "wine"}),
     ({"red", "burgundy", "wine", "bordeaux"},
@@ -1202,6 +1260,17 @@ def _alt_analysis(alt: str, item: Dict[str, Any]) -> Dict[str, Any]:
         bonus += 1.0 + 0.5 * min(3, len(product_hits))
         reasons.append(f"product cue ({product_hits[0]})")
 
+    # Prop penalty — when the alt names lifestyle props (skincare,
+    # candles, bouquets, plants, books, coffee, etc.) alongside the
+    # garment, the photo's main subject is almost certainly the
+    # prop / mood, not the garment we want for the demo card.
+    prop_hits = [t for t in _PROP_TOKENS if t in a]
+    if prop_hits:
+        # +5 per prop, capped at +10. Two props in one alt is enough
+        # to push a borderline candidate over the confidence threshold.
+        penalty += min(10.0, 5.0 * len(prop_hits))
+        reasons.append(f"lifestyle prop ({', '.join(prop_hits[:2])})")
+
     return {
         "penalty":        penalty,
         "bonus":          bonus,
@@ -1264,10 +1333,42 @@ def _score_candidate(photo: dict, item_type: str = "",
 
 # Confidence threshold: if the best candidate's score is above this,
 # the alt-text checks flagged the photo as bad — fall back to the
-# silhouette renderer rather than ship a wrong image. The value was
-# tuned against the live probe so clean product shots score ≤ 1.0
-# while typical person-focused shots score > 5.0.
-_CONFIDENCE_THRESHOLD = 4.0
+# silhouette renderer rather than ship a wrong image.
+# Tuned against probe v5 + v6 with prop penalty:
+#   clean product / hanger / single-item shots score ≤ 0
+#   single-item with one weak issue scores 0.5 – 1.5
+#   props + lifestyle scores ≥ 3
+#   person / multi-garment scores ≥ 5
+# Set to 1.5 for demo-grade strictness — better to show a silhouette
+# than a flat lay where skincare bottles share the frame with the top.
+_CONFIDENCE_THRESHOLD = 1.5
+
+
+# Photo-ID dedup. Prevents the same Pexels photo from being assigned
+# to multiple wardrobe items (the v3 loader assigned ONE skincare
+# flat lay to three different items, because that photo passed basic
+# checks for top / linen tee / midi skirt). Reset at the start of
+# every load_demo_wardrobe call.
+import threading as _threading
+_used_photo_ids: set = set()
+_used_photo_lock = _threading.Lock()
+
+
+def _reset_used_photo_ids() -> None:
+    """Reset the dedup set; called by load_demo_wardrobe."""
+    global _used_photo_ids
+    with _used_photo_lock:
+        _used_photo_ids = set()
+
+
+def _claim_photo_id(pid) -> bool:
+    """Atomically claim a Pexels photo id. Returns True if newly
+    claimed, False if already taken by another item this load."""
+    with _used_photo_lock:
+        if pid in _used_photo_ids:
+            return False
+        _used_photo_ids.add(pid)
+        return True
 
 
 def _fetch_real_photo(
@@ -1333,14 +1434,25 @@ def _fetch_real_photo(
     # Rank by combined aspect-ratio + alt-text scoring.
     pooled.sort(key=lambda p: _score_candidate(p, item_type,
                                                  item_for_scoring))
-    best = pooled[0]
-    best_score = _score_candidate(best, item_type, item_for_scoring)
 
-    # Confidence guard: if even the BEST candidate scores worse than
-    # the threshold, every candidate failed at least one alt-text
-    # check (person photo, multi-garment, wrong color, off-category).
-    # Reject the pool entirely so the loader falls back to silhouette.
-    if best_score > _CONFIDENCE_THRESHOLD:
+    # Walk candidates in score order; take the first one that
+    #   (a) passes the confidence threshold, AND
+    #   (b) hasn't been claimed by another item this load.
+    # If no candidate satisfies both, fall back to silhouette.
+    best = None
+    best_score = 99.0
+    for cand in pooled:
+        score = _score_candidate(cand, item_type, item_for_scoring)
+        if score > _CONFIDENCE_THRESHOLD:
+            # All remaining candidates score worse (sorted) — stop.
+            break
+        pid = cand.get("id")
+        if pid is None or not _claim_photo_id(pid):
+            continue
+        best = cand
+        best_score = score
+        break
+    if best is None:
         return b"", "", ""
 
     src = best.get("src") or {}
@@ -1754,6 +1866,11 @@ def load_demo_wardrobe(
 
     User-added items (UC### / US### / UA###) are NEVER touched.
     """
+    # Reset the photo-id dedup set so each load starts fresh. Without
+    # this, a second load in the same Python process could see all
+    # photos as "already taken" and silhouette every item.
+    _reset_used_photo_ids()
+
     try:
         seed = _load_demo_seed()
     except Exception as e:
