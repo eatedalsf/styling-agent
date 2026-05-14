@@ -2,6 +2,13 @@
 
 *The app reads the fit profile every run; this chapter explains how body-positive personalization is encoded and enforced.*
 
+> The *styling knowledge* behind this chapter lives in Part II:
+> [§S2 · Silhouette and fit](S2-silhouette-and-fit.md) explains why
+> proportion-related styling enters the agent as user-declared
+> preference, never as classification;
+> [§S8 · Body-positive framing as a discipline](S8-body-positive-framing.md)
+> explains the language contract enforced in code.
+
 This is the **body-positive** chapter. The language and the logic both matter — the way Wearly talks about the user's body is part of the product.
 
 ## What the fit profile is

@@ -2,6 +2,12 @@
 
 *The app reads two external context sources; this chapter explains how each one steers the recommendation.*
 
+> The *styling knowledge* behind context is taught in Part II:
+> [§S3 · Occasion and context](S3-occasion-and-context.md) explains
+> why five canonical occasion tags is the minimum useful taxonomy;
+> [§S4 · Weather and layering](S4-weather-and-layering.md) explains
+> the temperature bands and the <60°F outerwear threshold.
+
 Two external context streams enter the agent every run. This chapter documents both.
 
 ## Calendar

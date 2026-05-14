@@ -2,6 +2,12 @@
 
 *The app filters and builds outfits from this data model; this chapter explains how items become candidates and candidates become outfits.*
 
+> The *styling knowledge* the construction rules apply is taught in
+> Part II: [§S5 · Wardrobe construction](S5-wardrobe-construction.md)
+> covers required pieces, dress-vs-separates, and the accessory cap;
+> [§S6 · Rotation and freshness](S6-rotation-and-freshness.md) covers
+> the tie-breaker that picks among equally-eligible items.
+
 How Wearly models, filters, and reasons about the user's actual closet.
 
 ## Item model

@@ -2,6 +2,11 @@
 
 *The app surfaces gaps when an occasion needs a piece you don't own; this chapter explains the gap-detection logic and its body-positive tone rules.*
 
+> The *styling knowledge* behind gaps is taught in
+> [§S7 · Honest gaps](S7-honest-gaps.md) — the qualified-gap rule,
+> the descriptive-not-promotional tone, and the "honest gaps over
+> forced fits" principle.
+
 When Wearly says *"you don't own this yet,"* that's a deliberate design decision, not a missing feature. This chapter explains the logic.
 
 ## When a gap is detected

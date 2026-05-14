@@ -2,6 +2,14 @@
 
 *The app runs this loop every time you tap "Plan today's outfit"; this chapter explains why the seven steps are shaped the way they are.*
 
+> Each step consumes a piece of styling knowledge taught in Part II:
+> Step 1 reads occasion ([§S3](S3-occasion-and-context.md)),
+> Step 3 reads weather ([§S4](S4-weather-and-layering.md)),
+> Step 5 builds the outfit ([§S5](S5-wardrobe-construction.md))
+> using rotation ([§S6](S6-rotation-and-freshness.md)),
+> Step 6 detects gaps ([§S7](S7-honest-gaps.md)),
+> and Step 7 scores color ([§S1](S1-color-and-skin-tone.md)).
+
 This is the most important chapter. It documents the seven-step reasoning loop that runs every time the user taps **"Plan today's outfit →"**.
 
 The implementation lives in `styling_agent.py` · `run_agent()`. The per-step decision flow is in `workflow_diagram.md`. This chapter explains *why* the workflow is shaped the way it is.

@@ -135,7 +135,7 @@ extra:
 nav:
   - Home: index.md
 
-  - The Book:
+  - The Book — Part I · The Wearly Agent:
     - Overview: book/index.md
     - "01 · Product vision": book/01-vision.md
     - "02 · User problem": book/02-user-problem.md
@@ -148,6 +148,18 @@ nav:
     - "09 · Before / after demo": book/09-before-after-demo.md
     - "10 · Privacy & security": book/10-privacy-security.md
     - "11 · Product roadmap": book/11-product-roadmap.md
+
+  - The Book — Part II · Styling Rule Reference:
+    - "S1 · Color and skin tone": book/S1-color-and-skin-tone.md
+    - "S2 · Silhouette and fit": book/S2-silhouette-and-fit.md
+    - "S3 · Occasion and context": book/S3-occasion-and-context.md
+    - "S4 · Weather and layering": book/S4-weather-and-layering.md
+    - "S5 · Wardrobe construction": book/S5-wardrobe-construction.md
+    - "S6 · Rotation and freshness": book/S6-rotation-and-freshness.md
+    - "S7 · Honest gaps": book/S7-honest-gaps.md
+    - "S8 · Body-positive framing": book/S8-body-positive-framing.md
+
+  - The Book — Part III · Evidence & provenance:
     - "12 · Evidence & references": book/12-evidence-and-references.md
 
   - Reference:

@@ -2,6 +2,19 @@
 
 *The app applies these rules at runtime; this chapter is the reference layer that explains each rule pack and the data it reads.*
 
+> **Entry point to Part II.** This chapter is the structural map of
+> what Wearly knows. Each rule system below is taught in its own Part-II
+> chapter, learner-first, with the evidence behind it:
+>
+> - Color → [§S1 · Color and skin tone](S1-color-and-skin-tone.md)
+> - Silhouette / fit → [§S2 · Silhouette and fit](S2-silhouette-and-fit.md)
+> - Occasion → [§S3 · Occasion and context](S3-occasion-and-context.md)
+> - Weather / layering → [§S4 · Weather and layering](S4-weather-and-layering.md)
+> - Construction → [§S5 · Wardrobe construction](S5-wardrobe-construction.md)
+> - Rotation → [§S6 · Rotation and freshness](S6-rotation-and-freshness.md)
+> - Gaps → [§S7 · Honest gaps](S7-honest-gaps.md)
+> - Body-positive framing → [§S8 · Body-positive framing as a discipline](S8-body-positive-framing.md)
+
 Wearly's decisions aren't learned from photos — they're driven by a small, **inspectable knowledge base**. This chapter documents what's in it and why.
 
 ## Three rule systems

@@ -98,11 +98,9 @@ These are deliberate scope choices; see [`book/04-styling-knowledge-base.md`](..
 
 ## Linked concept
 
-- *Learning-graph concept:* **[color harmony rules](../learning-graph/index.md)**
-  (id `color-harmony`, Bloom level *Apply*).
-- *Rule citations:* `[color-coordination-rules#R1]`,
-  `[color-coordination-rules#R2]` — see
-  [`color-coordination-rules.md`](../../../skills/wearly-styling-agent/color-coordination-rules.md).
+- *Styling-rule reference chapter:* **[§S1 · Color and skin tone](../../../book/S1-color-and-skin-tone.md)** — the styling knowledge this sim makes touchable.
+- *Learning-graph concept:* **[color harmony rules](../learning-graph/index.md)** (id `color-harmony`, Bloom level *Apply*).
+- *Rule citations:* `[color-coordination-rules#R1]`, `[color-coordination-rules#R2]` — see [`color-coordination-rules.md`](../../../skills/wearly-styling-agent/color-coordination-rules.md).
 
 ---
 

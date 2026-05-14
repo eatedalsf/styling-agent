@@ -100,8 +100,6 @@ runtime is also a sim, not just a paragraph.
 
 ## Linked concept
 
-- *Learning-graph concept:* **[freshness score (0.4 floor)](../learning-graph/index.md)**
-  (id `freshness-score`, Bloom level *Analyze*).
-- *Rule citations:* `[wear-history-rules#R2]`,
-  `[wear-history-rules#R4]` — see
-  [`wear-history-rules.md`](../../../skills/wearly-styling-agent/wear-history-rules.md).
+- *Styling-rule reference chapter:* **[§S6 · Rotation and freshness](../../../book/S6-rotation-and-freshness.md)** — the styling knowledge this sim makes touchable.
+- *Learning-graph concept:* **[freshness score (0.4 floor)](../learning-graph/index.md)** (id `freshness-score`, Bloom level *Analyze*).
+- *Rule citations:* `[wear-history-rules#R2]`, `[wear-history-rules#R4]` — see [`wear-history-rules.md`](../../../skills/wearly-styling-agent/wear-history-rules.md).
