@@ -3914,85 +3914,91 @@ def _render_wardrobe():
         load_demo_wardrobe = unload_demo_wardrobe = None  # type: ignore
 
     if load_demo_wardrobe is not None:
-        # Auto-expanded when the demo isn't loaded yet, so the
-        # "Load demo wardrobe" button is immediately visible —
-        # the previous default (collapsed) was easy to miss.
-        # Collapses to a quiet expander after loading so the
-        # active Wardrobe page isn't dominated by it.
-        with st.expander(
-            ("Demo wardrobe (loaded — 48 curated items)"
-             if _demo_active
-             else "✨  Demo wardrobe — load 48 curated items in one click"),
-            expanded=(not _demo_active),
-        ):
-            st.markdown(
-                "<div style='font-size:0.82rem; color:#2E2E2E; "
-                "line-height:1.55; margin-bottom:0.7rem;'>"
-                "One click adds 48 curated wardrobe pieces — tops, "
-                "bottoms, dresses, outerwear, activewear, shoes, "
-                "accessories — across work / smart-casual / casual / "
-                "weekend / gym / dinner / formal / travel. Each item "
-                "carries fabric, silhouette, and body-positive style "
-                "notes so the agent can demo skin-tone, fit, and "
-                "modesty reasoning out of the box. A polished colored "
-                "card image is generated for each item locally — "
-                "nothing fetched from a retailer at runtime."
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            cols = st.columns([1, 1], gap="small")
-            with cols[0]:
-                if st.button(
-                    "↻ Reload demo wardrobe" if _demo_active else "Load demo wardrobe",
-                    key="demo_load_btn",
-                    type="primary", use_container_width=True,
-                ):
-                    with st.spinner("Loading demo wardrobe + generating card images…"):
-                        res = load_demo_wardrobe()
-                    if res.get("error"):
-                        st.error(res["error"])
-                    else:
-                        if res["added"]:
-                            st.success(
-                                f"Added {len(res['added'])} demo items. "
-                                f"Skipped {len(res['skipped'])} (already loaded). "
-                                f"Wardrobe now totals {res['total_after']}."
-                            )
-                        else:
-                            st.info(
-                                f"Demo already fully loaded — "
-                                f"{len(res['skipped'])} item(s) already present."
-                            )
-                        if res.get("image_errors"):
-                            st.warning(
-                                f"Could not render card image for "
-                                f"{len(res['image_errors'])} item(s). They still "
-                                "load — just without a thumbnail."
-                            )
-                        st.rerun()
-            with cols[1]:
-                if _demo_active:
-                    if st.button(
-                        "Remove demo wardrobe",
-                        key="demo_unload_btn",
-                        use_container_width=True,
-                        help="Removes every DM-* item and its card image. Your own added pieces stay.",
-                    ):
-                        with st.spinner("Removing demo items…"):
-                            ur = unload_demo_wardrobe()
-                        if ur.get("error"):
-                            st.error(ur["error"])
-                        else:
-                            st.success(
-                                f"Removed {len(ur['removed'])} demo items. "
-                                "Your own added items are untouched."
-                            )
-                            st.rerun()
+        # Always-visible card (not an expander) — the previous
+        # collapsed expander was missed twice. This sits at the very
+        # top of the Wardrobe page, above Backup & Restore.
+        st.markdown(
+            "<div style='background:#FFFFFF; border:2px solid #111111; "
+            "border-radius:8px; padding:1.25rem 1.4rem 1.05rem; "
+            "margin-bottom:1.1rem; box-shadow:0 1px 0 rgba(0,0,0,0.04);'>"
+            "<div style='font-size:0.66rem; color:#8E8E93; "
+            "letter-spacing:0.14em; text-transform:uppercase; "
+            "font-weight:600; margin-bottom:0.35rem;'>"
+            + ("Demo wardrobe loaded" if _demo_active else "Demo wardrobe")
+            + "</div>"
+            "<div style='font-family:\"DM Serif Display\",serif; "
+            "font-size:1.35rem; color:#1C1917; line-height:1.15; "
+            "margin-bottom:0.4rem;'>"
+            + ("48 curated demo items in your closet"
+               if _demo_active else
+               "Load 48 curated items in one click")
+            + "</div>"
+            "<div style='font-size:0.84rem; color:#6E6E73; "
+            "line-height:1.55;'>"
+            "Tops, bottoms, dresses, outerwear, activewear, shoes, "
+            "and accessories across work / smart-casual / casual / "
+            "weekend / gym / dinner / formal / travel. Each item "
+            "carries fabric, silhouette, and body-positive style "
+            "notes so the agent can demo skin-tone, fit, and "
+            "modesty reasoning. Polished colored card images "
+            "generated locally — nothing fetched at runtime."
+            "</div></div>",
+            unsafe_allow_html=True,
+        )
+        cols = st.columns([1, 1], gap="small")
+        with cols[0]:
+            if st.button(
+                "↻ Reload demo wardrobe" if _demo_active else "Load demo wardrobe",
+                key="demo_load_btn",
+                type="primary", use_container_width=True,
+            ):
+                with st.spinner("Loading demo wardrobe + generating card images…"):
+                    res = load_demo_wardrobe()
+                if res.get("error"):
+                    st.error(res["error"])
                 else:
-                    st.caption(
-                        "Once loaded, a button to remove the demo set appears here. "
-                        "User-added items are never affected."
-                    )
+                    if res["added"]:
+                        st.success(
+                            f"Added {len(res['added'])} demo items. "
+                            f"Skipped {len(res['skipped'])} (already loaded). "
+                            f"Wardrobe now totals {res['total_after']}."
+                        )
+                    else:
+                        st.info(
+                            f"Demo already fully loaded — "
+                            f"{len(res['skipped'])} item(s) already present."
+                        )
+                    if res.get("image_errors"):
+                        st.warning(
+                            f"Could not render card image for "
+                            f"{len(res['image_errors'])} item(s). They still "
+                            "load — just without a thumbnail."
+                        )
+                    st.rerun()
+        with cols[1]:
+            if _demo_active:
+                if st.button(
+                    "Remove demo wardrobe",
+                    key="demo_unload_btn",
+                    use_container_width=True,
+                    help=("Removes every DM-* item and its card image. "
+                          "Your own added pieces stay."),
+                ):
+                    with st.spinner("Removing demo items…"):
+                        ur = unload_demo_wardrobe()
+                    if ur.get("error"):
+                        st.error(ur["error"])
+                    else:
+                        st.success(
+                            f"Removed {len(ur['removed'])} demo items. "
+                            "Your own added items are untouched."
+                        )
+                        st.rerun()
+            else:
+                st.caption(
+                    "Once loaded, a button to remove the demo set "
+                    "appears here. User-added items are never affected."
+                )
 
     # ── Backup & Restore ────────────────────────────────────────
     # The persistence path. On localhost, files persist on disk and the
