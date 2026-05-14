@@ -5195,6 +5195,290 @@ def _render_measurement_analysis_panel(profile: dict, measurements: dict) -> Non
         st.rerun()
 
 
+def _render_fit_profile_chooser() -> None:
+    """
+    Three-card chooser shown when the user has not yet picked a path
+    through the fit-profile setup. Sets `fit_profile_mode` in the
+    profile overlay and reruns. Until a mode is chosen, nothing else
+    in the fit-profile area renders — body shape, predicted sizes,
+    and measurement suggestions are gated behind this choice so they
+    never appear contradictory.
+    """
+    try:
+        from fit_tool import save_fit_profile
+    except Exception:
+        return
+
+    st.markdown(
+        '<div style="background:#FFFFFF; border:2px solid #111111; '
+        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
+        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+        'Fit profile · choose your path</div>'
+        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
+        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
+        'How would you like to share your fit preferences?'
+        '</div>'
+        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+        "Every path is optional and editable. Wearly never displays "
+        "body-shape or size predictions until you choose how you want "
+        "to set them up. Body-positive vocabulary is enforced "
+        "throughout <code style='font-size:0.74rem;'>"
+        "[fit-silhouette-rules#R1, #R8]</code>."
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    cols = st.columns(3, gap="medium")
+    with cols[0]:
+        st.markdown(
+            '<div style="font-family:\'DM Serif Display\',serif; '
+            'font-size:1.15rem; color:#111111; line-height:1.15; '
+            'margin-bottom:0.4rem;">Use body measurements</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
+            'margin-bottom:0.85rem;">'
+            "Enter bust / waist / hips. Wearly will suggest a body-shape "
+            "preference and styling fields. Predicted sizes appear here."
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Use measurements →",
+                      key="fit_mode_btn_measurements",
+                      type="primary", use_container_width=True):
+            r = save_fit_profile({"fit_profile_mode": "measurements"})
+            if r.get("success"):
+                st.rerun()
+            else:
+                st.error(r.get("error", "Could not save mode."))
+
+    with cols[1]:
+        st.markdown(
+            '<div style="font-family:\'DM Serif Display\',serif; '
+            'font-size:1.15rem; color:#111111; line-height:1.15; '
+            'margin-bottom:0.4rem;">Choose body shape manually</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
+            'margin-bottom:0.85rem;">'
+            "Pick a body-shape preference from a list. Wearly will "
+            "suggest highlight / balance / fit fields based on your "
+            "choice. No measurements needed."
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Choose manually →",
+                      key="fit_mode_btn_manual",
+                      use_container_width=True):
+            r = save_fit_profile({"fit_profile_mode": "manual"})
+            if r.get("success"):
+                st.rerun()
+
+    with cols[2]:
+        st.markdown(
+            '<div style="font-family:\'DM Serif Display\',serif; '
+            'font-size:1.15rem; color:#111111; line-height:1.15; '
+            'margin-bottom:0.4rem;">Skip for now</div>'
+            '<div style="font-size:0.8rem; color:#6E6E73; line-height:1.55; '
+            'margin-bottom:0.85rem;">'
+            "Use only your general style preferences. No body-shape "
+            "analysis, no predicted sizes, no measurement suggestions. "
+            "You can switch paths anytime."
+            '</div>',
+            unsafe_allow_html=True,
+        )
+        if st.button("Skip for now",
+                      key="fit_mode_btn_skip",
+                      use_container_width=True):
+            r = save_fit_profile({"fit_profile_mode": "skip"})
+            if r.get("success"):
+                st.rerun()
+
+
+def _render_fit_profile_manual_panel(profile: dict) -> None:
+    """
+    "Choose body shape manually" path. Shows a body-shape selector
+    (hourglass / pear / rectangle / inverted triangle / apple / not
+    sure) and, once the user picks one, R8-grounded suggestion chips
+    labeled "Based on your selected body-shape preference" — never
+    "Suggested from measurements".
+
+    Manual mode never reads or runs predict_body_shape; the user's
+    declared shape is final.
+    """
+    try:
+        from fit_tool import save_fit_profile
+        from profile_inference import (
+            suggest_profile_from_shape, apply_suggestions,
+        )
+    except Exception:
+        return
+
+    # Card header
+    st.markdown(
+        '<div style="background:#FFFFFF; border:2px solid #111111; '
+        'border-radius:8px; padding:1.5rem 1.6rem 1.3rem; margin-bottom:1.1rem; '
+        'box-shadow:0 1px 0 rgba(0,0,0,0.04);">'
+        '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+        'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+        'Fit profile · manual selection</div>'
+        '<div style="font-family:\'DM Serif Display\',serif; font-size:1.45rem; '
+        'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
+        'Choose a body-shape preference'
+        '</div>'
+        '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+        "Body-shape labels are an industry heuristic, not a scientific "
+        "taxonomy. Wearly uses them only as a proxy for proportion-"
+        "related styling suggestions. Suggestions cite "
+        "<code style='font-size:0.74rem;'>[fit-silhouette-rules#R8]</code>."
+        '</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    _SHAPE_OPTIONS = [
+        "not sure",
+        "hourglass",
+        "pear",
+        "rectangle",
+        "inverted triangle",
+        "apple",
+    ]
+    current_shape = (profile.get("body_shape") or "").lower().strip()
+    if current_shape not in _SHAPE_OPTIONS:
+        current_shape = "not sure"
+
+    cols = st.columns([2, 3], gap="medium")
+    with cols[0]:
+        picked = st.selectbox(
+            "Body-shape preference",
+            options=_SHAPE_OPTIONS,
+            index=_SHAPE_OPTIONS.index(current_shape),
+            key="fit_manual_shape",
+            help="Pick the proportion preference closest to yours. "
+                 "Edit anytime. 'Not sure' = no suggestions shown.",
+        )
+    with cols[1]:
+        st.markdown(
+            "<div style='font-size:0.78rem; color:#6E6E73; "
+            "line-height:1.55; padding-top:0.35rem;'>"
+            "Selected: <strong>" + picked.title() + "</strong> · "
+            "manually chosen by you, not predicted by Wearly. "
+            "Source basis: "
+            "<code style='font-size:0.74rem;'>"
+            "[fit-silhouette-rules#R8]</code>."
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Persist the user's choice immediately (so a refresh preserves it).
+    if picked != current_shape:
+        if picked == "not sure":
+            save_fit_profile({"body_shape": None,
+                              "_body_shape_source": None})
+        else:
+            save_fit_profile({"body_shape": picked,
+                              "_body_shape_source": "user"})
+        st.rerun()
+
+    if picked == "not sure":
+        st.info(
+            "Pick a body-shape preference above to see suggestions. "
+            "You can also switch to the measurements path or skip — "
+            "use the reset button below."
+        )
+        return
+
+    # Generate suggestion chips for the selected shape.
+    result = suggest_profile_from_shape(picked, profile)
+    if not result.get("available"):
+        return
+
+    suggestions = result.get("suggestions", {})
+
+    # Per-field chips with checkboxes — identical UX to the
+    # measurements panel, but labels surface "manual selection" not
+    # "from measurements".
+    _CONF_COLOR = {
+        "user-selected":       "#1D6033",
+        "based-on-selection":  "#7D5A00",
+        "high":                "#1D6033",
+        "medium":              "#7D5A00",
+        "low":                 "#7A1D21",
+    }
+    selected: list = []
+
+    def _chip(field_key: str, label: str, sug: dict) -> bool:
+        value_str = sug.get("value") or ", ".join(sug.get("values") or [])
+        conf = sug.get("confidence", "based-on-selection")
+        conf_color = _CONF_COLOR.get(conf, "#6E6E73")
+        cols2 = st.columns([0.6, 5], gap="medium")
+        with cols2[0]:
+            on = st.checkbox(" ", key=f"manual_sug_chk_{field_key}",
+                              value=False, label_visibility="collapsed")
+        with cols2[1]:
+            st.markdown(
+                f'<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
+                f'border-radius:6px; padding:0.85rem 1.1rem; '
+                f'margin-bottom:0.6rem;">'
+                f'<div style="display:flex; align-items:baseline; '
+                f'flex-wrap:wrap; gap:0.3rem;">'
+                f'<span style="font-size:0.66rem; color:#8E8E93; '
+                f'letter-spacing:0.12em; text-transform:uppercase; '
+                f'font-weight:600;">{label}</span>'
+                f'<span style="font-size:0.6rem; color:{conf_color}; '
+                f'letter-spacing:0.08em; text-transform:uppercase; '
+                f'font-weight:600; margin-left:0.6rem;">'
+                f'BASED ON YOUR SELECTED BODY-SHAPE PREFERENCE</span>'
+                f'</div>'
+                f'<div style="font-family:\'DM Serif Display\',serif; '
+                f'font-size:1.25rem; color:#111111; line-height:1.1; '
+                f'margin:0.35rem 0;">{value_str}</div>'
+                f'<div style="font-size:0.76rem; color:#2E2E2E; '
+                f'line-height:1.5;">{sug.get("reason","")}</div>'
+                f'<div style="font-size:0.7rem; color:#8E8E93; '
+                f'margin-top:0.45rem;">Source basis: '
+                f'<code style="font-size:0.7rem;">'
+                f'[fit-silhouette-rules#R8]</code></div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+        return on
+
+    field_labels = [
+        ("highlight_features", "Features you may choose to highlight"),
+        ("balance_areas",      "Areas you may choose to balance"),
+        ("preferred_fit",      "Preferred fit"),
+    ]
+    for fkey, flabel in field_labels:
+        if fkey in suggestions:
+            if _chip(fkey, flabel, suggestions[fkey]):
+                selected.append(fkey)
+
+    apply_col, _spacer = st.columns([1, 3], gap="medium")
+    with apply_col:
+        apply_clicked = st.button(
+            "Apply suggestions",
+            key="manual_sug_apply_btn",
+            type="primary",
+            use_container_width=True,
+            disabled=not selected,
+            help=("Merge the checked suggestions into your profile. "
+                  "Your selected body shape is already saved."),
+        )
+
+    if apply_clicked and selected:
+        updates = apply_suggestions(profile, result, selected)
+        if updates:
+            r = save_fit_profile(updates)
+            if r.get("success"):
+                st.success(
+                    f"Applied {len(updates)} suggestion"
+                    f"{'s' if len(updates) != 1 else ''} based on your "
+                    f"'{picked}' selection."
+                )
+                st.rerun()
+            else:
+                st.error(r.get("error", "Could not save."))
+
+
 def _render_reset_fit_profile_panel(profile: dict) -> None:
     """
     "Reset fit profile test data" — a scoped destructive action that
@@ -5216,12 +5500,14 @@ def _render_reset_fit_profile_panel(profile: dict) -> None:
     pending_key = "_reset_fit_profile_pending"
     pending = st.session_state.get(pending_key, False)
 
-    # Only show the panel when there's something to reset — keeps the
-    # Profile page calm for first-time users.
+    # Show the panel whenever there's anything to reset OR a fit-profile
+    # mode is set (so the user can switch paths from any mode, even
+    # before they've populated any data). The reset returns the page to
+    # the initial chooser screen.
     has_anything = bool(
         profile.get("measurements") or profile.get("body_shape")
         or profile.get("preferred_fit") or profile.get("highlight_features")
-        or profile.get("balance_areas")
+        or profile.get("balance_areas") or profile.get("fit_profile_mode")
     )
     if not has_anything and not pending:
         return
@@ -5230,7 +5516,7 @@ def _render_reset_fit_profile_panel(profile: dict) -> None:
         cols = st.columns([1, 3], gap="medium")
         with cols[0]:
             if st.button(
-                "Reset fit profile test data",
+                "Clear fit profile and measurements",
                 key="profile_reset_btn",
                 use_container_width=True,
                 help="Clears measurements, body shape, preferred fit, "
@@ -5254,11 +5540,15 @@ def _render_reset_fit_profile_panel(profile: dict) -> None:
 
     # Pending → confirmation step.
     st.warning(
-        "**Confirm reset.** This will clear only your fit profile "
-        "and measurements (body shape, preferred fit, highlight / "
-        "balance areas, all measurements). Your wardrobe, wishlist, "
-        "calendar, routine, wear history, and favorite stores will "
-        "**not** be deleted."
+        "**This clears only your fit profile and measurements. "
+        "Your wardrobe and other data will stay.** "
+        "Specifically wiped: body measurements, manually selected "
+        "body-shape preference, inferred body shape, highlight "
+        "features, areas to balance, preferred fit, measurement-"
+        "based suggestions, and predicted sizes. "
+        "Wardrobe, wishlist, calendar, routine, wear history, and "
+        "favorite stores are not touched. The page returns to the "
+        "initial fit-profile choice screen."
     )
     cols = st.columns([1, 1, 3], gap="medium")
     with cols[0]:
@@ -5266,9 +5556,21 @@ def _render_reset_fit_profile_panel(profile: dict) -> None:
                      type="primary", use_container_width=True):
             r = reset_fit_profile_test_data()
             st.session_state[pending_key] = False
-            st.session_state.pop("_profile_inference_result", None)
+            # Clear every cached inference / pending-suggestion key so
+            # the next render starts from the choice screen with no
+            # stale chips lingering.
+            for _k in ("_profile_inference_result",
+                        "fit_manual_shape",
+                        "profile_sug_chk_body_shape",
+                        "profile_sug_chk_highlight_features",
+                        "profile_sug_chk_balance_areas",
+                        "profile_sug_chk_preferred_fit",
+                        "manual_sug_chk_highlight_features",
+                        "manual_sug_chk_balance_areas",
+                        "manual_sug_chk_preferred_fit"):
+                st.session_state.pop(_k, None)
             if r.get("success"):
-                st.success("Fit profile test data cleared.")
+                st.success("Fit profile and measurements cleared.")
                 st.rerun()
             else:
                 st.error(f"Could not reset: {r.get('error', 'unknown error')}.")
@@ -5377,25 +5679,47 @@ def _render_profile():
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Analyze measurements → preference-based styling suggestions ──
-    # ALWAYS visible — has its own empty state so the user knows the
-    # feature exists even before any measurements are saved. Surfaces
-    # R8-grounded suggestions for body_shape / highlight / balance /
-    # preferred_fit derived from bust + waist + hips.
+    # ── Fit profile section — dispatched by user-chosen mode ─────
+    # The user picks one of three paths via the chooser; until they
+    # do, the entire fit-profile area below is hidden so the user
+    # never sees a body-shape, predicted size, or measurement
+    # suggestion they haven't asked for.
+    _fit_mode = profile.get("fit_profile_mode")
     _meas = profile.get("measurements", {}) or {}
-    _render_measurement_analysis_panel(profile, _meas)
 
-    # ── Reset fit profile test data ──────────────────────────────
-    # Clears ONLY fit-profile fields (measurements, body_shape,
-    # preferred_fit, highlight_features, balance_areas) plus the
-    # cached inference result. Wardrobe / wishlist / calendar / routine
-    # / wear history / favorite stores are untouched.
-    _render_reset_fit_profile_panel(profile)
+    if not _fit_mode:
+        _render_fit_profile_chooser()
+    elif _fit_mode == "skip":
+        st.markdown(
+            '<div style="background:#FFFFFF; border:1px solid #E5E5E5; '
+            'border-radius:6px; padding:1.4rem 1.6rem; margin-bottom:1.1rem;">'
+            '<div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; '
+            'text-transform:uppercase; font-weight:600; margin-bottom:0.4rem;">'
+            'Fit profile · skipped</div>'
+            '<div style="font-family:\'DM Serif Display\',serif; font-size:1.25rem; '
+            'color:#111111; line-height:1.15; margin-bottom:0.4rem;">'
+            'Using only your general style preferences'
+            '</div>'
+            '<div style="font-size:0.82rem; color:#2E2E2E; line-height:1.55;">'
+            "No body-shape analysis, no predicted sizes, no measurement "
+            "suggestions. To switch paths later, use the Reset button "
+            "below and pick again."
+            '</div></div>',
+            unsafe_allow_html=True,
+        )
+        _render_reset_fit_profile_panel(profile)
+    elif _fit_mode == "manual":
+        _render_fit_profile_manual_panel(profile)
+        _render_reset_fit_profile_panel(profile)
+    else:  # "measurements"
+        _render_measurement_analysis_panel(profile, _meas)
+        _render_reset_fit_profile_panel(profile)
 
-    # ── Measurements card (renders only when at least one is saved) ──
-    # Display unit comes from session state ("measure_unit"), set by the
-    # toggle inside the edit form. Internal storage is always inches.
-    if any(_meas.values()):
+    # ── Measurements display / Predicted sizes / Body-shape card ─
+    # These three sub-sections are gated on mode == "measurements"
+    # AND the user actually having data saved. In manual or skip mode
+    # they never appear, so the user can't see contradictory chips.
+    if _fit_mode == "measurements" and any(_meas.values()):
         try:
             from fit_tool import MEASUREMENT_FIELDS as _MF, INCH_TO_CM as _IN2CM
         except Exception:

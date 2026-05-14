@@ -87,6 +87,12 @@ _EMPTY_OVERLAY = {
     # Layer 4 — meta: provenance of auto-fills. "user" = explicitly set
     # by the wearer; "auto" = predicted from measurements; None = unset.
     "_body_shape_source": None,
+    # Layer 4b — user's chosen path through the fit-profile setup:
+    #   "measurements" : enter bust/waist/hips, let Wearly suggest
+    #   "manual"       : pick a body-shape preference from a list
+    #   "skip"         : opt out — use general style preferences only
+    #   None           : not chosen yet → Profile shows the chooser
+    "fit_profile_mode":   None,
     # Layer 5 — locale settings. The IANA timezone the user lives in.
     # Used by the .ics calendar importer to convert UTC-timestamped
     # events to local clock time, so a 6 PM event in Google Calendar
@@ -504,6 +510,8 @@ def save_fit_profile(updates: dict) -> dict:
         "modesty_preference", "comfort_needs", "style_goals",
         "highlight_features", "balance_areas",
         "measurements",
+        "fit_profile_mode",
+        "_body_shape_source",
         "timezone",
     )
     for k in accepted:
@@ -546,29 +554,29 @@ def save_fit_profile(updates: dict) -> dict:
 
         overlay[k] = v
 
-    # Auto-fill body_shape from measurements. The prediction is an
-    # industry heuristic — see predict_body_shape() docstring. Provenance
-    # of the value is tracked in _body_shape_source so the UI can show
-    # "Auto-filled" vs "Your choice".
-    #
-    # Logic:
-    #   - empty overlay AND we have a prediction → save prediction, src="auto"
-    #   - non-empty overlay matching the prediction → keep src as-is (or
-    #     default to "auto" if it was never set — user accepted the suggestion)
-    #   - non-empty overlay differing from the prediction → src="user"
-    _meas = overlay.get("measurements", {}) or {}
-    _pred = predict_body_shape(_meas)
-    _pred_shape = _pred.get("shape") if _pred else None
-    if not overlay.get("body_shape"):
-        if _pred_shape:
-            overlay["body_shape"] = _pred_shape
-            overlay["_body_shape_source"] = "auto"
-    else:
-        if _pred_shape and overlay["body_shape"] == _pred_shape:
-            if not overlay.get("_body_shape_source"):
+    # Auto-fill body_shape from measurements — ONLY when the user has
+    # chosen the "measurements" path through the fit-profile chooser
+    # (or hasn't chosen yet but happens to have measurements present).
+    # If the user explicitly chose "manual" or "skip", their body_shape
+    # value (or absence) is respected verbatim. This prevents the
+    # earlier contradiction where a user-selected shape would be
+    # overwritten with the measurement prediction the moment they
+    # added any measurements.
+    _mode = overlay.get("fit_profile_mode")
+    if _mode in (None, "measurements"):
+        _meas = overlay.get("measurements", {}) or {}
+        _pred = predict_body_shape(_meas)
+        _pred_shape = _pred.get("shape") if _pred else None
+        if not overlay.get("body_shape"):
+            if _pred_shape:
+                overlay["body_shape"] = _pred_shape
                 overlay["_body_shape_source"] = "auto"
         else:
-            overlay["_body_shape_source"] = "user"
+            if _pred_shape and overlay["body_shape"] == _pred_shape:
+                if not overlay.get("_body_shape_source"):
+                    overlay["_body_shape_source"] = "auto"
+            elif _pred_shape:
+                overlay["_body_shape_source"] = "user"
 
     on_disk = {
         "_comment": "User fit / style profile overlay. See fit_tool.py.",
@@ -597,6 +605,7 @@ _RESET_FIELDS = (
     "highlight_features",
     "balance_areas",
     "measurements",
+    "fit_profile_mode",
 )
 
 

@@ -268,6 +268,152 @@ def suggest_profile_from_measurements(
     return out
 
 
+def suggest_profile_from_shape(
+    body_shape: str,
+    current_profile: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Build preference-based styling suggestions from a USER-SELECTED
+    body-shape preference (the "manual" path through the fit-profile
+    chooser). Parallel to ``suggest_profile_from_measurements``, but
+    skips the shape prediction step — the shape comes from the user.
+
+    Parameters
+    ----------
+    body_shape : str
+        One of: hourglass, pear, rectangle, inverted triangle, apple,
+        athletic. Also accepts the common alias "fuller midsection"
+        for apple. Empty string / unknown shape returns an
+        ``available=False`` result.
+    current_profile : dict | None
+        Used for the user_locked flag on each suggestion — same as the
+        measurement-based version.
+
+    Returns
+    -------
+    dict
+        Same shape as suggest_profile_from_measurements:
+          - "available":   bool
+          - "suggestions": {body_shape, highlight_features,
+                            balance_areas, preferred_fit}
+          - "notes":       framing copy ready to render
+          - "source":      always "manual" for this path (vs
+                            measurement-based which uses fit_tool's
+                            predict_body_shape)
+
+    The body_shape "value" returned for the body_shape suggestion
+    chip is the user's chosen value — accepting it via apply_suggestions
+    is therefore a no-op for body_shape (the user already set it), but
+    is kept in the return shape so the UI can render a "you selected:
+    pear" chip consistent with the measurements path.
+
+    All suggestions cite fit#R8 and use the same _SHAPE_TABLE mapping
+    that powers measurement-based suggestions — the source basis is
+    identical, only the input differs.
+    """
+    current_profile = current_profile or {}
+
+    # Normalize aliases.
+    s = (body_shape or "").strip().lower()
+    if s in ("fuller midsection", "apple/fuller midsection",
+              "apple (round midsection)"):
+        s = "apple"
+    if s in ("triangle", "pear / triangle"):
+        s = "pear"
+    if s in ("inverted triangle", "inverted-triangle"):
+        s = "inverted triangle"
+
+    out: Dict[str, Any] = {
+        "available":   False,
+        "missing":     [],
+        "suggestions": {},
+        "notes":       [],
+        "source":      "manual",
+    }
+
+    if not s or s == "not sure" or s not in _SHAPE_TABLE:
+        out["notes"].append(
+            "Pick a body-shape preference above to see industry-style "
+            "suggestions for highlight features, areas to balance, and "
+            "preferred fit. Every suggestion is optional and editable."
+        )
+        return out
+
+    out["available"] = True
+    out["notes"].append(
+        "These are preference-based suggestions tied to the body-shape "
+        "preference YOU selected — they are not a diagnosis and not "
+        "inferred from images or measurements. Wearly treats body-shape "
+        "labels as industry heuristics, never a claim about your body. "
+        "Review each chip and apply only what feels right."
+    )
+
+    # Body shape itself — for the manual path, "current" is the chosen
+    # value and user_locked is True (the user explicitly picked it).
+    out["suggestions"]["body_shape"] = {
+        "value":       s,
+        "confidence":  "user-selected",
+        "reason":      "You selected this body-shape preference manually.",
+        "rule_ref":    _RULE_SLUG,
+        "user_locked": True,
+        "current":     s,
+    }
+
+    table = _SHAPE_TABLE.get(s, _SHAPE_TABLE["athletic"])
+
+    # Highlight features.
+    highlight = list(table.get("highlight", []))
+    if highlight:
+        existing = [a.lower() for a in
+                    (current_profile.get("highlight_features") or [])]
+        out["suggestions"]["highlight_features"] = {
+            "values":      highlight,
+            "confidence":  "based-on-selection",
+            "reason":      _highlight_reason(s, highlight),
+            "rule_ref":    _RULE_SLUG,
+            "user_locked": bool(existing),
+            "current":     existing or [],
+        }
+
+    # Balance areas.
+    balance = list(table.get("balance", []))
+    if balance:
+        existing = [a.lower() for a in
+                    (current_profile.get("balance_areas") or [])]
+        out["suggestions"]["balance_areas"] = {
+            "values":      balance,
+            "confidence":  "based-on-selection",
+            "reason":      _balance_reason(s, balance),
+            "rule_ref":    _RULE_SLUG,
+            "user_locked": bool(existing),
+            "current":     existing or [],
+        }
+
+    # Preferred fit — no waist-definition data here, so just the
+    # shape-table options.
+    fit_options = list(table.get("fit", []))
+    if fit_options:
+        user_fit = (current_profile.get("preferred_fit") or "").strip().lower()
+        out["suggestions"]["preferred_fit"] = {
+            "value":       fit_options[0],
+            "options":     fit_options,
+            "confidence":  "based-on-selection",
+            "reason":      (f"For an {s} proportion, "
+                            f"{', '.join(fit_options)} fits are commonly "
+                            "suggested as supportive of the silhouette."),
+            "rule_ref":    _RULE_SLUG,
+            "user_locked": bool(user_fit),
+            "current":     user_fit or None,
+        }
+
+    out["notes"].append(
+        "Style goals and comfort preferences are personal — Wearly does "
+        "not infer them. Use the form below to share them when you're ready."
+    )
+
+    return out
+
+
 # ─────────────────────────────────────────────────────────────────────
 # APPLY — caller-driven merge. NEVER auto-runs.
 # ─────────────────────────────────────────────────────────────────────

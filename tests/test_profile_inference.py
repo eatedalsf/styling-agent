@@ -461,5 +461,150 @@ class TestEndToEndInferenceFlow(unittest.TestCase):
                                  f"Only exercised: {seen_fits}")
 
 
+class TestFitProfileMode(unittest.TestCase):
+    """The fit_profile_mode field controls which Profile UI path renders.
+    It must round-trip through save_fit_profile, be wiped by
+    reset_fit_profile_test_data, and gate the auto-fill of body_shape
+    from measurements when the user is in 'manual' mode."""
+
+    def setUp(self):
+        import fit_tool, tempfile
+        self._orig_path = fit_tool.PROFILE_PATH
+        self._tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8")
+        self._tmp.close()
+        fit_tool.PROFILE_PATH = self._tmp.name
+
+    def tearDown(self):
+        import fit_tool, os
+        fit_tool.PROFILE_PATH = self._orig_path
+        try:
+            os.unlink(self._tmp.name)
+        except OSError:
+            pass
+
+    def test_mode_round_trips(self):
+        from fit_tool import save_fit_profile, get_fit_profile
+        for mode in ("measurements", "manual", "skip"):
+            r = save_fit_profile({"fit_profile_mode": mode})
+            self.assertTrue(r["success"], msg=r.get("error"))
+            p = get_fit_profile()["profile"]
+            self.assertEqual(p["fit_profile_mode"], mode)
+
+    def test_reset_wipes_mode(self):
+        from fit_tool import save_fit_profile, reset_fit_profile_test_data
+        from fit_tool import _load_overlay
+        save_fit_profile({"fit_profile_mode": "measurements",
+                          "measurements": {"bust": 36, "waist": 27,
+                                            "hips": 36}})
+        r = reset_fit_profile_test_data()
+        self.assertTrue(r["success"])
+        overlay = _load_overlay()
+        self.assertFalse(overlay.get("fit_profile_mode"))
+        self.assertFalse(overlay.get("measurements"))
+
+    def test_manual_mode_does_not_overwrite_body_shape_from_measurements(self):
+        """The classic contradiction the redesign prevents: user picks
+        'pear' in manual mode, then measurements happen to be saved
+        (e.g. left over from a previous session); the prediction
+        would say 'hourglass'. In manual mode, body_shape must stay
+        'pear', not get overwritten."""
+        from fit_tool import save_fit_profile, get_fit_profile
+        # Pretend the user is in manual mode and picked pear.
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "pear",
+                          "_body_shape_source": "user"})
+        # Now add measurements that predict hourglass (36/27/36).
+        save_fit_profile({"measurements": HOURGLASS_M})
+        p = get_fit_profile()["profile"]
+        # body_shape must still be the user's pear choice.
+        self.assertEqual(p["body_shape"], "pear")
+
+    def test_measurements_mode_auto_fills_body_shape(self):
+        """In measurements mode, the auto-fill must still work — that's
+        the whole point of that path."""
+        from fit_tool import save_fit_profile, get_fit_profile
+        save_fit_profile({"fit_profile_mode": "measurements",
+                          "measurements": HOURGLASS_M})
+        p = get_fit_profile()["profile"]
+        self.assertEqual(p["body_shape"], "hourglass")
+        self.assertEqual(p["_body_shape_source"], "auto")
+
+
+class TestSuggestFromShape(unittest.TestCase):
+    """The manual-mode entry point: given a body-shape string directly
+    (not measurements), produce the same shape of suggestions with
+    fit#R8 cited and labeled 'based-on-selection'."""
+
+    def test_hourglass_returns_documented_suggestions(self):
+        from profile_inference import suggest_profile_from_shape
+        out = suggest_profile_from_shape("hourglass", {})
+        self.assertTrue(out["available"])
+        self.assertEqual(out["source"], "manual")
+        s = out["suggestions"]
+        self.assertEqual(s["body_shape"]["value"], "hourglass")
+        self.assertEqual(s["body_shape"]["confidence"], "user-selected")
+        self.assertEqual(set(s["highlight_features"]["values"]),
+                         {"waist", "neckline"})
+        self.assertEqual(s["preferred_fit"]["value"], "tailored")
+        # Every suggestion cites fit#R8.
+        for sug in s.values():
+            self.assertEqual(sug["rule_ref"], "fit#R8")
+        # Every suggestion is labeled 'based-on-selection' (or
+        # 'user-selected' for body_shape).
+        for fkey in ("highlight_features", "balance_areas", "preferred_fit"):
+            if fkey in s:
+                self.assertEqual(s[fkey]["confidence"],
+                                 "based-on-selection")
+
+    def test_pear_alias_triangle_normalizes(self):
+        from profile_inference import suggest_profile_from_shape
+        out = suggest_profile_from_shape("triangle", {})
+        self.assertTrue(out["available"])
+        self.assertEqual(out["suggestions"]["body_shape"]["value"], "pear")
+
+    def test_apple_alias_fuller_midsection_normalizes(self):
+        from profile_inference import suggest_profile_from_shape
+        for alias in ("fuller midsection", "apple/fuller midsection",
+                      "apple (round midsection)"):
+            with self.subTest(alias=alias):
+                out = suggest_profile_from_shape(alias, {})
+                self.assertTrue(out["available"])
+                self.assertEqual(out["suggestions"]["body_shape"]["value"],
+                                 "apple")
+
+    def test_not_sure_returns_unavailable(self):
+        from profile_inference import suggest_profile_from_shape
+        out = suggest_profile_from_shape("not sure", {})
+        self.assertFalse(out["available"])
+        self.assertEqual(out["suggestions"], {})
+
+    def test_empty_returns_unavailable_with_prompt(self):
+        from profile_inference import suggest_profile_from_shape
+        out = suggest_profile_from_shape("", {})
+        self.assertFalse(out["available"])
+        joined = " ".join(out.get("notes", []))
+        self.assertIn("Pick", joined)
+
+    def test_body_positive_language_in_all_shapes(self):
+        from profile_inference import suggest_profile_from_shape
+        from fit_tool import check_reasoning_for_forbidden_language
+        for shape in ("hourglass", "pear", "rectangle",
+                       "inverted triangle", "apple"):
+            with self.subTest(shape=shape):
+                out = suggest_profile_from_shape(shape, {})
+                blobs = list(out.get("notes", []))
+                for sug in out.get("suggestions", {}).values():
+                    for k in ("reason", "value"):
+                        v = sug.get(k)
+                        if isinstance(v, str):
+                            blobs.append(v)
+                    blobs.extend(sug.get("values") or [])
+                self.assertEqual(
+                    check_reasoning_for_forbidden_language(blobs), set(),
+                    f"forbidden language in shape={shape}",
+                )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
