@@ -150,6 +150,11 @@ nav:
     - "11 · Product roadmap": book/11-product-roadmap.md
     - "12 · Evidence & references": book/12-evidence-and-references.md
 
+  - Reference:
+    - "Glossary": docs/glossary.md
+    - "FAQ": docs/faq.md
+    - "References (bibliography)": docs/references.md
+
   - Evidence:
     - "Evidence & references (canonical)": docs/evidence-and-references.md
 

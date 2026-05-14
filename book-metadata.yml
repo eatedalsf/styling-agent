@@ -1,0 +1,52 @@
+# Wearly Intelligent Book — canonical metadata.
+#
+# This file is the single source of truth for project-level identifiers
+# (author, course, semester, license, version, framework level). MkDocs
+# reads its own site config from `mkdocs.yml`; this file is for tools
+# and for human reviewers who want one place to look.
+#
+# Pattern follows the Level-2 intelligent-textbook framework at
+# https://dmccreary.github.io/intelligent-textbooks/.
+
+title:        "Wearly — Intelligent Book"
+subtitle:     "An evidence-informed, body-positive personal styling agent"
+author:       "Eatedal SF"
+course:       "SEIS 666 — Digital Transformation with AI"
+institution:  "University of St. Thomas"
+semester:     "Spring 2026"
+license:      "CC BY-NC-SA 4.0"
+version:      "0.4.0"
+
+# Dan McCreary's five-level framework for intelligent textbooks.
+# Level 2: concept-dependency-graph-driven, MicroSim-equipped,
+# Bloom-tagged, glossary + FAQ + references shipped.
+level:            2
+framework_name:   "Intelligent Textbooks Framework"
+framework_source: "https://dmccreary.github.io/intelligent-textbooks/"
+
+# Repository pointers.
+repo:     "https://github.com/eatedalsf/styling-agent"
+site:     "https://eatedalsf.github.io/styling-agent/"
+
+# What this book ships (Level-2 expectations + Wearly extras).
+contents:
+  chapters:         12         # book/01-vision.md … book/12-evidence-and-references.md
+  microsims:        4          # color-harmony, freshness, knowledge-graph, learning-graph
+  learning_graph:   true       # graph/learning-graph.json — 28 concepts, 38 edges
+  knowledge_graph:  true       # graph/graph.json + graph/schema.md (runtime)
+  glossary:         true       # docs/glossary.md
+  faq:              true       # docs/faq.md
+  references:       true       # docs/references.md
+  evidence_doc:     true       # docs/evidence-and-references.md (canonical narrative)
+  skill_package:    true       # skills/wearly-styling-agent/ (8 rule files)
+  rule_registry:    true       # rule_refs.py — slug -> file -> R<N>
+  body_positive:    true       # fit_tool.FORBIDDEN_TOKENS + documentation-integrity test
+  self_check:       true       # per-chapter Key terms + Self-check footers
+
+# Bloom's taxonomy progression used to tag every concept in the
+# learning graph and every Self-check question.
+bloom_levels:
+  - Remember
+  - Understand
+  - Apply
+  - Analyze

@@ -11,6 +11,25 @@ The book **supports** the working product; it does not replace it. The product i
 
 ---
 
+## A Level-2 intelligent textbook
+
+Wearly is built as a **Level 2** intelligent textbook per
+[Dan McCreary's framework](https://dmccreary.github.io/intelligent-textbooks/):
+a concept-graph–driven, MicroSim-equipped, evidence-citable companion to
+the running prototype. That framing is concrete — Wearly ships the
+artifacts a Level-2 book is expected to ship:
+
+- a **[concept learning graph](../docs/sims/learning-graph/index.md)** — 28 concepts, 38 prerequisite edges, every node Bloom-tagged (Remember → Understand → Apply → Analyze);
+- **[MicroSims](../docs/sims/index.md)** — small interactive simulations for color harmony, freshness, and the two graphs;
+- a project-wide **[Glossary](../docs/glossary.md)**, **[FAQ](../docs/faq.md)**, and **[References](../docs/references.md)**;
+- per-chapter **Key terms** and **Self-check** footers (Bloom-tiered);
+- a canonical **[`book-metadata.yml`](https://github.com/eatedalsf/styling-agent/blob/main/book-metadata.yml)** at the repo root.
+
+See **[`book-metadata.yml`](https://github.com/eatedalsf/styling-agent/blob/main/book-metadata.yml)** for the canonical
+version, license, and framework pointers.
+
+---
+
 ## Table of contents
 
 | # | Chapter | What it covers |
