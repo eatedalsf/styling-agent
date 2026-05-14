@@ -1697,6 +1697,54 @@ def _fetch_override_url(url: str, timeout: float = _FETCH_TIMEOUT) -> bytes:
         return b""
 
 
+def _fetch_from_retailer_link(
+    page_url: str, timeout: float = _FETCH_TIMEOUT,
+) -> Tuple[bytes, str]:
+    """
+    Resolve a retailer product page URL to its product image bytes,
+    reusing the existing link_import pipeline (the same code that
+    powers the Wardrobe → Link tab the user adds items through).
+
+    Returns (image_bytes, source_page_url). Empty bytes on any failure
+    (no link_import module, page fetch failed, no og:image, image
+    download failed, decode error). NEVER raises — the loader falls
+    through to Pexels / silhouette.
+
+    The product image is sourced in priority order:
+      1. JSON-LD `image` (Schema.org Product) — usually higher quality.
+      2. `og:image` meta tag.
+    """
+    if not page_url:
+        return b"", ""
+    try:
+        from link_import import import_product_link
+    except Exception:
+        return b"", ""
+    try:
+        meta = import_product_link(page_url, fetch_metadata=True)
+    except Exception:
+        return b"", ""
+    if not meta or not meta.get("fetched"):
+        return b"", page_url
+
+    # Prefer JSON-LD product image; fall back to og:image.
+    md = meta.get("metadata") or {}
+    jsonld = md.get("jsonld_product") or {}
+    img_url = ""
+    j_img = jsonld.get("image")
+    if isinstance(j_img, list) and j_img:
+        img_url = j_img[0]
+    elif isinstance(j_img, str):
+        img_url = j_img
+    if not img_url:
+        img_url = (md.get("og_image") or meta.get("source_image_url") or "")
+    if not img_url:
+        return b"", page_url
+
+    raw = _fetch_override_url(img_url, timeout=timeout)
+    return raw, page_url
+
+
 def _save_card(item: Dict[str, Any], use_photos: bool = True
                ) -> Tuple[str, str, str, str]:
     """
@@ -1711,12 +1759,20 @@ def _save_card(item: Dict[str, Any], use_photos: bool = True
     Resolution order:
       1. `local_image_path_override`  → read a file from disk.
       2. `image_url_override`         → HTTP GET an explicit URL.
-      3. Pexels search                → biased product-photo query.
-      4. Drawn silhouette             → final fallback.
+      3. `source_link`                → fetch retailer product page,
+                                         extract og:image / JSON-LD
+                                         image via the same code path
+                                         as the user-facing Link tab.
+      4. Pexels search                → biased product-photo query.
+      5. Drawn silhouette             → final fallback.
 
-    The override fields are the documented escape hatch for any
-    DM-* item whose Pexels result is bad: open demo_wardrobe.json,
-    set the field on the item, click Reload.
+    Why source_link is preferred over Pexels: Pexels is a stock-photo
+    library, not a product catalog. Even the best-scored Pexels
+    candidate for a "burgundy wrap blouse" is going to be a lifestyle
+    shot, not the kind of clean catalog tile a real retailer's
+    product page carries. The link-import path was already added for
+    user-uploaded items via the Wardrobe Link tab; this just wires it
+    into the demo seed too.
     """
     os.makedirs(WARDROBE_IMAGES_DIR, exist_ok=True)
     item_id = item.get("id", "")
@@ -1745,7 +1801,20 @@ def _save_card(item: Dict[str, Any], use_photos: bool = True
             if png_bytes:
                 source = "override"
 
-    # 3. Pexels — `unsplash_query` is the legacy field name; the
+    # 3. Retailer product link — re-uses the exact pipeline the user
+    #    sees in the Wardrobe Link tab, so demo items get the same
+    #    high-quality catalog imagery as manually-added ones.
+    if not png_bytes and item.get("source_link"):
+        raw, retailer_url = _fetch_from_retailer_link(item["source_link"])
+        if raw:
+            png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
+            if png_bytes:
+                source = "retailer"
+                # Reuse the photo_url field to carry the source page
+                # so the UI can credit the store.
+                photo_url = retailer_url
+
+    # 4. Pexels — `unsplash_query` is the legacy field name; the
     #    keywords drive whichever real-photo source we use.
     if not png_bytes and use_photos and item.get("unsplash_query"):
         raw, photographer, photo_url = _fetch_real_photo(
@@ -1951,7 +2020,7 @@ def load_demo_wardrobe(
                     render_results.get(iid, ("", "", "", ""))
                 if new_path:
                     refreshed.append(iid)
-                    if source == "photo":
+                    if source in ("photo", "retailer", "override"):
                         photo_count += 1
                     elif source == "silhouette":
                         silhouette_count += 1
@@ -2070,9 +2139,12 @@ def _write_review_report(all_seed_items: list,
                 rec = render_results.get(iid, ("", "", "", ""))
                 ipath, source, photog, photo_url = rec
                 reason = {
+                    "retailer":   "retailer product page (source_link "
+                                   "via link_import)",
                     "photo":      "Pexels accepted (passed alt-text checks)",
-                    "silhouette": "fell back — Pexels candidates failed "
-                                   "alt-text checks OR no key OR network",
+                    "silhouette": "fell back — no source_link, Pexels "
+                                   "candidates failed alt-text checks, "
+                                   "OR network",
                     "override":   "manual override (image_url_override "
                                    "or local_image_path_override)",
                     "":           "render failed",
