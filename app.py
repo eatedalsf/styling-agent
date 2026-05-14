@@ -5889,24 +5889,31 @@ def _render_profile():
 
         # Unit toggle for measurements. Lives OUTSIDE the form so flipping
         # it re-renders the inputs immediately (st.form batches inputs and
-        # would only react on submit). Internal storage is always inches —
-        # we convert on save and on display.
-        _unit_cols = st.columns([2, 1], gap="medium")
-        with _unit_cols[0]:
-            st.markdown(
-                "<div style='font-size:0.78rem; color:#6E6E73; padding-top:0.4rem;'>"
-                "Measurement units</div>",
-                unsafe_allow_html=True,
-            )
-        with _unit_cols[1]:
-            _unit_choice = st.radio(
-                "Units",
-                options=["in", "cm"],
-                horizontal=True,
-                label_visibility="collapsed",
-                index=0 if st.session_state.get("measure_unit", "in") == "in" else 1,
-                key="measure_unit",
-            )
+        # would only react on submit). Only relevant in measurements mode;
+        # in other modes we use a default and never display the toggle.
+        # Internal storage is always inches — we convert on save and display.
+        _show_measurements_in_form = (
+            profile.get("fit_profile_mode") == "measurements"
+        )
+        if _show_measurements_in_form:
+            _unit_cols = st.columns([2, 1], gap="medium")
+            with _unit_cols[0]:
+                st.markdown(
+                    "<div style='font-size:0.78rem; color:#6E6E73; padding-top:0.4rem;'>"
+                    "Measurement units</div>",
+                    unsafe_allow_html=True,
+                )
+            with _unit_cols[1]:
+                _unit_choice = st.radio(
+                    "Units",
+                    options=["in", "cm"],
+                    horizontal=True,
+                    label_visibility="collapsed",
+                    index=0 if st.session_state.get("measure_unit", "in") == "in" else 1,
+                    key="measure_unit",
+                )
+        else:
+            _unit_choice = "in"  # placeholder; the measurements block is hidden too
 
         with st.form("profile_edit_form"):
             # ── Section 1: Identity ──────────────────────────────
@@ -5930,14 +5937,40 @@ def _render_profile():
             )
             col_s1, col_s2, col_s3 = st.columns(3, gap="medium")
             with col_s1:
-                new_body = st.selectbox(
-                    "Body shape",
-                    options=_BODY_SHAPE_OPTIONS,
-                    index=_BODY_SHAPE_OPTIONS.index(body) if (isinstance(body, str) and body in _BODY_SHAPE_OPTIONS) else 0,
-                    help="A proportion preference, not a classification. Industry-standard "
-                         "label set — Wearly uses it only to suggest cuts you've said work for you. "
-                         "Leave blank if you'd rather skip the category.",
-                )
+                # Body shape is owned by the fit-profile chooser/panel
+                # above when a path is chosen. To avoid a duplicate
+                # control (the user picks 'hourglass' above, then sees
+                # another body-shape selectbox here that competes for
+                # the same field), this slot becomes a read-only
+                # status when a fit mode is set. The user can still
+                # edit body_shape — just from the panel above, which
+                # is the single source of truth.
+                if profile.get("fit_profile_mode") in ("manual", "measurements"):
+                    _bs_display = (body or "—").title() if isinstance(body, str) else "—"
+                    _bs_hint = ("set via the manual panel above"
+                                if profile.get("fit_profile_mode") == "manual"
+                                else "set via the measurements panel above")
+                    st.markdown(
+                        "<div style='font-size:0.78rem; color:#1C1917; "
+                        "margin-bottom:0.25rem;'>Body shape</div>"
+                        f"<div style='font-size:0.92rem; color:#1C1917; "
+                        f"padding:0.55rem 0.75rem; background:#FAFAFA; "
+                        f"border:1px solid #EEEEEE; border-radius:6px;'>"
+                        f"{_bs_display}</div>"
+                        f"<div style='font-size:0.7rem; color:#8E8E93; "
+                        f"margin-top:0.35rem;'>{_bs_hint}</div>",
+                        unsafe_allow_html=True,
+                    )
+                    new_body = profile.get("body_shape") or None
+                else:
+                    new_body = st.selectbox(
+                        "Body shape",
+                        options=_BODY_SHAPE_OPTIONS,
+                        index=_BODY_SHAPE_OPTIONS.index(body) if (isinstance(body, str) and body in _BODY_SHAPE_OPTIONS) else 0,
+                        help="A proportion preference, not a classification. Industry-standard "
+                             "label set — Wearly uses it only to suggest cuts you've said work for you. "
+                             "Leave blank if you'd rather skip the category.",
+                    )
             with col_s2:
                 new_skin = st.selectbox(
                     "Skin tone palette",
@@ -5994,59 +6027,67 @@ def _render_profile():
                 )
 
             # ── Section 4: Measurements ──────────────────────────
-            # Single "?" entry point at the heading level. Per-field
-            # tooltips were dropped — the diagram inside the expander
-            # serves the same purpose with less visual clutter.
-            st.markdown(
-                "<div style='display:flex; align-items:baseline; gap:0.6rem; "
-                "margin:1.4rem 0 0.4rem;'>"
-                "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
-                "text-transform:uppercase; font-weight:600;'>"
-                "Body measurements</div>"
-                "</div>",
-                unsafe_allow_html=True,
-            )
-            with st.expander("?  How to measure", expanded=False):
-                st.markdown(_measurement_diagram_svg(), unsafe_allow_html=True)
+            # ONLY shown when the user has chosen the "measurements"
+            # path through the fit-profile chooser. In manual / skip /
+            # unset modes the inputs are hidden and existing measurements
+            # on disk pass through verbatim to Save (so switching paths
+            # never wipes data — only the explicit reset does that).
+            if _show_measurements_in_form:
+                st.markdown(
+                    "<div style='display:flex; align-items:baseline; gap:0.6rem; "
+                    "margin:1.4rem 0 0.4rem;'>"
+                    "<div style='font-size:0.7rem; color:#8E8E93; letter-spacing:0.14em; "
+                    "text-transform:uppercase; font-weight:600;'>"
+                    "Body measurements</div>"
+                    "</div>",
+                    unsafe_allow_html=True,
+                )
+                with st.expander("?  How to measure", expanded=False):
+                    st.markdown(_measurement_diagram_svg(), unsafe_allow_html=True)
 
-            # Import the field definitions from fit_tool so the form and the
-            # data model never drift.
-            try:
-                from fit_tool import MEASUREMENT_FIELDS as _MEAS_FIELDS, INCH_TO_CM as _IN2CM
-            except Exception:
-                _MEAS_FIELDS, _IN2CM = [], 2.54
+                # Import the field definitions from fit_tool so the form and the
+                # data model never drift.
+                try:
+                    from fit_tool import MEASUREMENT_FIELDS as _MEAS_FIELDS, INCH_TO_CM as _IN2CM
+                except Exception:
+                    _MEAS_FIELDS, _IN2CM = [], 2.54
 
-            # Unit-aware bounds. Internal storage is always inches; the
-            # input displays in the user-selected unit and we convert on save.
-            _use_cm = (_unit_choice == "cm")
-            _max_input = 120.0 * (_IN2CM if _use_cm else 1.0)
-            _step      = 1.0   if _use_cm else 0.5
+                # Unit-aware bounds. Internal storage is always inches; the
+                # input displays in the user-selected unit and we convert on save.
+                _use_cm = (_unit_choice == "cm")
+                _max_input = 120.0 * (_IN2CM if _use_cm else 1.0)
+                _step      = 1.0   if _use_cm else 0.5
 
-            new_measurements = {}
-            # 4 columns x N rows
-            _per_row = 4
-            for _row_start in range(0, len(_MEAS_FIELDS), _per_row):
-                _row = _MEAS_FIELDS[_row_start:_row_start + _per_row]
-                _cols = st.columns(len(_row), gap="medium")
-                for _i, (_key, _label, _tip) in enumerate(_row):
-                    with _cols[_i]:
-                        _current_in = measurements.get(_key)
-                        _initial = 0.0
-                        if isinstance(_current_in, (int, float)) and _current_in:
-                            _initial = float(_current_in) * (_IN2CM if _use_cm else 1.0)
-                        _shown = st.number_input(
-                            f"{_label} ({_unit_choice})",
-                            min_value=0.0,
-                            max_value=_max_input,
-                            step=_step,
-                            value=round(_initial, 1),
-                            # No per-field help= — the single diagram
-                            # expander above is the canonical reference.
-                            key=f"measure_{_key}",
-                        )
-                        new_measurements[_key] = (
-                            _shown / _IN2CM if _use_cm else _shown
-                        )
+                new_measurements = {}
+                # 4 columns x N rows
+                _per_row = 4
+                for _row_start in range(0, len(_MEAS_FIELDS), _per_row):
+                    _row = _MEAS_FIELDS[_row_start:_row_start + _per_row]
+                    _cols = st.columns(len(_row), gap="medium")
+                    for _i, (_key, _label, _tip) in enumerate(_row):
+                        with _cols[_i]:
+                            _current_in = measurements.get(_key)
+                            _initial = 0.0
+                            if isinstance(_current_in, (int, float)) and _current_in:
+                                _initial = float(_current_in) * (_IN2CM if _use_cm else 1.0)
+                            _shown = st.number_input(
+                                f"{_label} ({_unit_choice})",
+                                min_value=0.0,
+                                max_value=_max_input,
+                                step=_step,
+                                value=round(_initial, 1),
+                                # No per-field help= — the single diagram
+                                # expander above is the canonical reference.
+                                key=f"measure_{_key}",
+                            )
+                            new_measurements[_key] = (
+                                _shown / _IN2CM if _use_cm else _shown
+                            )
+            else:
+                # Pass through existing measurements unchanged so Save
+                # doesn't wipe data left by a previous measurements
+                # session. Only the explicit reset clears this dict.
+                new_measurements = dict(measurements or {})
 
             # ── Section 5: Timezone (locale setting) ─────────────
             # Drives how UTC-stamped calendar events (e.g. Google
