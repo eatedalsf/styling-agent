@@ -3957,11 +3957,22 @@ def _render_wardrobe():
                 if res.get("error"):
                     st.error(res["error"])
                 else:
+                    refreshed = len(res.get("refreshed", []))
                     if res["added"]:
-                        st.success(
+                        msg = (
                             f"Added {len(res['added'])} demo items. "
                             f"Skipped {len(res['skipped'])} (already loaded). "
                             f"Wardrobe now totals {res['total_after']}."
+                        )
+                        if refreshed:
+                            msg += (f" Refreshed {refreshed} card image"
+                                    f"{'s' if refreshed != 1 else ''}.")
+                        st.success(msg)
+                    elif refreshed:
+                        st.success(
+                            f"Refreshed {refreshed} card image"
+                            f"{'s' if refreshed != 1 else ''} from the latest "
+                            "silhouette renderer. Items themselves unchanged."
                         )
                     else:
                         st.info(

@@ -100,22 +100,684 @@ def _luminance(rgb: tuple) -> float:
     return (0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2]) / 255.0
 
 
+# ── Card image generator (silhouette-driven) ──────────────
+
+# A clothing illustration on a card — recognizable at thumbnail
+# size. Larger than the previous text-only card (400 x 500). The
+# silhouette is the focal element; the name + store sit as an
+# overlay band at the bottom.
+#
+# Why silhouettes and not real product photos: real scraping is
+# brittle (rate-limited, license-mixed, photos expire). A clean
+# illustration on a colored card communicates the SHAPE of the
+# item — top vs dress vs trousers vs heel — which is what the
+# user needs to recognize a thumbnail at a glance.
+
+# Default card size used by demo_wardrobe.json. 400 wide x 500 tall
+# is enough resolution for clean silhouette curves, and the same
+# aspect ratio as a real product card.
+_DEFAULT_CARD_SIZE = (400, 500)
+
+
+def _shade(rgb: tuple, delta: int) -> tuple:
+    """Lighten (positive delta) or darken (negative) an RGB tuple."""
+    return tuple(max(0, min(255, c + delta)) for c in rgb)
+
+
+def _silhouette_color(bg_rgb: tuple) -> tuple:
+    """Pick a contrast color for the clothing silhouette: a darker
+    shade of the item's own color on light backgrounds, a brighter
+    shade on dark backgrounds. Keeps everything tonal so the result
+    reads as "this color of this item", not "ink-on-paper logo"."""
+    lum = _luminance(bg_rgb)
+    if lum > 0.65:
+        return _shade(bg_rgb, -55)
+    if lum < 0.30:
+        return _shade(bg_rgb, +60)
+    return _shade(bg_rgb, -40)
+
+
+# ── Silhouette helpers — one per category ─────────────────
+# Each helper draws into (cx ± rx, cy ± ry) inside the canvas. The
+# center / extent is set by the caller so silhouettes share screen
+# real estate consistently. Coordinates flipped so y grows downward
+# (Pillow's convention).
+
+
+def _draw_top(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """T-shirt / blouse / sweater / cardigan / turtleneck / oxford /
+    polo / camisole / tunic / tee — a standard shirt silhouette. Sub-
+    type cues from the name keyword adjust details (turtleneck
+    adds a high collar; cardigan splits at center; tank loses
+    sleeves)."""
+    # Body trapezoid.
+    body_top = cy - ry * 0.6
+    body_bot = cy + ry * 0.95
+    waist_w = rx * 0.92
+    hem_w = rx * 1.05
+    body = [
+        (cx - waist_w, body_top + ry * 0.18),
+        (cx + waist_w, body_top + ry * 0.18),
+        (cx + hem_w,   body_bot),
+        (cx - hem_w,   body_bot),
+    ]
+    draw.polygon(body, fill=color, outline=accent)
+
+    # Sleeves.
+    sleeve_w = rx * 0.30
+    sleeve_h = ry * 0.55
+    if "tank" not in name_lower and "camisole" not in name_lower:
+        # Left sleeve
+        draw.polygon([
+            (cx - waist_w, body_top + ry * 0.18),
+            (cx - waist_w - sleeve_w, body_top + ry * 0.28),
+            (cx - waist_w - sleeve_w * 0.95, body_top + ry * 0.28 + sleeve_h),
+            (cx - waist_w + sleeve_w * 0.15, body_top + ry * 0.5),
+        ], fill=color, outline=accent)
+        # Right sleeve (mirrored)
+        draw.polygon([
+            (cx + waist_w, body_top + ry * 0.18),
+            (cx + waist_w + sleeve_w, body_top + ry * 0.28),
+            (cx + waist_w + sleeve_w * 0.95, body_top + ry * 0.28 + sleeve_h),
+            (cx + waist_w - sleeve_w * 0.15, body_top + ry * 0.5),
+        ], fill=color, outline=accent)
+
+    # Neckline.
+    neck_w = rx * 0.35
+    neck_h = ry * 0.18
+    if "turtleneck" in name_lower or "mock" in name_lower or "high-neck" in name_lower:
+        # Tall neck cylinder.
+        draw.rectangle(
+            [(cx - neck_w * 0.7, body_top - ry * 0.05),
+             (cx + neck_w * 0.7, body_top + ry * 0.10)],
+            fill=color, outline=accent,
+        )
+    else:
+        # Open neckline arc.
+        draw.chord(
+            [(cx - neck_w, body_top + ry * 0.06),
+             (cx + neck_w, body_top + ry * 0.06 + neck_h * 1.5)],
+            start=0, end=180, fill=accent, width=3,
+        )
+
+    # Center seam for cardigan / open shirt.
+    if "cardigan" in name_lower:
+        draw.line([(cx, body_top + ry * 0.18), (cx, body_bot)],
+                  fill=accent, width=3)
+    elif "shirt" in name_lower or "oxford" in name_lower or "button" in name_lower:
+        # Faint placket line + buttons.
+        draw.line([(cx, body_top + ry * 0.20), (cx, body_bot - ry * 0.05)],
+                  fill=accent, width=2)
+        for i in range(3):
+            yy = body_top + ry * (0.30 + i * 0.18)
+            draw.ellipse([(cx - 3, yy - 3), (cx + 3, yy + 3)], fill=accent)
+
+
+def _draw_bottom(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Trousers / jeans / shorts / skirt / leggings / chinos."""
+    if "skirt" in name_lower:
+        # A-line skirt: narrow waist, wide hem.
+        draw.polygon([
+            (cx - rx * 0.60, cy - ry * 0.8),
+            (cx + rx * 0.60, cy - ry * 0.8),
+            (cx + rx * 1.05, cy + ry * 0.95),
+            (cx - rx * 1.05, cy + ry * 0.95),
+        ], fill=color, outline=accent)
+        # Pleats hint.
+        if "pleated" in name_lower:
+            for off in (-0.4, -0.13, 0.13, 0.4):
+                draw.line(
+                    [(cx + rx * 0.6 * off, cy - ry * 0.65),
+                     (cx + rx * 1.0 * off, cy + ry * 0.95)],
+                    fill=accent, width=2,
+                )
+        return
+
+    # Trousers / shorts: waistband + two legs.
+    waist_top = cy - ry * 0.85
+    crotch_y  = cy - ry * 0.05
+    leg_inner = rx * 0.08
+    leg_outer = rx * 0.78
+    if "shorts" in name_lower:
+        leg_bottom = cy + ry * 0.20
+    elif "shorts" in name_lower:
+        leg_bottom = cy + ry * 0.20
+    else:
+        leg_bottom = cy + ry * 0.95
+
+    # Waistband
+    draw.rectangle(
+        [(cx - leg_outer, waist_top), (cx + leg_outer, waist_top + ry * 0.13)],
+        fill=color, outline=accent,
+    )
+    # Left leg
+    draw.polygon([
+        (cx - leg_outer,  waist_top + ry * 0.13),
+        (cx - leg_inner,  waist_top + ry * 0.13),
+        (cx - leg_inner * 0.75,  leg_bottom),
+        (cx - leg_outer * 0.85,  leg_bottom),
+    ], fill=color, outline=accent)
+    # Right leg
+    draw.polygon([
+        (cx + leg_outer,  waist_top + ry * 0.13),
+        (cx + leg_inner,  waist_top + ry * 0.13),
+        (cx + leg_inner * 0.75,  leg_bottom),
+        (cx + leg_outer * 0.85,  leg_bottom),
+    ], fill=color, outline=accent)
+    # Center seam
+    draw.line([(cx, waist_top + ry * 0.13), (cx, crotch_y)],
+              fill=accent, width=2)
+
+
+def _draw_dress(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Dress / gown / sundress / wrap / sheath / maxi / midi.
+    Combined bodice + skirt. Sub-types: 'gown'/'maxi' → floor-length
+    elongated skirt; 'sheath' → straight column; 'wrap' → center wrap line."""
+    bodice_top = cy - ry * 0.8
+    waist_y    = cy - ry * 0.0
+    hem_y      = cy + ry * 0.98
+    if "gown" in name_lower or "floor-length" in name_lower:
+        hem_y = cy + ry * 1.05
+    elif "midi" in name_lower:
+        hem_y = cy + ry * 0.95
+
+    bodice_half = rx * 0.65
+    waist_half  = rx * 0.50
+    is_sheath   = "sheath" in name_lower
+    is_column   = is_sheath or "column" in name_lower
+    if is_column:
+        hem_half = rx * 0.55
+    else:
+        hem_half = rx * 1.05    # flared
+
+    # Single polygon for bodice + skirt
+    draw.polygon([
+        (cx - bodice_half, bodice_top + ry * 0.18),
+        (cx + bodice_half, bodice_top + ry * 0.18),
+        (cx + waist_half,  waist_y),
+        (cx + hem_half,    hem_y),
+        (cx - hem_half,    hem_y),
+        (cx - waist_half,  waist_y),
+    ], fill=color, outline=accent)
+
+    # Sleeves (most dresses are sleeveless; show only when name says so)
+    if "long-sleeve" in name_lower or "long sleeve" in name_lower:
+        sleeve_w = rx * 0.25
+        # Left
+        draw.polygon([
+            (cx - bodice_half, bodice_top + ry * 0.18),
+            (cx - bodice_half - sleeve_w, bodice_top + ry * 0.30),
+            (cx - bodice_half - sleeve_w * 0.85, bodice_top + ry * 0.85),
+            (cx - bodice_half + sleeve_w * 0.20, bodice_top + ry * 0.55),
+        ], fill=color, outline=accent)
+        # Right
+        draw.polygon([
+            (cx + bodice_half, bodice_top + ry * 0.18),
+            (cx + bodice_half + sleeve_w, bodice_top + ry * 0.30),
+            (cx + bodice_half + sleeve_w * 0.85, bodice_top + ry * 0.85),
+            (cx + bodice_half - sleeve_w * 0.20, bodice_top + ry * 0.55),
+        ], fill=color, outline=accent)
+
+    # Neckline
+    neck_w = rx * 0.30
+    draw.chord(
+        [(cx - neck_w, bodice_top + ry * 0.10),
+         (cx + neck_w, bodice_top + ry * 0.32)],
+        start=0, end=180, fill=accent, width=3,
+    )
+
+    # Wrap line for wrap dress
+    if "wrap" in name_lower:
+        draw.line([(cx - bodice_half * 0.8, bodice_top + ry * 0.25),
+                   (cx + waist_half * 0.5, waist_y)],
+                  fill=accent, width=3)
+        # tie-knot dot
+        draw.ellipse(
+            [(cx + waist_half * 0.40, waist_y - 4),
+             (cx + waist_half * 0.55, waist_y + 4)],
+            fill=accent,
+        )
+
+
+def _draw_outerwear(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Coat / blazer / trench / parka / puffer / cardigan / vest /
+    jacket. Body open at center (lapels), structured shoulders.
+    Trench gets a belt line; vest loses sleeves; puffer gets quilt
+    rows."""
+    body_top = cy - ry * 0.85
+    body_bot = cy + ry * 0.95
+    shoulder = rx * 1.05
+    waist    = rx * 0.95
+    hem      = rx * 1.10
+
+    # Body
+    draw.polygon([
+        (cx - shoulder, body_top + ry * 0.18),
+        (cx + shoulder, body_top + ry * 0.18),
+        (cx + waist,    cy + ry * 0.10),
+        (cx + hem,      body_bot),
+        (cx - hem,      body_bot),
+        (cx - waist,    cy + ry * 0.10),
+    ], fill=color, outline=accent)
+
+    # Sleeves (skip for vest)
+    if "vest" not in name_lower:
+        sleeve_w = rx * 0.32
+        # Left
+        draw.polygon([
+            (cx - shoulder, body_top + ry * 0.18),
+            (cx - shoulder - sleeve_w * 0.5, body_top + ry * 0.32),
+            (cx - shoulder - sleeve_w * 0.2, body_bot - ry * 0.05),
+            (cx - shoulder + sleeve_w * 0.45, body_bot - ry * 0.12),
+        ], fill=color, outline=accent)
+        # Right
+        draw.polygon([
+            (cx + shoulder, body_top + ry * 0.18),
+            (cx + shoulder + sleeve_w * 0.5, body_top + ry * 0.32),
+            (cx + shoulder + sleeve_w * 0.2, body_bot - ry * 0.05),
+            (cx + shoulder - sleeve_w * 0.45, body_bot - ry * 0.12),
+        ], fill=color, outline=accent)
+
+    # Center opening + lapels
+    draw.line([(cx, body_top + ry * 0.18), (cx, body_bot)],
+              fill=accent, width=3)
+    # Lapel triangles
+    draw.line([(cx - shoulder * 0.40, body_top + ry * 0.18),
+               (cx, body_top + ry * 0.55)],
+              fill=accent, width=2)
+    draw.line([(cx + shoulder * 0.40, body_top + ry * 0.18),
+               (cx, body_top + ry * 0.55)],
+              fill=accent, width=2)
+
+    # Trench belt
+    if "trench" in name_lower:
+        belt_y = cy + ry * 0.05
+        draw.line([(cx - waist, belt_y), (cx + waist, belt_y)],
+                  fill=accent, width=4)
+        # buckle
+        draw.rectangle(
+            [(cx - rx * 0.08, belt_y - 5),
+             (cx + rx * 0.08, belt_y + 5)],
+            outline=accent, width=2,
+        )
+
+    # Puffer quilt rows
+    if "puffer" in name_lower or "quilted" in name_lower:
+        for k in range(3):
+            yy = body_top + ry * (0.40 + k * 0.22)
+            draw.line([(cx - shoulder * 0.85, yy),
+                       (cx + shoulder * 0.85, yy)],
+                      fill=accent, width=2)
+
+
+def _draw_activewear(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Leggings / sports bra / athletic tee / joggers."""
+    if "bra" in name_lower:
+        # Two cup shapes side-by-side, band underneath.
+        cup_r = rx * 0.42
+        cy_band = cy + ry * 0.05
+        draw.pieslice(
+            [(cx - rx * 0.92, cy - ry * 0.35),
+             (cx - rx * 0.08, cy + ry * 0.35)],
+            start=0, end=180, fill=color, outline=accent,
+        )
+        draw.pieslice(
+            [(cx + rx * 0.08, cy - ry * 0.35),
+             (cx + rx * 0.92, cy + ry * 0.35)],
+            start=0, end=180, fill=color, outline=accent,
+        )
+        # Band
+        draw.rectangle(
+            [(cx - rx * 0.95, cy_band),
+             (cx + rx * 0.95, cy_band + ry * 0.20)],
+            fill=color, outline=accent,
+        )
+        return
+
+    if "legging" in name_lower or "tight" in name_lower:
+        # Tight pants — fitted bottom silhouette.
+        waist_top = cy - ry * 0.85
+        leg_outer_top = rx * 0.85
+        leg_outer_bot = rx * 0.55
+        # Waistband
+        draw.rectangle(
+            [(cx - leg_outer_top, waist_top),
+             (cx + leg_outer_top, waist_top + ry * 0.12)],
+            fill=color, outline=accent,
+        )
+        # Legs (tighter than trousers — taper to ankle)
+        draw.polygon([
+            (cx - leg_outer_top, waist_top + ry * 0.12),
+            (cx - rx * 0.05,     waist_top + ry * 0.12),
+            (cx - rx * 0.05,     cy + ry * 0.95),
+            (cx - leg_outer_bot, cy + ry * 0.95),
+        ], fill=color, outline=accent)
+        draw.polygon([
+            (cx + leg_outer_top, waist_top + ry * 0.12),
+            (cx + rx * 0.05,     waist_top + ry * 0.12),
+            (cx + rx * 0.05,     cy + ry * 0.95),
+            (cx + leg_outer_bot, cy + ry * 0.95),
+        ], fill=color, outline=accent)
+        draw.line([(cx, waist_top + ry * 0.12), (cx, cy - ry * 0.10)],
+                  fill=accent, width=2)
+        return
+
+    if "jogger" in name_lower:
+        # Trousers but with cuffed ankles.
+        _draw_bottom(draw, name_lower, cx, cy, rx, ry, color, accent)
+        # Cuff lines
+        cuff_y = cy + ry * 0.78
+        draw.line([(cx - rx * 0.70, cuff_y), (cx - rx * 0.18, cuff_y)],
+                  fill=accent, width=3)
+        draw.line([(cx + rx * 0.18, cuff_y), (cx + rx * 0.70, cuff_y)],
+                  fill=accent, width=3)
+        return
+
+    # Athletic tee → re-use the top silhouette.
+    _draw_top(draw, name_lower, cx, cy, rx, ry, color, accent)
+
+
+def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Pumps / heels / sneakers / boots / sandals / flats. Profile view."""
+    sole_y = cy + ry * 0.45
+
+    if "heel" in name_lower or "pump" in name_lower or \
+            "stiletto" in name_lower:
+        # Heel profile: pointed toe, arch, thin heel.
+        toe_x = cx + rx * 0.95
+        heel_x = cx - rx * 0.65
+        body = [
+            (toe_x, sole_y),
+            (cx + rx * 0.30, cy - ry * 0.05),
+            (cx - rx * 0.15, cy - ry * 0.15),
+            (heel_x + rx * 0.10, cy - ry * 0.05),
+            (heel_x, sole_y - ry * 0.20),
+        ]
+        draw.polygon(body, fill=color, outline=accent)
+        # Heel column
+        draw.polygon([
+            (heel_x, sole_y - ry * 0.20),
+            (heel_x + rx * 0.06, sole_y - ry * 0.20),
+            (heel_x + rx * 0.10, sole_y + ry * 0.05),
+            (heel_x - rx * 0.02, sole_y + ry * 0.05),
+        ], fill=accent)
+        # Sole shadow
+        draw.line([(heel_x, sole_y + ry * 0.05),
+                   (toe_x, sole_y + ry * 0.05)],
+                  fill=accent, width=2)
+        return
+
+    if "sandal" in name_lower or "strappy" in name_lower:
+        # Open sole + strap arcs.
+        toe_x = cx + rx * 0.95
+        heel_x = cx - rx * 0.65
+        # Sole
+        draw.line([(heel_x, sole_y), (toe_x, sole_y)],
+                  fill=accent, width=5)
+        # Strap arc (across the foot)
+        draw.arc(
+            [(cx - rx * 0.30, cy - ry * 0.10),
+             (cx + rx * 0.45, sole_y)],
+            start=180, end=360, fill=accent, width=4,
+        )
+        # Heel
+        draw.polygon([
+            (heel_x, sole_y),
+            (heel_x + rx * 0.08, sole_y),
+            (heel_x + rx * 0.12, sole_y + ry * 0.25),
+            (heel_x - rx * 0.02, sole_y + ry * 0.25),
+        ], fill=accent)
+        return
+
+    if "boot" in name_lower:
+        # Ankle/Chelsea boot — taller shaft, rounded toe.
+        draw.polygon([
+            (cx - rx * 0.55, cy - ry * 0.55),
+            (cx + rx * 0.30, cy - ry * 0.55),
+            (cx + rx * 0.45, sole_y - ry * 0.15),
+            (cx + rx * 0.95, sole_y - ry * 0.10),
+            (cx + rx * 0.95, sole_y),
+            (cx - rx * 0.55, sole_y),
+        ], fill=color, outline=accent)
+        # Sole
+        draw.line([(cx - rx * 0.55, sole_y),
+                   (cx + rx * 0.95, sole_y)],
+                  fill=accent, width=4)
+        # Pull tab
+        draw.rectangle(
+            [(cx + rx * 0.10, cy - ry * 0.70),
+             (cx + rx * 0.28, cy - ry * 0.55)],
+            outline=accent, width=2,
+        )
+        return
+
+    if "sneaker" in name_lower or "running" in name_lower or \
+            "trainer" in name_lower:
+        # Low sneaker with chunky sole.
+        # Upper
+        draw.polygon([
+            (cx - rx * 0.85, sole_y - ry * 0.05),
+            (cx - rx * 0.60, cy - ry * 0.18),
+            (cx + rx * 0.10, cy - ry * 0.18),
+            (cx + rx * 0.85, cy + ry * 0.10),
+            (cx + rx * 0.95, sole_y - ry * 0.05),
+        ], fill=color, outline=accent)
+        # Sole
+        draw.rectangle(
+            [(cx - rx * 0.92, sole_y - ry * 0.05),
+             (cx + rx * 0.98, sole_y + ry * 0.05)],
+            fill=accent,
+        )
+        # Lace lines
+        for k in range(3):
+            xx = cx - rx * 0.25 + k * rx * 0.18
+            draw.line(
+                [(xx, cy - ry * 0.18),
+                 (xx + rx * 0.06, cy - ry * 0.05)],
+                fill=accent, width=2,
+            )
+        return
+
+    # Default — ballet flat / loafer outline.
+    draw.polygon([
+        (cx - rx * 0.55, cy + ry * 0.05),
+        (cx + rx * 0.90, cy + ry * 0.10),
+        (cx + rx * 0.95, sole_y),
+        (cx - rx * 0.55, sole_y),
+    ], fill=color, outline=accent)
+    # Vamp (top edge cutout)
+    draw.chord(
+        [(cx - rx * 0.40, cy - ry * 0.05),
+         (cx + rx * 0.30, cy + ry * 0.20)],
+        start=180, end=360, fill=accent, width=3,
+    )
+
+
+def _draw_accessory(draw, name_lower, cx, cy, rx, ry, color, accent):
+    """Earrings, necklace, scarf, handbag, tote, clutch, belt."""
+    if "hoop" in name_lower:
+        # Two hoops side by side.
+        r = rx * 0.40
+        draw.ellipse(
+            [(cx - rx * 0.80 - r, cy - r),
+             (cx - rx * 0.80 + r, cy + r)],
+            outline=accent, width=5,
+        )
+        draw.ellipse(
+            [(cx + rx * 0.80 - r, cy - r),
+             (cx + rx * 0.80 + r, cy + r)],
+            outline=accent, width=5,
+        )
+        # Posts
+        draw.ellipse(
+            [(cx - rx * 0.80 - 3, cy - r - 5),
+             (cx - rx * 0.80 + 3, cy - r + 1)],
+            fill=accent,
+        )
+        draw.ellipse(
+            [(cx + rx * 0.80 - 3, cy - r - 5),
+             (cx + rx * 0.80 + 3, cy - r + 1)],
+            fill=accent,
+        )
+        return
+
+    if "stud" in name_lower or "earring" in name_lower:
+        # Two filled circles side by side.
+        r = rx * 0.30
+        draw.ellipse(
+            [(cx - rx * 0.55 - r, cy - r),
+             (cx - rx * 0.55 + r, cy + r)],
+            fill=color, outline=accent, width=3,
+        )
+        draw.ellipse(
+            [(cx + rx * 0.55 - r, cy - r),
+             (cx + rx * 0.55 + r, cy + r)],
+            fill=color, outline=accent, width=3,
+        )
+        return
+
+    if "necklace" in name_lower or "chain" in name_lower:
+        # V-chain with pendant.
+        draw.arc(
+            [(cx - rx * 0.90, cy - ry * 0.85),
+             (cx + rx * 0.90, cy + ry * 0.30)],
+            start=0, end=180, fill=accent, width=3,
+        )
+        draw.ellipse(
+            [(cx - rx * 0.10, cy + ry * 0.20),
+             (cx + rx * 0.10, cy + ry * 0.40)],
+            fill=color, outline=accent, width=3,
+        )
+        return
+
+    if "scarf" in name_lower:
+        # Triangle silk scarf with knot.
+        draw.polygon([
+            (cx - rx * 0.85, cy - ry * 0.45),
+            (cx + rx * 0.85, cy - ry * 0.45),
+            (cx,              cy + ry * 0.75),
+        ], fill=color, outline=accent)
+        draw.rectangle(
+            [(cx - rx * 0.20, cy - ry * 0.60),
+             (cx + rx * 0.20, cy - ry * 0.40)],
+            fill=color, outline=accent,
+        )
+        # Print dots hint
+        for (xx, yy) in (
+            (cx - rx * 0.3, cy - ry * 0.1),
+            (cx + rx * 0.25, cy + ry * 0.05),
+            (cx - rx * 0.05, cy + ry * 0.3),
+        ):
+            draw.ellipse([(xx - 3, yy - 3), (xx + 3, yy + 3)], fill=accent)
+        return
+
+    if "belt" in name_lower:
+        # Horizontal belt with buckle.
+        bag_h = ry * 0.20
+        draw.rectangle(
+            [(cx - rx * 0.95, cy - bag_h),
+             (cx + rx * 0.95, cy + bag_h)],
+            fill=color, outline=accent,
+        )
+        # Buckle
+        draw.rectangle(
+            [(cx - rx * 0.15, cy - bag_h - 6),
+             (cx + rx * 0.15, cy + bag_h + 6)],
+            outline=accent, width=3,
+        )
+        return
+
+    if "tote" in name_lower:
+        # Rectangular tote with two strap arcs.
+        body_top = cy - ry * 0.40
+        draw.rectangle(
+            [(cx - rx * 0.85, body_top),
+             (cx + rx * 0.85, cy + ry * 0.80)],
+            fill=color, outline=accent,
+        )
+        # Long straps
+        draw.arc(
+            [(cx - rx * 0.60, body_top - ry * 0.60),
+             (cx + rx * 0.05, body_top + ry * 0.05)],
+            start=0, end=180, fill=accent, width=4,
+        )
+        draw.arc(
+            [(cx - rx * 0.05, body_top - ry * 0.60),
+             (cx + rx * 0.60, body_top + ry * 0.05)],
+            start=0, end=180, fill=accent, width=4,
+        )
+        return
+
+    if "clutch" in name_lower:
+        # Long narrow rectangle.
+        draw.rectangle(
+            [(cx - rx * 0.95, cy - ry * 0.18),
+             (cx + rx * 0.95, cy + ry * 0.18)],
+            fill=color, outline=accent,
+        )
+        # Center clasp
+        draw.line([(cx - rx * 0.95, cy - ry * 0.04),
+                   (cx + rx * 0.95, cy - ry * 0.04)],
+                  fill=accent, width=2)
+        draw.ellipse(
+            [(cx - rx * 0.04, cy - ry * 0.08),
+             (cx + rx * 0.04, cy)],
+            fill=accent,
+        )
+        return
+
+    # Default — generic handbag with single top-handle.
+    body_top = cy - ry * 0.30
+    body_bot = cy + ry * 0.75
+    draw.rectangle(
+        [(cx - rx * 0.78, body_top),
+         (cx + rx * 0.78, body_bot)],
+        fill=color, outline=accent,
+    )
+    # Top-handle arc
+    draw.arc(
+        [(cx - rx * 0.50, body_top - ry * 0.55),
+         (cx + rx * 0.50, body_top + ry * 0.05)],
+        start=0, end=180, fill=accent, width=5,
+    )
+
+
+_DRAW_BY_TYPE = {
+    "top":        _draw_top,
+    "bottom":     _draw_bottom,
+    "dress":      _draw_dress,
+    "outerwear":  _draw_outerwear,
+    "activewear": _draw_activewear,
+    "shoes":      _draw_shoes,
+    "accessory":  _draw_accessory,
+}
+
+
 # ── Card image generator ──────────────────────────────────
 
-def _generate_card_image(item: Dict[str, Any], size: tuple = (320, 400)) -> bytes:
+def _generate_card_image(
+    item: Dict[str, Any],
+    size: tuple = _DEFAULT_CARD_SIZE,
+) -> bytes:
     """
-    Render a polished colored-card PNG for a single demo item.
-    Returns PNG bytes. Self-contained — only depends on Pillow,
-    which the rest of the app already needs.
+    Render a polished demo-wardrobe card. Returns PNG bytes.
 
-    Card layout:
-        - Full-bleed background = item color.
-        - Small category badge (top-left, pill).
-        - Item name + " · " + store, centered, contrast-adjusted.
-        - Color name in a faint footer line.
+    Layout (400 x 500 default):
+      ┌──────────────────────────────────────────┐
+      │ [TYPE pill]                              │   top
+      │                                          │
+      │         CLOTHING SILHOUETTE              │   body (recognizable
+      │         drawn in a darker / lighter      │           shape per
+      │         shade of the item's own color    │           category)
+      │                                          │
+      │  ────────────────────────────────────── │
+      │  Item Name                       Store   │   footer (overlay band)
+      │  COLOR                                   │
+      └──────────────────────────────────────────┘
 
-    Body-positive language is enforced upstream in the JSON; this
-    function only renders what's there.
+    The silhouette is the focal element — that's what the user
+    scans the wardrobe for. Name + store sit at the bottom in a
+    tinted overlay band so they don't compete with the shape.
     """
     try:
         from PIL import Image, ImageDraw, ImageFont
@@ -125,31 +787,32 @@ def _generate_card_image(item: Dict[str, Any], size: tuple = (320, 400)) -> byte
     w, h = size
     bg_hex = _hex_for(item.get("color", ""))
     bg_rgb = _hex_to_rgb(bg_hex)
+    accent = _silhouette_color(bg_rgb)
     lum = _luminance(bg_rgb)
-    fg = (28, 25, 23) if lum > 0.55 else (244, 239, 232)        # ink or paper
+    fg = (28, 25, 23) if lum > 0.55 else (244, 239, 232)
 
     img = Image.new("RGB", (w, h), bg_rgb)
     draw = ImageDraw.Draw(img)
 
-    # Subtle inner border so cards read as "cards" even on a
-    # white-on-white site background.
-    draw.rectangle([(0, 0), (w - 1, h - 1)], outline=(0, 0, 0, 30), width=1)
+    # Subtle inner border so cards read as cards on a white site bg.
+    draw.rectangle([(0, 0), (w - 1, h - 1)],
+                   outline=_shade(bg_rgb, -25 if lum > 0.5 else +30),
+                   width=2)
 
-    # Top-left category badge (small uppercase pill).
+    # ── Top: category pill ─────────────────────────────
     category_label = (item.get("type") or "").upper() or "ITEM"
     try:
-        badge_font = ImageFont.truetype("arial.ttf", 11)
+        badge_font = ImageFont.truetype("arial.ttf", 12)
     except Exception:
         badge_font = ImageFont.load_default()
-    pad_x, pad_y = 10, 6
-    # Width via textbbox so we can size the rounded pill.
+    pad_x, pad_y = 12, 6
     bbox = draw.textbbox((0, 0), category_label, font=badge_font)
     tw = bbox[2] - bbox[0]
     th = bbox[3] - bbox[1]
     pill_w = tw + pad_x * 2
     pill_h = th + pad_y * 2
-    pill_x = 14
-    pill_y = 14
+    pill_x = 18
+    pill_y = 18
     pill_bg = (244, 239, 232) if lum < 0.55 else (28, 25, 23)
     pill_fg = (28, 25, 23) if lum < 0.55 else (244, 239, 232)
     try:
@@ -157,65 +820,87 @@ def _generate_card_image(item: Dict[str, Any], size: tuple = (320, 400)) -> byte
             [(pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h)],
             radius=99, fill=pill_bg,
         )
-    except AttributeError:                                      # older PIL
+    except AttributeError:
         draw.rectangle(
-            [(pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h)], fill=pill_bg,
+            [(pill_x, pill_y), (pill_x + pill_w, pill_y + pill_h)],
+            fill=pill_bg,
         )
     draw.text((pill_x + pad_x, pill_y + pad_y), category_label,
               font=badge_font, fill=pill_fg)
 
-    # Item name (centered, large, serif if available).
+    # ── Body: silhouette ───────────────────────────────
+    # Center the silhouette in the upper 75% of the card. The
+    # bottom 25% is the footer overlay.
+    body_cy = int(h * 0.46)
+    body_rx = int(w * 0.34)
+    body_ry = int(h * 0.30)
+    item_type = (item.get("type") or "").lower()
+    name_lower = (item.get("name") or "").lower()
+    drawer = _DRAW_BY_TYPE.get(item_type, _draw_top)
+    try:
+        drawer(draw, name_lower, w // 2, body_cy, body_rx, body_ry,
+               _shade(bg_rgb, -8 if lum > 0.5 else +14),    # silhouette fill
+               accent)                                       # silhouette outline
+    except Exception:
+        # Silhouette failed — let the footer text carry the card.
+        pass
+
+    # ── Footer: name + store overlay band ──────────────
+    footer_h = int(h * 0.25)
+    footer_top = h - footer_h
+    band_rgb = _shade(bg_rgb, -22 if lum > 0.5 else +18)
+    draw.rectangle([(0, footer_top), (w, h)], fill=band_rgb)
+    draw.line([(0, footer_top), (w, footer_top)],
+              fill=_shade(bg_rgb, -45 if lum > 0.5 else +30), width=1)
+
     name = item.get("name", "Item")
     store = item.get("source_store", "")
     try:
-        name_font   = ImageFont.truetype("georgia.ttf", 21)
-        store_font  = ImageFont.truetype("arial.ttf", 12)
-        color_font  = ImageFont.truetype("arial.ttf", 10)
+        name_font  = ImageFont.truetype("georgia.ttf", 19)
+        store_font = ImageFont.truetype("arial.ttf", 13)
+        color_font = ImageFont.truetype("arial.ttf", 10)
     except Exception:
-        name_font   = ImageFont.load_default()
-        store_font  = ImageFont.load_default()
-        color_font  = ImageFont.load_default()
+        name_font  = ImageFont.load_default()
+        store_font = ImageFont.load_default()
+        color_font = ImageFont.load_default()
 
-    # Wrap the name to ~2-3 lines so long names don't overflow.
     def _wrap(text, font, max_w):
         words = text.split()
         lines, cur = [], ""
-        for w_ in words:
-            test = (cur + " " + w_).strip()
-            bbox_ = draw.textbbox((0, 0), test, font=font)
-            test_w = bbox_[2] - bbox_[0]
-            if test_w <= max_w:
+        for tok in words:
+            test = (cur + " " + tok).strip()
+            bb = draw.textbbox((0, 0), test, font=font)
+            tw_ = bb[2] - bb[0]
+            if tw_ <= max_w:
                 cur = test
             else:
                 if cur: lines.append(cur)
-                cur = w_
+                cur = tok
         if cur: lines.append(cur)
-        return lines[:3]
+        return lines[:2]
 
-    name_lines = _wrap(name, name_font, w - 60)
-    line_h = name_font.size + 6
-    total_h = line_h * len(name_lines)
-    y = (h - total_h) // 2 - 10
+    name_lines = _wrap(name, name_font, w - 40)
+    line_h = name_font.size + 4
+    y = footer_top + 16
     for line in name_lines:
-        bbox = draw.textbbox((0, 0), line, font=name_font)
-        lw = bbox[2] - bbox[0]
+        bb = draw.textbbox((0, 0), line, font=name_font)
+        lw = bb[2] - bb[0]
         draw.text(((w - lw) // 2, y), line, font=name_font, fill=fg)
         y += line_h
-
     if store:
-        bbox = draw.textbbox((0, 0), store, font=store_font)
-        lw = bbox[2] - bbox[0]
+        bb = draw.textbbox((0, 0), store, font=store_font)
+        lw = bb[2] - bb[0]
+        store_color = _shade(fg, +40 if lum > 0.5 else -50)
         draw.text(((w - lw) // 2, y + 4), store, font=store_font,
-                  fill=tuple(int(c * 0.7 if lum > 0.55 else (c + 60))
-                             for c in fg))
-
-    # Footer color name.
+                  fill=store_color)
+        y += store_font.size + 6
     color_label = (item.get("color") or "").upper()
     if color_label:
-        bbox = draw.textbbox((0, 0), color_label, font=color_font)
-        lw = bbox[2] - bbox[0]
-        draw.text(((w - lw) // 2, h - 28), color_label, font=color_font,
-                  fill=fg)
+        bb = draw.textbbox((0, 0), color_label, font=color_font)
+        lw = bb[2] - bb[0]
+        # tiny letter-spaced color line at the bottom
+        draw.text(((w - lw) // 2, h - 18), color_label, font=color_font,
+                  fill=_shade(fg, +60 if lum > 0.5 else -60))
 
     out = io.BytesIO()
     img.save(out, format="PNG", optimize=True)
@@ -300,29 +985,36 @@ def _section_for_type(item_type: str) -> str:
     return "clothing"
 
 
-def load_demo_wardrobe() -> dict:
+def load_demo_wardrobe(regenerate_images: bool = True) -> dict:
     """
     Merge every item from `demo_wardrobe.json` into user_wardrobe.json.
 
     Returns::
 
         {
-          "added":          [item_id, ...],
-          "skipped":        [item_id, ...],   # already present
+          "added":          [item_id, ...],     # newly inserted
+          "skipped":        [item_id, ...],     # already in overlay (record kept as-is)
+          "refreshed":      [item_id, ...],     # already present BUT card image re-rendered
           "total_after":    int,
-          "image_errors":   [item_id, ...],   # PNG generation failed
+          "image_errors":   [item_id, ...],     # PNG generation failed
           "error":          str | None,
         }
 
-    Items already present (by id) are skipped — running this twice is
-    a no-op. User-added items (UC### / US### / UA###) are never
-    touched.
+    Items already present (by id) keep their existing JSON record.
+    BUT when `regenerate_images=True` (default), their card image is
+    re-rendered from the latest silhouette renderer — so clicking
+    "↻ Reload demo wardrobe" after upgrading the renderer refreshes
+    every thumbnail in place. Set `regenerate_images=False` to get
+    the old "skip everything" behavior.
+
+    User-added items (UC### / US### / UA###) are NEVER touched.
     """
     try:
         seed = _load_demo_seed()
     except Exception as e:
-        return {"added": [], "skipped": [], "total_after": 0,
-                "image_errors": [], "error": f"Could not read demo seed: {e}"}
+        return {"added": [], "skipped": [], "refreshed": [],
+                "total_after": 0, "image_errors": [],
+                "error": f"Could not read demo seed: {e}"}
 
     overlay = _load_user_overlay()
     overlay.setdefault("clothing", [])
@@ -336,9 +1028,10 @@ def load_demo_wardrobe() -> dict:
             if isinstance(it, dict) and it.get("id"):
                 existing_ids.add(it["id"])
 
-    added:   List[str] = []
-    skipped: List[str] = []
-    img_err: List[str] = []
+    added:     List[str] = []
+    skipped:   List[str] = []
+    refreshed: List[str] = []
+    img_err:   List[str] = []
 
     all_seed_items = (
         list(seed.get("clothing", []))
@@ -352,17 +1045,25 @@ def load_demo_wardrobe() -> dict:
         iid = item.get("id", "")
         if not iid:
             continue
+
         if iid in existing_ids:
             skipped.append(iid)
+            if regenerate_images:
+                # Refresh the cached card image in place. Doesn't
+                # touch the JSON record at all — just redraws the
+                # PNG on disk so the upgraded renderer takes effect.
+                new_path = _save_card(item)
+                if new_path:
+                    refreshed.append(iid)
+                else:
+                    img_err.append(iid)
             continue
 
-        # Generate the card image. Errors are non-fatal — the item
-        # still loads, just without a visual.
+        # New item — render card, build record, append to section.
         image_path = _save_card(item)
         if not image_path:
             img_err.append(iid)
 
-        # Build the item record with the canonical wardrobe shape.
         record = {
             "id":           iid,
             "type":         item.get("type", "top"),
@@ -390,7 +1091,7 @@ def load_demo_wardrobe() -> dict:
         try:
             _persist_user_overlay(overlay)
         except Exception as e:
-            return {"added": [], "skipped": skipped,
+            return {"added": [], "skipped": skipped, "refreshed": refreshed,
                     "total_after": 0, "image_errors": img_err,
                     "error": f"Save failed: {e}"}
 
@@ -399,6 +1100,7 @@ def load_demo_wardrobe() -> dict:
     return {
         "added":         added,
         "skipped":       skipped,
+        "refreshed":     refreshed,
         "total_after":   total_after,
         "image_errors":  img_err,
         "error":         None,
