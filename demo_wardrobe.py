@@ -798,32 +798,78 @@ _DRAW_BY_TYPE = {
 
 # ── Real-photo fetcher (Unsplash Source, no API key) ─────
 
-# Per-type query suffixes — biased toward catalog / product / flat-lay
-# imagery. "clothing flat lay" and "product photo" are the two terms
-# that most reliably surface e-commerce-style shots on Pexels; "on
-# white background" reinforces the catalog look. Accessories and
-# shoes get their own tighter biases. The order matters — the loader
-# tries them in sequence and stops at the first non-empty result set.
+# Per-type query suffixes — biased toward FULL-ITEM catalog / product
+# imagery. The "full length" / "full item" / "pair" wording pushes
+# Pexels toward photographs where the entire garment is visible,
+# instead of cropped detail / texture / runway-walking shots. The
+# loader tries the variants in order and stops at the first non-empty
+# result set.
 _QUERY_BIAS_BY_TYPE: Dict[str, Tuple[str, ...]] = {
-    "top":        ("clothing flat lay",  "product photo", ""),
-    "bottom":     ("clothing flat lay",  "product photo", ""),
-    "dress":      ("dress on hanger",    "product photo", ""),
-    "outerwear":  ("coat on hanger",     "product photo", ""),
-    "activewear": ("activewear flat lay","product photo", ""),
-    "shoes":      ("shoes product photo","studio shot",   ""),
-    "accessory":  ("product photo",      "studio shot",   ""),
+    "top":        ("blouse flat lay full item",
+                   "shirt flat lay product photo",
+                   "clothing flat lay full item",
+                   "product photo white background",
+                   ""),
+    "bottom":     ("trousers flat lay product photo",
+                   "pants flat lay full item",
+                   "clothing flat lay full item",
+                   "product photo white background",
+                   ""),
+    "dress":      ("full length dress product photo",
+                   "dress on hanger full length",
+                   "dress flat lay full item",
+                   "product photo white background",
+                   ""),
+    "outerwear":  ("coat on hanger full length",
+                   "jacket flat lay product photo",
+                   "outerwear product photo",
+                   "product photo white background",
+                   ""),
+    "activewear": ("activewear flat lay full set",
+                   "sportswear product photo",
+                   "clothing flat lay full item",
+                   ""),
+    "shoes":      ("shoes pair product photo",
+                   "shoes on white background",
+                   "shoes studio shot",
+                   ""),
+    "accessory":  ("product photo white background",
+                   "studio shot product photo",
+                   ""),
 }
 
-# A "product shape" is approximately portrait, between 0.55 (tall and
-# narrow, e.g. dress on hanger) and 0.95 (near-square catalog tile)
-# in width/height ratio. Lifestyle / editorial portraits tend to be
-# narrower (people are tall) or much wider (landscape group shots
-# that slipped past the orientation filter). We rank candidates by
-# distance from the sweet spot 0.75, then take the closest.
-_PRODUCT_ASPECT_LOW   = 0.55
-_PRODUCT_ASPECT_HIGH  = 0.95
-_PRODUCT_ASPECT_IDEAL = 0.75
-_CANDIDATES_PER_SEARCH = 15
+# Per-type aspect-ratio sweet spots. The "ideal" is the W/H ratio of
+# a typical catalog tile for that category; the band is the range
+# where candidates score well. Outside the band, candidates get a
+# heavy penalty so they only win when nothing else is on offer.
+#
+# Numbers come from how a fully-visible item tends to be framed:
+#   - Full-length dresses / coats: tall narrow rectangle (ratio ~0.5–0.7).
+#   - Tops, bottoms, activewear:   medium portrait        (ratio ~0.7–0.9).
+#   - Shoes / handbags:            squat-ish              (ratio ~0.8–1.05).
+_ASPECT_BY_TYPE: Dict[str, Tuple[float, float, float]] = {
+    # (ideal, low, high)
+    "top":        (0.78, 0.55, 0.95),
+    "bottom":     (0.72, 0.50, 0.90),
+    "dress":      (0.62, 0.42, 0.82),
+    "outerwear":  (0.62, 0.45, 0.85),
+    "activewear": (0.78, 0.55, 0.95),
+    "shoes":      (0.90, 0.65, 1.10),
+    "accessory":  (0.90, 0.65, 1.10),
+}
+_DEFAULT_ASPECT = (0.78, 0.55, 0.95)
+
+# Fetching 25 candidates per query (vs. 15 earlier) gives the scorer
+# room to skip cropped / face-only shots without falling off the end
+# of the result page.
+_CANDIDATES_PER_SEARCH = 25
+
+# How tightly the candidate dimensions must match the target before
+# we cover-crop. Sources that deviate more than this fraction from
+# the target aspect get LETTERBOXED (object-fit: contain) so the
+# full garment stays visible, padded with white. Sources within the
+# threshold are center-cropped (object-fit: cover) for a tight tile.
+_RESIZE_COVER_TOLERANCE = 0.20
 
 
 def _pexels_search(query: str, key: str, per_page: int,
@@ -851,10 +897,15 @@ def _pexels_search(query: str, key: str, per_page: int,
         return []
 
 
-def _score_candidate(photo: dict) -> float:
+def _score_candidate(photo: dict, item_type: str = "") -> float:
     """Lower is better. Candidates whose aspect ratio falls outside the
-    product band [0.55, 0.95] get a large penalty so they only win
-    when nothing else is available."""
+    per-type product band get a large penalty so they only win when
+    nothing else is on offer. Within the band, candidates are ranked
+    by distance from the type's ideal ratio.
+
+    Larger source images get a small bonus — full-item shots tend to
+    be photographed at higher resolution than cropped detail shots,
+    so pixel count is a noisy but useful tiebreaker."""
     try:
         w = float(photo.get("width") or 0)
         h = float(photo.get("height") or 0)
@@ -863,9 +914,23 @@ def _score_candidate(photo: dict) -> float:
         ratio = w / h
     except Exception:
         return 99.0
-    if ratio < _PRODUCT_ASPECT_LOW or ratio > _PRODUCT_ASPECT_HIGH:
-        return 10.0 + abs(ratio - _PRODUCT_ASPECT_IDEAL)
-    return abs(ratio - _PRODUCT_ASPECT_IDEAL)
+
+    ideal, low, high = _ASPECT_BY_TYPE.get(
+        (item_type or "").lower(), _DEFAULT_ASPECT)
+
+    if ratio < low or ratio > high:
+        base = 10.0 + abs(ratio - ideal)
+    else:
+        base = abs(ratio - ideal)
+
+    # Tiebreaker: prefer images >= 1500px on the long side. Cropped
+    # detail shots from Pexels tend to be served as smaller crops.
+    long_side = max(w, h)
+    if long_side >= 1500:
+        base -= 0.02
+    elif long_side < 700:
+        base += 0.10
+    return base
 
 
 def _fetch_real_photo(
@@ -900,7 +965,7 @@ def _fetch_real_photo(
         return b"", "", ""
 
     biases = _QUERY_BIAS_BY_TYPE.get((item_type or "").lower(),
-                                      ("product photo", ""))
+                                      ("product photo white background", ""))
 
     candidates: list = []
     for bias in biases:
@@ -912,8 +977,8 @@ def _fetch_real_photo(
     if not candidates:
         return b"", "", ""
 
-    # Rank by aspect-ratio fit; take the best.
-    candidates.sort(key=_score_candidate)
+    # Rank by per-type aspect-ratio fit; take the best.
+    candidates.sort(key=lambda p: _score_candidate(p, item_type))
     best = candidates[0]
     src = best.get("src") or {}
     img_url = src.get("large") or src.get("medium") or src.get("original")
@@ -977,23 +1042,43 @@ def _resize_for_card(
             bg.paste(img, mask=img.split()[-1])
             img = bg
 
-        # Center-crop to the target aspect ratio (cover).
         target_w, target_h = size
         target_ratio = target_w / target_h
         src_w, src_h = img.size
         src_ratio = src_w / src_h
-        if src_ratio > target_ratio:
-            # Source wider than target — crop horizontally.
-            new_w = int(src_h * target_ratio)
-            left = (src_w - new_w) // 2
-            img = img.crop((left, 0, left + new_w, src_h))
-        elif src_ratio < target_ratio:
-            new_h = int(src_w / target_ratio)
-            top = (src_h - new_h) // 2
-            img = img.crop((0, top, src_w, top + new_h))
 
-        # Downscale to the target.
-        img = img.resize((target_w, target_h), Image.LANCZOS)
+        # Decision: cover (center-crop) vs. contain (letterbox with
+        # white padding). When the source aspect is close to the card
+        # aspect, cover gives a tight tile and crops only a few pixels.
+        # When the source is much taller or much wider (e.g. a full-
+        # length dress photographed at 0.5 aspect vs. the card at 0.8),
+        # cover would cut off the garment's head or feet — so we
+        # letterbox instead, preserving the entire item.
+        deviation = abs(src_ratio - target_ratio) / target_ratio
+        from PIL import Image as _I
+        if deviation <= _RESIZE_COVER_TOLERANCE:
+            # COVER — center-crop to target aspect, then resize.
+            if src_ratio > target_ratio:
+                new_w = int(src_h * target_ratio)
+                left = (src_w - new_w) // 2
+                img = img.crop((left, 0, left + new_w, src_h))
+            elif src_ratio < target_ratio:
+                new_h = int(src_w / target_ratio)
+                top = (src_h - new_h) // 2
+                img = img.crop((0, top, src_w, top + new_h))
+            img = img.resize((target_w, target_h), Image.LANCZOS)
+        else:
+            # CONTAIN — fit inside the card, pad sides with white. The
+            # full garment is preserved.
+            scale = min(target_w / src_w, target_h / src_h)
+            new_w = max(1, int(src_w * scale))
+            new_h = max(1, int(src_h * scale))
+            resized = img.resize((new_w, new_h), Image.LANCZOS)
+            canvas = _I.new("RGB", (target_w, target_h), (255, 255, 255))
+            ox = (target_w - new_w) // 2
+            oy = (target_h - new_h) // 2
+            canvas.paste(resized, (ox, oy))
+            img = canvas
 
         out = io.BytesIO()
         img.save(out, format="PNG", optimize=True)
@@ -1102,18 +1187,61 @@ def _generate_card_image(
     return out.getvalue()
 
 
+def _read_local_override(rel_or_abs: str) -> bytes:
+    """Read a local image override file. Returns its raw bytes, or
+    empty bytes if the path is missing / unreadable. Accepts paths
+    relative to the repo root or absolute paths."""
+    if not rel_or_abs:
+        return b""
+    p = rel_or_abs
+    if not os.path.isabs(p):
+        p = os.path.join(_repo_root(), p)
+    if not os.path.exists(p):
+        return b""
+    try:
+        with open(p, "rb") as f:
+            return f.read(8 * 1024 * 1024)
+    except OSError:
+        return b""
+
+
+def _fetch_override_url(url: str, timeout: float = _FETCH_TIMEOUT) -> bytes:
+    """Fetch raw bytes from an arbitrary HTTPS URL set by the demo
+    JSON's `image_url_override`. NEVER raises — empty bytes on any
+    failure."""
+    if not url:
+        return b""
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": _FETCH_UA,
+            "Accept":     "image/jpeg, image/png, image/webp",
+        })
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return resp.read(8 * 1024 * 1024)
+    except Exception:
+        return b""
+
+
 def _save_card(item: Dict[str, Any], use_photos: bool = True
                ) -> Tuple[str, str, str, str]:
     """
     Save a card image for a demo item. Returns
     ``(relative_path, source, photographer, photo_url)`` where:
-      - source ∈ {"photo", "silhouette", ""}
+      - source ∈ {"photo", "override", "silhouette", ""}
       - photographer / photo_url are populated only when source=="photo"
         so the UI can render "Photo: <Name> · Pexels" attribution.
+        Manual overrides carry no attribution (the operator who set
+        them is responsible for the image's licensing).
 
-    When `use_photos=True` (default), tries Pexels first using
-    item["unsplash_query"] biased by item["type"]. On any failure,
-    falls back to the silhouette renderer.
+    Resolution order:
+      1. `local_image_path_override`  → read a file from disk.
+      2. `image_url_override`         → HTTP GET an explicit URL.
+      3. Pexels search                → biased product-photo query.
+      4. Drawn silhouette             → final fallback.
+
+    The override fields are the documented escape hatch for any
+    DM-* item whose Pexels result is bad: open demo_wardrobe.json,
+    set the field on the item, click Reload.
     """
     os.makedirs(WARDROBE_IMAGES_DIR, exist_ok=True)
     item_id = item.get("id", "")
@@ -1125,9 +1253,26 @@ def _save_card(item: Dict[str, Any], use_photos: bool = True
     photographer = ""
     photo_url = ""
 
-    # `unsplash_query` is the canonical field name on each demo
-    # item; the keywords drive whichever real-photo source we use.
-    if use_photos and item.get("unsplash_query"):
+    # 1. Local file override — operator-supplied image on disk.
+    local_override = item.get("local_image_path_override")
+    if local_override:
+        raw = _read_local_override(local_override)
+        if raw:
+            png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
+            if png_bytes:
+                source = "override"
+
+    # 2. URL override — operator-supplied direct image URL.
+    if not png_bytes and item.get("image_url_override"):
+        raw = _fetch_override_url(item["image_url_override"])
+        if raw:
+            png_bytes = _resize_for_card(raw, _DEFAULT_CARD_SIZE)
+            if png_bytes:
+                source = "override"
+
+    # 3. Pexels — `unsplash_query` is the legacy field name; the
+    #    keywords drive whichever real-photo source we use.
+    if not png_bytes and use_photos and item.get("unsplash_query"):
         raw, photographer, photo_url = _fetch_real_photo(
             item["unsplash_query"],
             item_type=item.get("type", ""),
