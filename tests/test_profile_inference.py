@@ -560,6 +560,118 @@ class TestAutoFillFromShape(unittest.TestCase):
         self.assertFalse(ov.get("preferred_fit"))
 
 
+class TestSuggestedFitReconciliation(unittest.TestCase):
+    """When the user has chosen a preferred_fit that differs from the
+    R8 _suggested_fit for their body shape, both values must be
+    preserved AND the recommendation reasoning must surface the blend."""
+
+    def setUp(self):
+        import fit_tool, tempfile
+        self._orig_path = fit_tool.PROFILE_PATH
+        self._tmp = tempfile.NamedTemporaryFile(
+            mode="w", suffix=".json", delete=False, encoding="utf-8")
+        self._tmp.close()
+        fit_tool.PROFILE_PATH = self._tmp.name
+
+    def tearDown(self):
+        import fit_tool, os
+        fit_tool.PROFILE_PATH = self._orig_path
+        try:
+            os.unlink(self._tmp.name)
+        except OSError:
+            pass
+
+    def test_suggested_fit_round_trips(self):
+        """_suggested_fit is always set from R8 when body_shape is set in
+        an active mode, independent of the user's preferred_fit."""
+        from fit_tool import save_fit_profile, get_fit_profile
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "pear",
+                          "_body_shape_source": "user",
+                          "preferred_fit": "relaxed"})
+        p = get_fit_profile()["profile"]
+        # User's preferred_fit preserved
+        self.assertEqual(p["preferred_fit"], "relaxed")
+        # R8 suggested_fit for pear is "structured"
+        self.assertEqual(p["_suggested_fit"], "structured")
+
+    def test_user_preferred_fit_not_overwritten_by_r8(self):
+        """save_fit_profile must never write preferred_fit when the user
+        has already chosen one, even when the R8 mapping would suggest
+        a different value."""
+        from fit_tool import save_fit_profile, _load_overlay
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "pear",
+                          "preferred_fit": "relaxed"})
+        ov = _load_overlay()
+        self.assertEqual(ov.get("preferred_fit"), "relaxed",
+                         "user's preferred_fit must survive R8 auto-fill")
+        # And the R8 suggestion is still recorded separately
+        self.assertEqual(ov.get("_suggested_fit"), "structured")
+
+    def test_suggested_fit_wiped_on_reset(self):
+        from fit_tool import save_fit_profile, reset_fit_profile_test_data, _load_overlay
+        save_fit_profile({"fit_profile_mode": "manual",
+                          "body_shape": "pear"})
+        # _suggested_fit should be present
+        self.assertEqual(_load_overlay().get("_suggested_fit"), "structured")
+        reset_fit_profile_test_data()
+        ov = _load_overlay()
+        self.assertFalse(ov.get("_suggested_fit"))
+
+    def test_blend_note_appears_when_fits_differ_and_item_supports_balance(self):
+        """The reasoning trail must surface the blend when:
+          - user's preferred_fit ≠ R8's _suggested_fit, AND
+          - the item's silhouette is structured (blazer / fit-and-flare /
+            A-line / peplum / wrap), AND
+          - the item earned a balance note (it targets a balance area).
+        Pear's balance_areas = ['hips']; the hip silhouette signals
+        include 'a-line', so an A-line skirt fires both the balance
+        note and the structured-element check.
+        """
+        from fit_tool import fit_alignment_notes
+        profile = {
+            "body_shape":         "pear",
+            "preferred_fit":      "relaxed",   # user
+            "_suggested_fit":     "structured", # R8
+            "balance_areas":      ["hips"],
+            "highlight_features": ["neckline"],
+        }
+        item = {
+            "type":      "bottom",
+            "name":      "Cream A-Line Midi Skirt",
+            "tags":      ["work", "smart_casual"],
+            "formality": "smart_casual",
+            "color":     "cream",
+            "silhouette": "a-line",
+        }
+        notes = fit_alignment_notes(item, profile)
+        joined = "\n".join(notes).lower()
+        self.assertIn("blends your preferred relaxed fit", joined,
+                      msg=f"got: {notes}")
+        self.assertIn("[fit-silhouette-rules#r8]", joined)
+
+    def test_blend_note_does_not_appear_when_fits_match(self):
+        """When user kept the R8-suggested fit, no blend note fires —
+        there's nothing to reconcile."""
+        from fit_tool import fit_alignment_notes
+        profile = {
+            "body_shape":         "pear",
+            "preferred_fit":      "structured",
+            "_suggested_fit":     "structured",
+            "balance_areas":      ["hips"],
+        }
+        item = {
+            "type":      "bottom",
+            "name":      "Cream A-Line Midi Skirt",
+            "silhouette":"a-line",
+            "formality": "smart_casual",
+        }
+        notes = fit_alignment_notes(item, profile)
+        joined = "\n".join(notes).lower()
+        self.assertNotIn("blends your preferred", joined)
+
+
 class TestFitProfileMode(unittest.TestCase):
     """The fit_profile_mode field controls which Profile UI path renders.
     It must round-trip through save_fit_profile, be wiped by

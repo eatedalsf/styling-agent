@@ -87,6 +87,14 @@ _EMPTY_OVERLAY = {
     # Layer 4 — meta: provenance of auto-fills. "user" = explicitly set
     # by the wearer; "auto" = predicted from measurements; None = unset.
     "_body_shape_source": None,
+    # Layer 4a — R8's suggested preferred_fit for the current body
+    # shape, tracked SEPARATELY from the user's `preferred_fit` so
+    # we can reconcile the two when they differ. The user's choice
+    # is canonical for "what cut they want"; this field captures
+    # "what cut the R8 mapping would suggest for their proportions"
+    # so the recommendation engine can blend the two (e.g. relaxed
+    # overall with structured pieces for balance).
+    "_suggested_fit":     None,
     # Layer 4b — user's chosen path through the fit-profile setup:
     #   "measurements" : enter bust/waist/hips, let Wearly suggest
     #   "manual"       : pick a body-shape preference from a list
@@ -512,6 +520,7 @@ def save_fit_profile(updates: dict) -> dict:
         "measurements",
         "fit_profile_mode",
         "_body_shape_source",
+        "_suggested_fit",
         "timezone",
     )
     for k in accepted:
@@ -615,10 +624,20 @@ def save_fit_profile(updates: dict) -> dict:
             if _ba:
                 overlay["balance_areas"] = _ba
         # preferred_fit — first option in the R8 list, when one exists.
-        if not overlay.get("preferred_fit"):
-            _fit_opts = list(_table.get("fit", []))
-            if _fit_opts:
-                overlay["preferred_fit"] = _fit_opts[0]
+        # ONLY fills when empty; user-set values are preserved.
+        _fit_opts = list(_table.get("fit", []))
+        if not overlay.get("preferred_fit") and _fit_opts:
+            overlay["preferred_fit"] = _fit_opts[0]
+        # _suggested_fit — ALWAYS reflects R8's recommendation for the
+        # current shape, even when the user has already chosen a
+        # different preferred_fit. This is what powers the
+        # reconciliation panel in the UI ("Your saved preference is
+        # relaxed; based on your proportions, Wearly may add
+        # structured elements for balance") and the blend note in
+        # fit_alignment_notes. Reset wipes it alongside the other
+        # fit fields.
+        if _fit_opts:
+            overlay["_suggested_fit"] = _fit_opts[0]
 
     on_disk = {
         "_comment": "User fit / style profile overlay. See fit_tool.py.",
@@ -644,6 +663,7 @@ _RESET_FIELDS = (
     "body_shape",
     "_body_shape_source",
     "preferred_fit",
+    "_suggested_fit",
     "highlight_features",
     "balance_areas",
     "measurements",
@@ -964,7 +984,37 @@ def fit_alignment_notes(item: dict, profile: dict) -> list:
             if area in natural_areas:
                 notes.append(_r8_note(
                     "honors your choice to bring balance to", area))
+                balance_note_emitted = True
                 break
+
+    # ── Blend note: user's preferred_fit ≠ R8's suggested_fit ─────
+    # When the user has chosen one cut (e.g. "relaxed") but the R8
+    # mapping for their body shape would suggest a different cut
+    # (e.g. "structured" for pear), the recommendation engine still
+    # honors the user's choice for the overall silhouette — but a
+    # structured ITEM that targets one of their balance_areas earns
+    # a soft blend note. This is the reconciliation the user asked
+    # for: relaxed comfort overall, with structured pieces only
+    # where they support balance.
+    #
+    # We surface the blend ONLY when:
+    #   - user's preferred_fit and the R8 _suggested_fit differ AND
+    #   - this item already earned a balance / draws-attention note
+    #     (i.e. it does support one of the user's areas), AND
+    #   - the item's silhouette suggests structured-ness (matches
+    #     one of the structured signals we already use elsewhere).
+    pf_user = (profile.get("preferred_fit") or "").lower().strip()
+    pf_sug  = (profile.get("_suggested_fit") or "").lower().strip()
+    if (pf_user and pf_sug and pf_user != pf_sug
+            and balance_note_emitted
+            and any(sig in haystack_silhouette for sig in (
+                "blazer", "structured", "tailored", "fit-and-flare",
+                "a-line", "a line", "peplum", "wrap"))):
+        tail = f" {cite_tag_r8}" if cite_tag_r8 else ""
+        notes.append(
+            f"blends your preferred {pf_user} fit with a "
+            f"structured element for balance{tail}"
+        )
 
     # Final formatting: only the FIRST character is uppercased so the
     # rule citation tag's R8 stays uppercase. The earlier ".capitalize()"

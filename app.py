@@ -4989,24 +4989,67 @@ def _render_shop():
 def _render_autofill_summary(profile: dict, source_label: str) -> None:
     """
     Calm read-only summary of what was auto-filled into the fit
-    profile. Replaces the previous "tick a chip, click Apply" UI.
-    Values are written to disk by `fit_tool.save_fit_profile`'s
-    R8 auto-fill — this card just surfaces what got applied so the
-    user can see the source basis. Anything left empty (or anything
-    the user has explicitly edited) is reflected verbatim.
+    profile. Values are written to disk by save_fit_profile's R8
+    auto-fill; this card just surfaces what got applied so the user
+    can see the source basis.
 
-    `source_label` is interpolated into the headline:
-      "Auto-filled from <source_label>" — e.g.
-        "your selection"    (manual mode)
-        "your measurements" (measurements mode)
+    Reconciliation: when the user's `preferred_fit` differs from the
+    R8 `_suggested_fit` for their body shape, the card splits the
+    "Preferred fit" row into three lines:
+        Your preference:                  <preferred_fit>
+        Measurement-based suggestion:     <_suggested_fit>
+        Final approach:                   <user's fit> overall, with
+                                          structured elements for balance
+    User-set fields are never overwritten — see the auto-fill logic
+    in fit_tool.save_fit_profile.
     """
-    body_shape = profile.get("body_shape") or "—"
-    highlights = profile.get("highlight_features") or []
-    balances   = profile.get("balance_areas") or []
-    preferred  = profile.get("preferred_fit") or "—"
+    body_shape    = profile.get("body_shape") or "—"
+    highlights    = profile.get("highlight_features") or []
+    balances      = profile.get("balance_areas") or []
+    preferred     = (profile.get("preferred_fit") or "").strip()
+    suggested     = (profile.get("_suggested_fit") or "").strip()
 
     def _list_or_dash(values):
         return ", ".join(values) if values else "—"
+
+    _shape_str = (body_shape or "—").title() if isinstance(body_shape, str) else "—"
+
+    # Build the preferred-fit row depending on whether reconciliation
+    # is needed.
+    fits_differ = (preferred and suggested
+                   and preferred.lower() != suggested.lower())
+    if fits_differ:
+        fit_block = (
+            '<div style="margin-top:0.45rem; padding:0.55rem 0.7rem; '
+            'background:#FFFFFF; border:1px solid #EFD9A6; '
+            'border-radius:4px;">'
+            '<div style="font-size:0.66rem; color:#7C5A22; '
+            'letter-spacing:0.1em; text-transform:uppercase; '
+            'font-weight:600; margin-bottom:0.3rem;">'
+            'Preferred fit · reconciled'
+            '</div>'
+            f'<div style="font-size:0.82rem; color:#1C1917; line-height:1.6;">'
+            f'Your saved preference: <strong>{preferred.title()}</strong><br>'
+            f'Measurement-based suggestion: <strong>{suggested.title()}</strong><br>'
+            f'Final styling approach: <strong>{preferred.title()}</strong> '
+            f'overall, with <strong>{suggested}</strong> elements only where '
+            f'they support balance (e.g. blazer, A-line skirt, structured '
+            f'neckline, fit-and-flare).'
+            f'</div>'
+            f'<div style="font-size:0.72rem; color:#7C5A22; line-height:1.55; '
+            f'margin-top:0.4rem;">'
+            f'Your preference is never overwritten. Wearly keeps the overall '
+            f'silhouette {preferred} and adds {suggested} pieces only where '
+            f'they help balance at your {", ".join(balances) if balances else "preferred areas"}.'
+            f'</div></div>'
+        )
+    else:
+        fit_block = (
+            f'<div style="font-size:0.86rem; color:#1C1917;">'
+            f'<strong>Preferred fit:</strong> '
+            f'{(preferred or "—").title() if preferred else "—"}'
+            f'</div>'
+        )
 
     st.markdown(
         '<div style="background:#FAFAFA; border:1px solid #EEEEEE; '
@@ -5017,11 +5060,11 @@ def _render_autofill_summary(profile: dict, source_label: str) -> None:
         f'Auto-filled from {source_label}'
         '</div>'
         f'<div style="font-size:0.86rem; color:#1C1917;">'
-        f'<strong>Body shape:</strong> {body_shape.title() if isinstance(body_shape, str) else "—"}<br>'
+        f'<strong>Body shape:</strong> {_shape_str}<br>'
         f'<strong>Features to highlight:</strong> {_list_or_dash(highlights)}<br>'
-        f'<strong>Areas to balance:</strong> {_list_or_dash(balances)}<br>'
-        f'<strong>Preferred fit:</strong> {(preferred or "—").title() if isinstance(preferred, str) else "—"}'
+        f'<strong>Areas to balance:</strong> {_list_or_dash(balances)}'
         f'</div>'
+        + fit_block +
         '<div style="font-size:0.7rem; color:#8E8E93; margin-top:0.55rem;">'
         'Edit any of these in the form below. '
         '<code style="font-size:0.7rem; color:#8E8E93;">[fit-silhouette-rules#R8]</code>'
