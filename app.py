@@ -2602,10 +2602,16 @@ def _render_calendar_import() -> None:
                             # calendar are reflected locally.
                             res = refresh_subscription(replace=True)
                         if res.get("success"):
+                            # Use current_sub (the value bound above in
+                            # this scope) — not `sub`, which is the
+                            # outer-scope name from elsewhere in the
+                            # module and would NameError here.
+                            _prev_count = (
+                                current_sub.get("last_event_count") or 0
+                            ) if isinstance(current_sub, dict) else 0
                             dropped = max(
                                 0,
-                                (sub.get("last_event_count") or 0)
-                                - res.get("total", 0)
+                                _prev_count - res.get("total", 0)
                             )
                             st.success(
                                 f"Synced. {len(res['added'])} new · "
