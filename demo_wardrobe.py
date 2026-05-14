@@ -161,7 +161,7 @@ def _draw_top(draw, name_lower, cx, cy, rx, ry, color, accent):
         (cx + hem_w,   body_bot),
         (cx - hem_w,   body_bot),
     ]
-    draw.polygon(body, fill=color, outline=accent)
+    draw.polygon(body, fill=color, outline=accent, width=4)
 
     # Sleeves.
     sleeve_w = rx * 0.30
@@ -173,14 +173,14 @@ def _draw_top(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx - waist_w - sleeve_w, body_top + ry * 0.28),
             (cx - waist_w - sleeve_w * 0.95, body_top + ry * 0.28 + sleeve_h),
             (cx - waist_w + sleeve_w * 0.15, body_top + ry * 0.5),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Right sleeve (mirrored)
         draw.polygon([
             (cx + waist_w, body_top + ry * 0.18),
             (cx + waist_w + sleeve_w, body_top + ry * 0.28),
             (cx + waist_w + sleeve_w * 0.95, body_top + ry * 0.28 + sleeve_h),
             (cx + waist_w - sleeve_w * 0.15, body_top + ry * 0.5),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
 
     # Neckline.
     neck_w = rx * 0.35
@@ -203,11 +203,11 @@ def _draw_top(draw, name_lower, cx, cy, rx, ry, color, accent):
     # Center seam for cardigan / open shirt.
     if "cardigan" in name_lower:
         draw.line([(cx, body_top + ry * 0.18), (cx, body_bot)],
-                  fill=accent, width=3)
+                  fill=accent, width=4)
     elif "shirt" in name_lower or "oxford" in name_lower or "button" in name_lower:
         # Faint placket line + buttons.
         draw.line([(cx, body_top + ry * 0.20), (cx, body_bot - ry * 0.05)],
-                  fill=accent, width=2)
+                  fill=accent, width=4)
         for i in range(3):
             yy = body_top + ry * (0.30 + i * 0.18)
             draw.ellipse([(cx - 3, yy - 3), (cx + 3, yy + 3)], fill=accent)
@@ -222,7 +222,7 @@ def _draw_bottom(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx + rx * 0.60, cy - ry * 0.8),
             (cx + rx * 1.05, cy + ry * 0.95),
             (cx - rx * 1.05, cy + ry * 0.95),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Pleats hint.
         if "pleated" in name_lower:
             for off in (-0.4, -0.13, 0.13, 0.4):
@@ -256,17 +256,17 @@ def _draw_bottom(draw, name_lower, cx, cy, rx, ry, color, accent):
         (cx - leg_inner,  waist_top + ry * 0.13),
         (cx - leg_inner * 0.75,  leg_bottom),
         (cx - leg_outer * 0.85,  leg_bottom),
-    ], fill=color, outline=accent)
+    ], fill=color, outline=accent, width=4)
     # Right leg
     draw.polygon([
         (cx + leg_outer,  waist_top + ry * 0.13),
         (cx + leg_inner,  waist_top + ry * 0.13),
         (cx + leg_inner * 0.75,  leg_bottom),
         (cx + leg_outer * 0.85,  leg_bottom),
-    ], fill=color, outline=accent)
+    ], fill=color, outline=accent, width=4)
     # Center seam
     draw.line([(cx, waist_top + ry * 0.13), (cx, crotch_y)],
-              fill=accent, width=2)
+              fill=accent, width=4)
 
 
 def _draw_dress(draw, name_lower, cx, cy, rx, ry, color, accent):
@@ -298,7 +298,7 @@ def _draw_dress(draw, name_lower, cx, cy, rx, ry, color, accent):
         (cx + hem_half,    hem_y),
         (cx - hem_half,    hem_y),
         (cx - waist_half,  waist_y),
-    ], fill=color, outline=accent)
+    ], fill=color, outline=accent, width=4)
 
     # Sleeves (most dresses are sleeveless; show only when name says so)
     if "long-sleeve" in name_lower or "long sleeve" in name_lower:
@@ -309,14 +309,14 @@ def _draw_dress(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx - bodice_half - sleeve_w, bodice_top + ry * 0.30),
             (cx - bodice_half - sleeve_w * 0.85, bodice_top + ry * 0.85),
             (cx - bodice_half + sleeve_w * 0.20, bodice_top + ry * 0.55),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Right
         draw.polygon([
             (cx + bodice_half, bodice_top + ry * 0.18),
             (cx + bodice_half + sleeve_w, bodice_top + ry * 0.30),
             (cx + bodice_half + sleeve_w * 0.85, bodice_top + ry * 0.85),
             (cx + bodice_half - sleeve_w * 0.20, bodice_top + ry * 0.55),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
 
     # Neckline
     neck_w = rx * 0.30
@@ -330,7 +330,7 @@ def _draw_dress(draw, name_lower, cx, cy, rx, ry, color, accent):
     if "wrap" in name_lower:
         draw.line([(cx - bodice_half * 0.8, bodice_top + ry * 0.25),
                    (cx + waist_half * 0.5, waist_y)],
-                  fill=accent, width=3)
+                  fill=accent, width=4)
         # tie-knot dot
         draw.ellipse(
             [(cx + waist_half * 0.40, waist_y - 4),
@@ -358,7 +358,7 @@ def _draw_outerwear(draw, name_lower, cx, cy, rx, ry, color, accent):
         (cx + hem,      body_bot),
         (cx - hem,      body_bot),
         (cx - waist,    cy + ry * 0.10),
-    ], fill=color, outline=accent)
+    ], fill=color, outline=accent, width=4)
 
     # Sleeves (skip for vest)
     if "vest" not in name_lower:
@@ -369,25 +369,25 @@ def _draw_outerwear(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx - shoulder - sleeve_w * 0.5, body_top + ry * 0.32),
             (cx - shoulder - sleeve_w * 0.2, body_bot - ry * 0.05),
             (cx - shoulder + sleeve_w * 0.45, body_bot - ry * 0.12),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Right
         draw.polygon([
             (cx + shoulder, body_top + ry * 0.18),
             (cx + shoulder + sleeve_w * 0.5, body_top + ry * 0.32),
             (cx + shoulder + sleeve_w * 0.2, body_bot - ry * 0.05),
             (cx + shoulder - sleeve_w * 0.45, body_bot - ry * 0.12),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
 
     # Center opening + lapels
     draw.line([(cx, body_top + ry * 0.18), (cx, body_bot)],
-              fill=accent, width=3)
+              fill=accent, width=4)
     # Lapel triangles
     draw.line([(cx - shoulder * 0.40, body_top + ry * 0.18),
                (cx, body_top + ry * 0.55)],
-              fill=accent, width=2)
+              fill=accent, width=4)
     draw.line([(cx + shoulder * 0.40, body_top + ry * 0.18),
                (cx, body_top + ry * 0.55)],
-              fill=accent, width=2)
+              fill=accent, width=4)
 
     # Trench belt
     if "trench" in name_lower:
@@ -407,7 +407,7 @@ def _draw_outerwear(draw, name_lower, cx, cy, rx, ry, color, accent):
             yy = body_top + ry * (0.40 + k * 0.22)
             draw.line([(cx - shoulder * 0.85, yy),
                        (cx + shoulder * 0.85, yy)],
-                      fill=accent, width=2)
+                      fill=accent, width=4)
 
 
 def _draw_activewear(draw, name_lower, cx, cy, rx, ry, color, accent):
@@ -451,15 +451,15 @@ def _draw_activewear(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx - rx * 0.05,     waist_top + ry * 0.12),
             (cx - rx * 0.05,     cy + ry * 0.95),
             (cx - leg_outer_bot, cy + ry * 0.95),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         draw.polygon([
             (cx + leg_outer_top, waist_top + ry * 0.12),
             (cx + rx * 0.05,     waist_top + ry * 0.12),
             (cx + rx * 0.05,     cy + ry * 0.95),
             (cx + leg_outer_bot, cy + ry * 0.95),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         draw.line([(cx, waist_top + ry * 0.12), (cx, cy - ry * 0.10)],
-                  fill=accent, width=2)
+                  fill=accent, width=4)
         return
 
     if "jogger" in name_lower:
@@ -468,9 +468,9 @@ def _draw_activewear(draw, name_lower, cx, cy, rx, ry, color, accent):
         # Cuff lines
         cuff_y = cy + ry * 0.78
         draw.line([(cx - rx * 0.70, cuff_y), (cx - rx * 0.18, cuff_y)],
-                  fill=accent, width=3)
+                  fill=accent, width=4)
         draw.line([(cx + rx * 0.18, cuff_y), (cx + rx * 0.70, cuff_y)],
-                  fill=accent, width=3)
+                  fill=accent, width=4)
         return
 
     # Athletic tee → re-use the top silhouette.
@@ -493,7 +493,7 @@ def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
             (heel_x + rx * 0.10, cy - ry * 0.05),
             (heel_x, sole_y - ry * 0.20),
         ]
-        draw.polygon(body, fill=color, outline=accent)
+        draw.polygon(body, fill=color, outline=accent, width=4)
         # Heel column
         draw.polygon([
             (heel_x, sole_y - ry * 0.20),
@@ -504,7 +504,7 @@ def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
         # Sole shadow
         draw.line([(heel_x, sole_y + ry * 0.05),
                    (toe_x, sole_y + ry * 0.05)],
-                  fill=accent, width=2)
+                  fill=accent, width=4)
         return
 
     if "sandal" in name_lower or "strappy" in name_lower:
@@ -538,7 +538,7 @@ def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx + rx * 0.95, sole_y - ry * 0.10),
             (cx + rx * 0.95, sole_y),
             (cx - rx * 0.55, sole_y),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Sole
         draw.line([(cx - rx * 0.55, sole_y),
                    (cx + rx * 0.95, sole_y)],
@@ -561,7 +561,7 @@ def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx + rx * 0.10, cy - ry * 0.18),
             (cx + rx * 0.85, cy + ry * 0.10),
             (cx + rx * 0.95, sole_y - ry * 0.05),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         # Sole
         draw.rectangle(
             [(cx - rx * 0.92, sole_y - ry * 0.05),
@@ -584,7 +584,7 @@ def _draw_shoes(draw, name_lower, cx, cy, rx, ry, color, accent):
         (cx + rx * 0.90, cy + ry * 0.10),
         (cx + rx * 0.95, sole_y),
         (cx - rx * 0.55, sole_y),
-    ], fill=color, outline=accent)
+    ], fill=color, outline=accent, width=4)
     # Vamp (top edge cutout)
     draw.chord(
         [(cx - rx * 0.40, cy - ry * 0.05),
@@ -656,7 +656,7 @@ def _draw_accessory(draw, name_lower, cx, cy, rx, ry, color, accent):
             (cx - rx * 0.85, cy - ry * 0.45),
             (cx + rx * 0.85, cy - ry * 0.45),
             (cx,              cy + ry * 0.75),
-        ], fill=color, outline=accent)
+        ], fill=color, outline=accent, width=4)
         draw.rectangle(
             [(cx - rx * 0.20, cy - ry * 0.60),
              (cx + rx * 0.20, cy - ry * 0.40)],
@@ -718,7 +718,7 @@ def _draw_accessory(draw, name_lower, cx, cy, rx, ry, color, accent):
         # Center clasp
         draw.line([(cx - rx * 0.95, cy - ry * 0.04),
                    (cx + rx * 0.95, cy - ry * 0.04)],
-                  fill=accent, width=2)
+                  fill=accent, width=4)
         draw.ellipse(
             [(cx - rx * 0.04, cy - ry * 0.08),
              (cx + rx * 0.04, cy)],
@@ -828,79 +828,25 @@ def _generate_card_image(
     draw.text((pill_x + pad_x, pill_y + pad_y), category_label,
               font=badge_font, fill=pill_fg)
 
-    # ── Body: silhouette ───────────────────────────────
-    # Center the silhouette in the upper 75% of the card. The
-    # bottom 25% is the footer overlay.
-    body_cy = int(h * 0.46)
-    body_rx = int(w * 0.34)
-    body_ry = int(h * 0.30)
+    # ── Body: silhouette fills 80% of the canvas ──────
+    # Earlier draft kept a footer band with the name + store + color,
+    # but at 48-80px thumbnail size that text is unreadable noise and
+    # the silhouette was too small to recognize. The wardrobe row
+    # ALREADY shows the name and the color dot next to the image, so
+    # we drop the in-card text entirely and let the silhouette fill
+    # the available space.
+    body_cy = int(h * 0.52)
+    body_rx = int(w * 0.42)
+    body_ry = int(h * 0.40)
     item_type = (item.get("type") or "").lower()
     name_lower = (item.get("name") or "").lower()
     drawer = _DRAW_BY_TYPE.get(item_type, _draw_top)
     try:
         drawer(draw, name_lower, w // 2, body_cy, body_rx, body_ry,
-               _shade(bg_rgb, -8 if lum > 0.5 else +14),    # silhouette fill
-               accent)                                       # silhouette outline
+               _shade(bg_rgb, -12 if lum > 0.5 else +22),    # silhouette fill
+               accent)                                        # silhouette outline
     except Exception:
-        # Silhouette failed — let the footer text carry the card.
         pass
-
-    # ── Footer: name + store overlay band ──────────────
-    footer_h = int(h * 0.25)
-    footer_top = h - footer_h
-    band_rgb = _shade(bg_rgb, -22 if lum > 0.5 else +18)
-    draw.rectangle([(0, footer_top), (w, h)], fill=band_rgb)
-    draw.line([(0, footer_top), (w, footer_top)],
-              fill=_shade(bg_rgb, -45 if lum > 0.5 else +30), width=1)
-
-    name = item.get("name", "Item")
-    store = item.get("source_store", "")
-    try:
-        name_font  = ImageFont.truetype("georgia.ttf", 19)
-        store_font = ImageFont.truetype("arial.ttf", 13)
-        color_font = ImageFont.truetype("arial.ttf", 10)
-    except Exception:
-        name_font  = ImageFont.load_default()
-        store_font = ImageFont.load_default()
-        color_font = ImageFont.load_default()
-
-    def _wrap(text, font, max_w):
-        words = text.split()
-        lines, cur = [], ""
-        for tok in words:
-            test = (cur + " " + tok).strip()
-            bb = draw.textbbox((0, 0), test, font=font)
-            tw_ = bb[2] - bb[0]
-            if tw_ <= max_w:
-                cur = test
-            else:
-                if cur: lines.append(cur)
-                cur = tok
-        if cur: lines.append(cur)
-        return lines[:2]
-
-    name_lines = _wrap(name, name_font, w - 40)
-    line_h = name_font.size + 4
-    y = footer_top + 16
-    for line in name_lines:
-        bb = draw.textbbox((0, 0), line, font=name_font)
-        lw = bb[2] - bb[0]
-        draw.text(((w - lw) // 2, y), line, font=name_font, fill=fg)
-        y += line_h
-    if store:
-        bb = draw.textbbox((0, 0), store, font=store_font)
-        lw = bb[2] - bb[0]
-        store_color = _shade(fg, +40 if lum > 0.5 else -50)
-        draw.text(((w - lw) // 2, y + 4), store, font=store_font,
-                  fill=store_color)
-        y += store_font.size + 6
-    color_label = (item.get("color") or "").upper()
-    if color_label:
-        bb = draw.textbbox((0, 0), color_label, font=color_font)
-        lw = bb[2] - bb[0]
-        # tiny letter-spaced color line at the bottom
-        draw.text(((w - lw) // 2, h - 18), color_label, font=color_font,
-                  fill=_shade(fg, +60 if lum > 0.5 else -60))
 
     out = io.BytesIO()
     img.save(out, format="PNG", optimize=True)

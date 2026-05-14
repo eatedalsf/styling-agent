@@ -1094,21 +1094,21 @@ def _render_user_items_list(items: list) -> None:
             if data_uri:
                 thumb_html = (
                     f'<img src="{data_uri}" alt="" '
-                    f'style="width:42px; height:42px; object-fit:cover; '
+                    f'style="width:72px; height:72px; object-fit:cover; '
                     f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
                     f'onerror="this.style.display=\'none\'">'
                 )
         if not thumb_html and src_image:
             thumb_html = (
                 f'<img src="{src_image}" alt="" '
-                f'style="width:42px; height:42px; object-fit:cover; '
+                f'style="width:72px; height:72px; object-fit:cover; '
                 f'border-radius:4px; border:1px solid #E5E5E5; flex-shrink:0;" '
                 f'onerror="this.style.display=\'none\'">'
             )
         if not thumb_html:
             # Calm "no image" placeholder so the row alignment stays clean.
             thumb_html = (
-                '<div style="width:42px; height:42px; background:#FAFAFA; '
+                '<div style="width:72px; height:72px; background:#FAFAFA; '
                 'border:1px dashed #E5E5E5; border-radius:4px; flex-shrink:0; '
                 'display:flex; align-items:center; justify-content:center; '
                 'font-size:0.7rem; color:#8E8E93;">img</div>'
