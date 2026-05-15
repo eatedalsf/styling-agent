@@ -6,988 +6,461 @@
   <title>Wearly — Knowledge Graph</title>
 
   <!--
-    Wearly Knowledge Graph — viewer v0.2.
+    Wearly Knowledge Graph — viewer v0.3.
 
-    A presenter-grade exploration tool for the three-layer
-    knowledge graph at graph/wearly-knowledge-graph.json.
+    Rebuilt in the SEIS 666 class design language (Yarmoluk's
+    learning-graph viewer): gradient page background, frosted-glass
+    card containers, pastel-per-type legend with count badges, a
+    minimal four-button toolbar, force-directed clustering by
+    default. Drops the v0.2 preset-button system in favor of a
+    single search + filter pattern.
 
-    Designed around the class feedback that good graphs (Juan's
-    financial-risk graph in particular) (a) gave every link a clear
-    meaning, (b) sized nodes by something meaningful, and (c)
-    explained the domain rather than displaying a cluster of dots.
-
-    Key decisions:
-      - Default to the OVERVIEW preset (~25 structural nodes), not
-        the full 91-node blob. Eight named presets total.
-      - Hierarchical layout per preset, with explicit per-node
-        `level` so the relationships read top-to-bottom.
-      - Edge labels OFF by default; visible only when a node is
-        selected (the click reveals what each link to/from it means)
-        or when the "Show edge labels" toggle is on.
-      - Click-to-highlight: selected + 1-hop neighbors stay full
-        opacity; everything else fades to 12%. Edges get accent.
-      - Node size driven by the weight field already present in
-        the JSON; legend explicitly names what size encodes.
-      - Standalone-friendly: this HTML works both inside an iframe
-        and when opened directly in a new tab (presenter mode).
+    Differences vs. the class reference, all driven by Wearly's
+    domain:
+      - Color groups are NODE TYPES (User, RulePack, …) rather than
+        concept categories.
+      - The User node is the dark anchor (deep slate, white text)
+        so the eye finds the focal point in any layout.
+      - WardrobeGap uses a warning-coral pastel + triangle shape
+        so unmet needs stand out without breaking the soft palette.
+      - Node SIZE is weight-driven (worn_count × versatility for
+        items, rolled up for categories) — kept from v0.1/v0.2 since
+        it answers Dan's "what does size mean?" question.
   -->
 
-  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+  <script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <style>
-    :root {
-      --bg:           #FFFFFF;
-      --ink:          #0F0F0F;
-      --body:         #303030;
-      --secondary:   #6B6B6B;
-      --eyebrow:     #9A9A9A;
-      --border:      #E5E5E5;
-      --soft:        #F5F5F2;
-      --paper:       #FAFAF7;
-      --accent:      #C24E3B;
-      --accent-deep: #8E2C1E;
-      --rule:        #2E5B8A;
-      --user:        #0F0F0F;
-      --warn:        #B45A2E;
-      --fade:        rgba(120, 120, 120, 0.16);
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont,
+                    "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      color: #333;
     }
-    * { box-sizing: border-box; }
-    html, body {
-      margin: 0; padding: 0;
-      background: var(--bg);
-      color: var(--ink);
-      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
-                   Roboto, system-ui, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      height: 100%;
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 20px;
     }
-    .layout {
-      display: grid;
-      grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr;
-      height: 100vh;
+
+    header {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 22px 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
-    @media (min-width: 1000px) {
-      .layout { grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; }
-      .header { grid-column: 1 / span 2; }
-    }
-    .header {
-      padding: 0.9rem 1.4rem;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-      display: flex; align-items: baseline; justify-content: space-between;
-      gap: 1rem; flex-wrap: wrap;
-    }
-    .header .title {
-      font-family: "DM Serif Display", "Times New Roman", serif;
-      font-size: 1.45rem; color: var(--ink);
+    header h1 {
+      color: #1C1917;
+      font-family: "DM Serif Display", Georgia, serif;
+      font-size: 1.7em;
+      font-weight: 400;
+      margin-bottom: 6px;
       letter-spacing: -0.01em;
     }
-    .header .subtitle {
-      font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em;
+    header .subtitle {
+      color: #6B6B6B;
+      font-size: 0.92em;
+      line-height: 1.5;
     }
-    .header .stats { font-weight: 600; color: var(--ink); }
-    .header .openfs {
-      font-size: 0.78rem; color: var(--accent-deep);
-      text-decoration: none; border-bottom: 1px solid var(--accent-deep);
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 20px;
     }
-    .header .openfs:hover { color: var(--accent); border-color: var(--accent); }
+
+    @media (max-width: 900px) {
+      .main-content { grid-template-columns: 1fr; }
+    }
 
     /* ── Sidebar ───────────────────────────── */
     .sidebar {
-      background: var(--paper);
-      border-right: 1px solid var(--border);
-      padding: 1rem 1.1rem 1.4rem;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      max-height: calc(100vh - 180px);
       overflow-y: auto;
-      font-size: 0.86rem;
     }
     .sidebar h3 {
-      font-size: 0.66rem;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
-      color: var(--eyebrow);
-      font-weight: 700;
-      margin: 1.2rem 0 0.55rem;
-    }
-    .sidebar h3:first-child { margin-top: 0; }
-
-    .preset-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;
-    }
-    .preset-btn {
-      font-family: inherit;
-      font-size: 0.79rem;
-      padding: 0.5rem 0.55rem;
-      border: 1px solid var(--border);
-      background: var(--bg);
-      color: var(--ink);
-      border-radius: 4px;
-      cursor: pointer;
-      text-align: left;
-      line-height: 1.2;
-      transition: all 120ms ease;
-    }
-    .preset-btn:hover {
-      border-color: var(--ink);
-      background: var(--soft);
-    }
-    .preset-btn.active {
-      background: var(--ink);
-      color: #FFFFFF;
-      border-color: var(--ink);
-    }
-    .preset-btn .preset-meta {
-      display: block;
-      font-size: 0.66rem;
-      color: var(--secondary);
+      color: #1C1917;
+      font-family: "DM Serif Display", Georgia, serif;
+      font-size: 1.05em;
       font-weight: 400;
-      margin-top: 0.15rem;
+      margin: 0 0 8px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #eee;
     }
-    .preset-btn.active .preset-meta { color: rgba(255,255,255,0.7); }
+    .sidebar h3:not(:first-child) { margin-top: 22px; }
 
-    .control-row {
-      display: flex; align-items: center; gap: 0.5rem;
-      font-size: 0.82rem; color: var(--body); margin: 0.45rem 0;
+    .size-note {
+      background: #faf7f2;
+      border-left: 3px solid #C24E3B;
+      padding: 10px 12px;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.78em;
+      color: #4a4a4a;
+      line-height: 1.5;
+      margin-bottom: 14px;
     }
-    .control-row input[type="checkbox"] { accent-color: var(--accent); }
-    .control-row input[type="text"] {
-      flex: 1; padding: 0.4rem 0.55rem;
-      border: 1px solid var(--border); border-radius: 4px;
-      font: inherit; font-size: 0.84rem; background: var(--bg); color: var(--ink);
-    }
-    .control-row select {
-      flex: 1; padding: 0.4rem 0.55rem;
-      border: 1px solid var(--border); border-radius: 4px;
-      background: var(--bg); font: inherit; font-size: 0.84rem; color: var(--ink);
-    }
+    .size-note strong { color: #1C1917; }
 
-    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
-    .btn {
-      font-family: inherit; font-size: 0.79rem;
-      padding: 0.45rem 0.55rem; border-radius: 4px; cursor: pointer;
-      transition: all 120ms ease;
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.18s, transform 0.15s;
     }
-    .btn-primary {
-      background: var(--accent); color: #FFFFFF; border: 1px solid var(--accent);
+    .legend-item:hover {
+      background: #f5f5f5;
+      transform: translateX(2px);
     }
-    .btn-primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
-    .btn-secondary {
-      background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+    .legend-item.active {
+      background: #f0e9f6;
     }
-    .btn-secondary:hover { border-color: var(--ink); background: var(--soft); }
-
-    /* ── Legend ───────────────────────────── */
-    .legend {
-      display: flex; flex-direction: column; gap: 0.32rem;
-      font-size: 0.78rem; color: var(--body);
-    }
-    .legend-row { display: flex; align-items: center; gap: 0.5rem; line-height: 1.3; }
-    .legend-glyph {
-      flex-shrink: 0;
-      width: 16px; height: 16px;
-      display: inline-block;
-    }
-    .legend-glyph.circle   { border-radius: 50%; }
-    .legend-glyph.box      { border-radius: 2px; }
-    .legend-glyph.diamond  { transform: rotate(45deg); border-radius: 2px; }
-    .legend-glyph.star     { clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
-    .legend-glyph.hexagon  { clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
-    .legend-glyph.triangle { clip-path: polygon(50% 100%,0 20%,100% 20%); }
-    .legend-glyph.cloud    { border-radius: 999px; }
-
-    .size-explain {
-      background: var(--soft);
-      border-left: 3px solid var(--accent);
-      padding: 0.55rem 0.7rem;
-      font-size: 0.76rem;
-      color: var(--body);
-      line-height: 1.45;
-      border-radius: 0 4px 4px 0;
-    }
-    .size-explain strong { color: var(--ink); }
-
-    /* ── Details panel ───────────────────────────── */
-    .details {
-      background: var(--bg);
-      border: 1px solid var(--border);
+    .legend-color {
+      width: 22px; height: 22px;
       border-radius: 4px;
-      padding: 0.7rem 0.85rem;
-      font-size: 0.82rem;
-      color: var(--body);
-      line-height: 1.45;
+      margin-right: 12px;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(0,0,0,0.18);
     }
-    .details .empty { color: var(--secondary); font-style: italic; font-size: 0.78rem; }
-    .details .row { margin: 0.18rem 0; }
-    .details .k {
-      color: var(--secondary); display: inline-block;
-      min-width: 6.5rem; font-size: 0.74rem;
-      text-transform: uppercase; letter-spacing: 0.08em;
+    .legend-color.user-anchor { border-color: #1C1917; }
+    .legend-text {
+      font-size: 0.85em;
+      color: #333;
+      flex: 1;
     }
-    .details .label-line {
-      font-weight: 600; color: var(--ink);
-      font-size: 1rem; margin-bottom: 0.3rem;
+    .legend-count {
+      background: #eee;
+      padding: 2px 8px;
+      border-radius: 10px;
+      font-size: 0.74em;
+      color: #666;
+      font-weight: 500;
     }
-    .details .type-line {
-      font-size: 0.7rem; color: var(--secondary);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      margin-bottom: 0.55rem;
+
+    .filter-section {
+      margin-top: 16px;
     }
-    .details .weight-pill {
-      display: inline-block;
-      font-size: 0.66rem; padding: 1px 7px;
-      background: var(--soft); border: 1px solid var(--border);
-      border-radius: 99px; color: var(--secondary);
-      letter-spacing: 0.08em; text-transform: uppercase;
-      margin-bottom: 0.45rem;
-    }
-    .rel-block { margin-top: 0.45rem; }
-    .rel-block h4 {
-      font-size: 0.66rem; color: var(--secondary);
-      letter-spacing: 0.12em; text-transform: uppercase;
-      margin: 0.35rem 0 0.2rem; font-weight: 700;
-    }
-    .rel-chip {
-      display: inline-block;
-      font: inherit; font-size: 0.73rem;
-      padding: 1px 7px; margin: 0 0.25rem 0.25rem 0;
-      background: var(--bg); color: var(--ink);
-      border: 1px solid var(--border); border-radius: 99px;
-      cursor: pointer; line-height: 1.4;
-      transition: all 100ms ease;
-    }
-    .rel-chip:hover { border-color: var(--accent); color: var(--accent-deep); }
-    .rel-chip .rel-type {
-      color: var(--secondary); font-size: 0.68rem; margin-right: 0.3rem;
+    .filter-section label {
+      display: block;
+      margin: 12px 0 6px;
+      color: #333;
+      font-size: 0.78em;
+      font-weight: 600;
       letter-spacing: 0.04em;
     }
+    .filter-section select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1.5px solid #ddd;
+      border-radius: 6px;
+      font: inherit;
+      font-size: 0.85em;
+      color: #333;
+      background: #fff;
+      cursor: pointer;
+    }
+    .filter-section select:focus {
+      outline: none;
+      border-color: #667eea;
+    }
 
-    /* ── Canvas ───────────────────────────── */
+    .node-info {
+      margin-top: 18px;
+      padding: 14px 16px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 3px solid #667eea;
+      display: none;
+    }
+    .node-info.active { display: block; }
+    .node-info h4 {
+      color: #1C1917;
+      margin-bottom: 4px;
+      font-size: 1em;
+      font-weight: 600;
+    }
+    .node-info .info-type {
+      font-size: 0.7em;
+      color: #888;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .node-info .info-row {
+      display: flex;
+      gap: 6px;
+      align-items: baseline;
+      font-size: 0.82em;
+      margin: 4px 0;
+      color: #444;
+    }
+    .node-info .info-row strong {
+      color: #666;
+      min-width: 5.2rem;
+      font-weight: 500;
+      font-size: 0.78em;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .node-info .meaning {
+      font-size: 0.84em;
+      color: #4a4a4a;
+      font-style: italic;
+      margin: 8px 0;
+      line-height: 1.5;
+    }
+    .node-info button.action {
+      margin-top: 10px;
+      padding: 6px 12px;
+      font: inherit;
+      font-size: 0.78em;
+      background: #fff;
+      color: #667eea;
+      border: 1.5px solid #667eea;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .node-info button.action:hover {
+      background: #667eea;
+      color: white;
+    }
+
+    /* ── Graph card ───────────────────────────── */
+    .graph-container {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .graph-toolbar {
+      display: flex;
+      gap: 10px;
+      padding: 14px 18px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #eee;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      padding: 9px 14px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.88em;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-box:focus { border-color: #667eea; }
+
+    .btn {
+      padding: 9px 16px;
+      border: none;
+      border-radius: 8px;
+      font: inherit;
+      font-size: 0.85em;
+      cursor: pointer;
+      transition: all 0.18s;
+      font-weight: 500;
+    }
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+    .btn-primary:hover { background: #5a6fd6; }
+    .btn-secondary {
+      background: #e9ecef;
+      color: #333;
+    }
+    .btn-secondary:hover { background: #dee2e6; }
+
     #network {
-      width: 100%; height: 100%;
-      background: var(--bg);
-      min-height: 540px;
-      position: relative;
+      width: 100%;
+      height: calc(100vh - 320px);
+      min-height: 500px;
+      background: #fff;
     }
-    .canvas-hint {
-      position: absolute;
-      left: 18px; top: 18px;
-      background: rgba(255,255,255,0.95);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--accent);
-      padding: 0.5rem 0.75rem;
-      font-size: 0.78rem;
-      color: var(--body);
-      max-width: 360px;
-      line-height: 1.45;
-      border-radius: 4px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
-      z-index: 5;
-      transition: opacity 250ms ease, transform 250ms ease;
+
+    .stats-bar {
+      display: flex;
+      gap: 24px;
+      padding: 12px 20px;
+      background: #f8f9fa;
+      border-top: 1px solid #eee;
+      flex-wrap: wrap;
     }
-    .canvas-hint.dismissed {
-      opacity: 0; transform: translateY(-8px); pointer-events: none;
+    .stat {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      font-size: 0.84em;
     }
-    .canvas-hint .preset-name { color: var(--accent-deep); font-weight: 600; }
-    .canvas-hint button {
-      background: none; border: none; color: var(--secondary);
-      cursor: pointer; padding: 0; margin-left: 0.4rem;
-      font: inherit; font-size: 0.78rem;
+    .stat-label { color: #888; }
+    .stat-value {
+      font-weight: 600;
+      color: #1C1917;
+    }
+    .stat .layer-chip {
+      display: inline-block;
+      font-size: 0.7em;
+      padding: 1px 7px;
+      border-radius: 999px;
+      background: #ede9f6;
+      color: #5e4ba8;
+      margin-left: 4px;
     }
 
     .error-state {
-      padding: 1rem; color: var(--secondary); font-size: 0.84rem;
+      padding: 1.5rem;
+      color: #888;
+      font-size: 0.92em;
     }
   </style>
 </head>
 <body>
-  <div class="layout">
+  <div class="container">
 
-    <!-- ─── Header ─────────────────────────────────────────── -->
-    <div class="header">
-      <div>
-        <div class="title">Wearly — Knowledge Graph</div>
-        <div class="subtitle">
-          <span id="stats" class="stats">loading…</span> ·
-          <span>three layers: domain · user behavior · runtime</span> ·
-          <span>click any node to focus its neighborhood</span>
+    <header>
+      <h1>Wearly — Knowledge Graph</h1>
+      <p class="subtitle">
+        Three-layer structured-knowledge model · <strong id="hStats">loading…</strong> ·
+        click any node for details · double-click to highlight its connections
+      </p>
+    </header>
+
+    <div class="main-content">
+
+      <!-- ─── Sidebar ─────────────────────────── -->
+      <aside class="sidebar">
+        <h3>What size means</h3>
+        <div class="size-note">
+          Larger nodes carry <strong>more user signal</strong> — a
+          wardrobe item worn more often, a color family used across
+          more pieces, an occasion your closet is rich for. Domain
+          archetypes (rule packs, weather bands, skin-tone palettes)
+          stay at base size — they're equal-importance facts.
+        </div>
+
+        <h3>Node types</h3>
+        <div id="legend"></div>
+
+        <div class="filter-section">
+          <label for="layerSelect">Layer filter</label>
+          <select id="layerSelect">
+            <option value="">All layers</option>
+            <option value="domain">Domain</option>
+            <option value="user_behavior">User behavior</option>
+            <option value="runtime">Runtime</option>
+          </select>
+
+          <label for="layoutSelect">Layout</label>
+          <select id="layoutSelect">
+            <option value="default">Physics (force-directed)</option>
+            <option value="hierarchical">Hierarchical (top → bottom)</option>
+          </select>
+        </div>
+
+        <div class="node-info" id="nodeInfo">
+          <h4 id="nodeName">Select a Node</h4>
+          <div class="info-type" id="nodeMeta"></div>
+          <div class="meaning" id="nodeMeaning"></div>
+          <div class="info-row"><strong>Layer</strong><span id="nodeLayer"></span></div>
+          <div class="info-row"><strong>Weight</strong><span id="nodeWeight"></span></div>
+          <div class="info-row"><strong>In-edges</strong><span id="nodeIn">0</span></div>
+          <div class="info-row"><strong>Out-edges</strong><span id="nodeOut">0</span></div>
+          <div id="nodeMetrics"></div>
+          <button class="action" id="highlightBtn">Highlight 1-hop neighborhood</button>
+        </div>
+      </aside>
+
+      <!-- ─── Graph card ─────────────────────────── -->
+      <div class="graph-container">
+        <div class="graph-toolbar">
+          <input type="text" class="search-box" id="searchBox"
+                  placeholder="Search nodes by name or type…">
+          <button class="btn btn-primary" id="fitBtn">Fit to view</button>
+          <button class="btn btn-secondary" id="resetBtn">Reset</button>
+          <button class="btn btn-secondary" id="physicsBtn">Pause physics</button>
+        </div>
+
+        <div id="network"></div>
+
+        <div class="stats-bar">
+          <div class="stat"><span class="stat-label">Nodes:</span>
+                            <span class="stat-value" id="nodeCount">0</span></div>
+          <div class="stat"><span class="stat-label">Edges:</span>
+                            <span class="stat-value" id="edgeCount">0</span></div>
+          <div class="stat"><span class="stat-label">Node types:</span>
+                            <span class="stat-value" id="typeCount">0</span></div>
+          <div class="stat"><span class="stat-label">Layers:</span>
+                            <span class="stat-value">3</span>
+                            <span class="layer-chip">domain</span>
+                            <span class="layer-chip">user behavior</span>
+                            <span class="layer-chip">runtime</span></div>
         </div>
       </div>
-      <a href="main.html" target="_blank" rel="noopener" class="openfs"
-         id="openFsLink">Open full-screen ↗</a>
-    </div>
 
-    <!-- ─── Sidebar ────────────────────────────────────────── -->
-    <div class="sidebar">
-
-      <h3>Preset view</h3>
-      <div class="preset-grid" id="presetGrid"></div>
-
-      <h3>Filter</h3>
-      <div class="control-row">
-        <input type="text" id="searchBox" placeholder="Search nodes…">
-      </div>
-      <div class="control-row">
-        <label for="layerSel" style="font-size:0.74rem; color:var(--secondary);">Layer</label>
-        <select id="layerSel">
-          <option value="">All layers</option>
-          <option value="domain">domain</option>
-          <option value="user_behavior">user behavior</option>
-          <option value="runtime">runtime</option>
-        </select>
-      </div>
-      <div class="control-row">
-        <input type="checkbox" id="showEdgeLabels">
-        <label for="showEdgeLabels">Show edge labels</label>
-      </div>
-
-      <div class="btn-row" style="margin-top:0.55rem;">
-        <button class="btn btn-secondary" id="fitBtn"
-                title="Center + zoom to fit every visible node.">Fit to view</button>
-        <button class="btn btn-secondary" id="resetBtn"
-                title="Return to Overview preset.">Reset</button>
-      </div>
-
-      <h3>What node size means</h3>
-      <div class="size-explain">
-        Larger nodes carry <strong>more user signal</strong> — a
-        wardrobe item worn more often, a color family used across
-        more pieces, an occasion your closet is rich for. Domain
-        archetypes (rule packs, weather bands, skin-tone palettes)
-        stay at base size — they're equal-importance facts.
-      </div>
-
-      <h3>Node types</h3>
-      <div id="legend" class="legend"></div>
-
-      <h3>Selected node</h3>
-      <div class="details" id="details">
-        <div class="empty">Click any node in the graph to inspect its
-        type, layer, metrics, and 1-hop relationships.</div>
-      </div>
-    </div>
-
-    <!-- ─── Canvas ─────────────────────────────────────────── -->
-    <div id="network">
-      <div id="canvasHint" class="canvas-hint" role="status" aria-live="polite">
-        <strong>Current view:</strong>
-        <span class="preset-name" id="hintPresetName">Overview</span>.
-        <br>
-        <span id="hintPresetBlurb">The system structure — User, rule
-        packs, occasion types, and the seven workflow steps.</span>
-        <button id="hintDismiss" type="button" aria-label="Dismiss">dismiss</button>
-      </div>
     </div>
   </div>
 
   <script>
   /* eslint-disable */
 
-  // ─────────────────────────────────────────────────────────────
-  //  Constants — preset definitions, type styling, weight scaling
-  // ─────────────────────────────────────────────────────────────
-
-  // Per-node-type visual styling. Shape comes from the user's
-  // requested mapping (User=star, RulePack=box, etc.). The base
-  // size is multiplied by the node's `weight` (1.0–3.0) so user
-  // signal visibly grows or shrinks the rendered radius.
-  //
-  // `level` here is the DEFAULT level used by the Overview preset.
-  // Other presets override it per-node.
-  const TYPE_STYLE = {
-    "User":              {shape: "star",         color: "#0F0F0F", border: "#0F0F0F", size: 28, font: "#FFFFFF", level: 0},
-    "FitProfile":        {shape: "diamond",      color: "#FAF3EE", border: "#8E2C1E", size: 20,                  level: 1},
-    "SkinTonePalette":   {shape: "diamond",      color: "#F4E9DE", border: "#A55C3F", size: 20,                  level: 1},
-    "OccasionType":      {shape: "hexagon",      color: "#FFFFFF", border: "#0F0F0F", size: 26,                  level: 2},
-    "WeatherCondition":  {shape: "ellipse",      color: "#F5F5F2", border: "#6B6B6B", size: 22,                  level: 2},
-    "WardrobeItemType":  {shape: "box",          color: "#F1ECE4", border: "#6B6B6B", size: 20,                  level: 3},
-    "ColorFamily":       {shape: "dot",          color: "#F4E9DE", border: "#9A9A9A", size: 18,                  level: 3},
-    "RulePack":          {shape: "box",          color: "#E9EEF6", border: "#2E5B8A", size: 22,                  level: 4},
-    "Rule":              {shape: "box",          color: "#F4F7FB", border: "#7A93B4", size: 14,                  level: 5},
-    "WorkflowStep":      {shape: "ellipse",      color: "#FFFFFF", border: "#0F0F0F", size: 22,                  level: 6},
-    // ── User-behavior layer ──
-    "WardrobeItem":      {shape: "dot",          color: "#F1ECE4", border: "#6B6B6B", size: 16,                  level: 3},
-    "WishlistItem":      {shape: "triangle",     color: "#FDF3EE", border: "#8E2C1E", size: 16,                  level: 3},
-    "FavoriteStore":     {shape: "star",         color: "#FFFFFF", border: "#C24E3B", size: 18,                  level: 3},
-    // ── Runtime archetypes (declared in schema; the seed JSON has none) ──
-    "OutfitRecommendation": {shape: "diamond",   color: "#FFFFFF", border: "#0F0F0F", size: 24,                  level: 5},
-    "WardrobeGap":          {shape: "triangleDown", color: "#FDF3EE", border: "#B45A2E", size: 20,               level: 5},
-    "ShoppingSuggestion":   {shape: "triangleDown", color: "#FDF3EE", border: "#6B6B6B", size: 18,               level: 5},
-    "Feedback":             {shape: "square",    color: "#F4F7FB", border: "#7A93B4", size: 16,                  level: 5},
+  // ── Per-type pastel palette ────────────────────────────────
+  // Soft pastels in the SEIS 666 viewer's design language.
+  // Each type gets a distinct, low-saturation tone so the graph reads
+  // as one cohesive surface. The User is the single dark anchor —
+  // the deep slate makes the focal point unmistakable even from
+  // across the room.
+  const TYPE_COLORS = {
+    "User":              {bg: "#3A3A5C", border: "#1C1933", font: "#FFFFFF"},
+    "FitProfile":        {bg: "#FFE5D9", border: "#D9A48B", font: "#333"},
+    "SkinTonePalette":   {bg: "#FFCEB3", border: "#C68F6F", font: "#333"},
+    "OccasionType":      {bg: "#B5EAD7", border: "#76B59B", font: "#333"},
+    "WeatherCondition":  {bg: "#C7CEEA", border: "#8B96C2", font: "#333"},
+    "WardrobeItemType":  {bg: "#FFDAC1", border: "#D0A282", font: "#333"},
+    "ColorFamily":       {bg: "#E2F0CB", border: "#A5B985", font: "#333"},
+    "RulePack":          {bg: "#C5D5E5", border: "#88A2BD", font: "#333"},
+    "Rule":              {bg: "#DCEAF7", border: "#A5BFD5", font: "#333"},
+    "WorkflowStep":      {bg: "#F1C0E8", border: "#C087B6", font: "#333"},
+    "WardrobeItem":      {bg: "#FFF1D6", border: "#D6BF8C", font: "#333"},
+    "WishlistItem":      {bg: "#FFD1DC", border: "#D08699", font: "#333"},
+    "FavoriteStore":     {bg: "#F1D4F7", border: "#B888C2", font: "#333"},
+    "OutfitRecommendation": {bg: "#FFFACD", border: "#C2BC75", font: "#333"},
+    "WardrobeGap":          {bg: "#FFB3B3", border: "#C77272", font: "#333"},
+    "ShoppingSuggestion":   {bg: "#F0E4F7", border: "#B6A2C2", font: "#333"},
+    "Feedback":             {bg: "#DDFAE6", border: "#86C29A", font: "#333"},
   };
 
-  // Preset views. Each one is a deliberate slice of the full graph.
-  //
-  //   include       — array of node TYPES to include
-  //   alsoInclude   — array of explicit node IDS to include (regardless of type)
-  //   levels        — function (node) -> integer; overrides default level
-  //   layout        — "UD" | "LR" | "none" (no hierarchy)
-  //   blurb         — one-line description shown in the canvas hint
-  //
-  // The Overview is intentionally SMALL (~25 nodes) so a first-time
-  // viewer sees the system's structure rather than a 91-node blob.
-  const PRESETS = {
-    overview: {
-      label: "Overview",
-      blurb: "The system structure — User, rule packs, occasion types, and the seven workflow steps.",
-      include: ["User", "FitProfile", "SkinTonePalette",
-                 "OccasionType", "RulePack", "WorkflowStep"],
-      levels: function(n) {
-        return ({"User": 0, "FitProfile": 1, "SkinTonePalette": 1,
-                  "OccasionType": 2, "RulePack": 3, "WorkflowStep": 4})[n.type];
-      },
-      layout: "UD",
-    },
-    user_pattern: {
-      label: "User Pattern",
-      blurb: "The user, their items, and what each item is connected to (type, color, occasion).",
-      include: ["User", "FitProfile", "WardrobeItem", "WardrobeItemType",
-                 "ColorFamily", "OccasionType"],
-      levels: function(n) {
-        return ({"User": 0, "FitProfile": 1,
-                  "OccasionType": 2, "WardrobeItem": 3,
-                  "WardrobeItemType": 4, "ColorFamily": 4})[n.type];
-      },
-      layout: "UD",
-    },
-    occasion: {
-      label: "Occasions",
-      blurb: "Each occasion shows the item types it requires, the rule pack governing it, and the items that fit.",
-      include: ["OccasionType", "WardrobeItemType", "WardrobeItem", "RulePack"],
-      levels: function(n) {
-        if (n.type === "WardrobeItemType") return 0;
-        if (n.type === "OccasionType")     return 1;
-        if (n.type === "WardrobeItem")     return 2;
-        if (n.type === "RulePack")         return 3;
-        return 2;
-      },
-      layout: "UD",
-    },
-    wardrobe: {
-      label: "Wardrobe Items",
-      blurb: "Every item in the closet. Size = wear count × versatility. Color/type/occasion as anchors.",
-      include: ["WardrobeItem", "WardrobeItemType", "ColorFamily", "OccasionType"],
-      levels: function(n) {
-        if (n.type === "WardrobeItemType") return 0;
-        if (n.type === "ColorFamily")      return 0;
-        if (n.type === "WardrobeItem")     return 1;
-        if (n.type === "OccasionType")     return 2;
-        return 1;
-      },
-      layout: "UD",
-    },
-    rules: {
-      label: "Rules & Skills",
-      blurb: "Each rule pack contains its R-numbered rules and powers one or more workflow steps.",
-      include: ["RulePack", "Rule", "WorkflowStep", "OccasionType", "WeatherCondition"],
-      levels: function(n) {
-        if (n.type === "OccasionType" || n.type === "WeatherCondition") return 0;
-        if (n.type === "RulePack") return 1;
-        if (n.type === "Rule")     return 2;
-        if (n.type === "WorkflowStep") return 3;
-        return 1;
-      },
-      layout: "UD",
-    },
-    color: {
-      label: "Color & Skin",
-      blurb: "Three skin-tone palettes, the color families in the closet, and the color rules that evaluate them.",
-      include: ["SkinTonePalette", "ColorFamily", "WardrobeItem", "Rule", "RulePack"],
-      extraFilterRule: function(n) {
-        // Only the color-coordination rule pack and its rules
-        if (n.type === "RulePack") return n.id === "pack:color-coordination-rules";
-        if (n.type === "Rule")     return (n.metrics && (n.metrics.slug || "").startsWith("color#"));
-        return true;
-      },
-      levels: function(n) {
-        if (n.type === "SkinTonePalette") return 0;
-        if (n.type === "Rule")            return 1;
-        if (n.type === "RulePack")        return 2;
-        if (n.type === "ColorFamily")     return 3;
-        if (n.type === "WardrobeItem")    return 4;
-        return 1;
-      },
-      layout: "UD",
-    },
-    weather: {
-      label: "Weather & Layers",
-      blurb: "The five temperature bands, the weather rule pack, and Step 3 of the workflow.",
-      include: ["WeatherCondition", "RulePack", "Rule", "WorkflowStep"],
-      extraFilterRule: function(n) {
-        if (n.type === "RulePack") return n.id === "pack:weather-rules";
-        if (n.type === "Rule")     return (n.metrics && (n.metrics.slug || "").startsWith("weather#"));
-        if (n.type === "WorkflowStep") return n.id === "step:3";
-        return true;
-      },
-      levels: function(n) {
-        if (n.type === "WeatherCondition") return 0;
-        if (n.type === "RulePack")         return 1;
-        if (n.type === "Rule")             return 2;
-        if (n.type === "WorkflowStep")     return 3;
-        return 1;
-      },
-      layout: "UD",
-    },
-    full: {
-      label: "Full Graph",
-      blurb: "All 91 nodes, 187 edges. Useful for an overall density check; less readable than the focused views.",
-      include: null,  // null = include every type
-      levels: function(n) {
-        return TYPE_STYLE[n.type] ? TYPE_STYLE[n.type].level : 3;
-      },
-      layout: "UD",
-    },
+  // ── Per-type shape ────────────────────────────────
+  // Default: ellipse (uniform, readable labels). Special shapes are
+  // reserved for anchors and warnings so the eye finds them without
+  // scanning.
+  const TYPE_SHAPES = {
+    "User":           "star",          // single focal point
+    "WardrobeGap":    "triangleDown",  // warning
+    "ShoppingSuggestion": "triangleDown",
   };
+  function shapeFor(type) { return TYPE_SHAPES[type] || "ellipse"; }
 
-  // ─────────────────────────────────────────────────────────────
-  //  Data loading
-  // ─────────────────────────────────────────────────────────────
-  const candidatePaths = [
-    "../../../graph/wearly-knowledge-graph.json",
-    "/styling-agent/graph/wearly-knowledge-graph.json",
-    "/graph/wearly-knowledge-graph.json",
-    "graph/wearly-knowledge-graph.json",
-  ];
-  async function loadGraph() {
-    for (const path of candidatePaths) {
-      try {
-        const r = await fetch(path, {cache: "no-cache"});
-        if (r.ok) return await r.json();
-      } catch (e) { /* try next */ }
-    }
-    throw new Error("Could not load wearly-knowledge-graph.json");
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Setup
-  // ─────────────────────────────────────────────────────────────
-
-  let RAW;                  // entire JSON
-  let NETWORK;              // vis.Network instance
-  let NODES_BY_ID = {};     // {id: rawNode}
-  let EDGES;                // raw edges array
-  let CURRENT_PRESET = "overview";
-  let SELECTED_ID = null;
-  let EDGE_LABELS_ON = false;
-  let LAYER_FILTER = "";    // "" | "domain" | "user_behavior" | "runtime"
-  let SEARCH_Q = "";
-
-  function buildSidebarPresets() {
-    const grid = document.getElementById("presetGrid");
-    grid.innerHTML = "";
-    const order = ["overview", "user_pattern", "occasion", "wardrobe",
-                    "rules", "color", "weather", "full"];
-    const blurbs = {
-      overview:     "≈ 25 nodes · structural",
-      user_pattern: "User & their items",
-      occasion:     "What each occasion needs",
-      wardrobe:     "Items, sized by use",
-      rules:        "Rule packs & rules",
-      color:        "Color × skin tone",
-      weather:      "Temperature bands",
-      full:         "91 · everything",
-    };
-    for (const key of order) {
-      const p = PRESETS[key];
-      if (!p) continue;
-      const btn = document.createElement("button");
-      btn.className = "preset-btn" + (key === CURRENT_PRESET ? " active" : "");
-      btn.setAttribute("data-preset", key);
-      btn.innerHTML = `${p.label}<span class="preset-meta">${blurbs[key] || ""}</span>`;
-      btn.addEventListener("click", () => applyPreset(key));
-      grid.appendChild(btn);
-    }
-  }
-
-  function buildLegend() {
-    const order = ["User", "OccasionType", "RulePack", "Rule",
-                    "WardrobeItemType", "WardrobeItem", "ColorFamily",
-                    "SkinTonePalette", "FitProfile", "WeatherCondition",
-                    "WorkflowStep", "WishlistItem", "FavoriteStore",
-                    "WardrobeGap", "ShoppingSuggestion"];
-    const el = document.getElementById("legend");
-    el.innerHTML = order
-      .filter(t => TYPE_STYLE[t])
-      .map(t => {
-        const s = TYPE_STYLE[t];
-        let cls = "circle";
-        if (s.shape === "box" || s.shape === "square") cls = "box";
-        else if (s.shape === "diamond")     cls = "diamond";
-        else if (s.shape === "star")        cls = "star";
-        else if (s.shape === "hexagon")     cls = "hexagon";
-        else if (s.shape === "triangle" || s.shape === "triangleDown") cls = "triangle";
-        else if (s.shape === "ellipse")     cls = "cloud";
-        // Star/hex/triangle use clip-path which doesn't honor border, so paint
-        // the glyph background with the border color so it still reads.
-        const isClipped = cls === "star" || cls === "hexagon" || cls === "triangle";
-        const styleStr = isClipped
-          ? `background:${s.border}`
-          : `background:${s.color}; border: 2px solid ${s.border}`;
-        return `<div class="legend-row">
-          <span class="legend-glyph ${cls}" style="${styleStr}"></span>
-          <span>${t}</span>
-        </div>`;
-      }).join("");
-  }
-
-  function buildAllNodesAndEdges(raw) {
-    NODES_BY_ID = Object.fromEntries(raw.nodes.map(n => [n.id, n]));
-    EDGES = raw.edges;
-    document.getElementById("stats").textContent =
-      `${raw.metadata.node_count} nodes · ${raw.metadata.edge_count} edges`;
-  }
-
-  function isNodeIncludedInPreset(presetKey, n) {
-    const p = PRESETS[presetKey];
-    if (!p) return false;
-    if (p.include !== null && !p.include.includes(n.type)) return false;
-    if (typeof p.extraFilterRule === "function" && !p.extraFilterRule(n)) return false;
-    return true;
-  }
-
-  function visibleNodeIdsForPreset(presetKey) {
-    return new Set(RAW.nodes
-      .filter(n => isNodeIncludedInPreset(presetKey, n))
-      .map(n => n.id));
-  }
-
-  function applyPreset(key) {
-    if (!PRESETS[key]) return;
-    CURRENT_PRESET = key;
-    // Update preset-button active state
-    document.querySelectorAll(".preset-btn").forEach(btn => {
-      btn.classList.toggle("active",
-        btn.getAttribute("data-preset") === key);
-    });
-
-    // Compute visible node set + their levels.
-    const visibleIds = visibleNodeIdsForPreset(key);
-    const visNodes = RAW.nodes
-      .filter(n => visibleIds.has(n.id))
-      .filter(n => layerMatches(n) && searchMatches(n))
-      .map(n => visNodeFor(n, key));
-
-    const visEdges = EDGES
-      .filter(e => visibleIds.has(e.from) && visibleIds.has(e.to))
-      .filter(e =>
-        layerMatches(NODES_BY_ID[e.from]) &&
-        layerMatches(NODES_BY_ID[e.to]) &&
-        searchEdgeMatches(e))
-      .map((e, i) => visEdgeFor(e, i));
-
-    // Clear selection on preset switch
-    SELECTED_ID = null;
-    showDetails(null);
-
-    // Push to network
-    NETWORK.setData({nodes: new vis.DataSet(visNodes),
-                      edges: new vis.DataSet(visEdges)});
-    // Apply layout
-    setLayoutForPreset(key);
-
-    // Update canvas hint
-    const hint = document.getElementById("canvasHint");
-    document.getElementById("hintPresetName").textContent = PRESETS[key].label;
-    document.getElementById("hintPresetBlurb").textContent = PRESETS[key].blurb;
-    hint.classList.remove("dismissed");
-    // Auto-dismiss after 8s on preset switch
-    if (window._kgHintTimer) clearTimeout(window._kgHintTimer);
-    window._kgHintTimer = setTimeout(() => hint.classList.add("dismissed"), 8000);
-
-    setTimeout(() => NETWORK.fit({animation: {duration: 300}}), 60);
-  }
-
-  function layerMatches(n) {
-    if (!n) return false;
-    return !LAYER_FILTER || n.layer === LAYER_FILTER;
-  }
-  function searchMatches(n) {
-    if (!SEARCH_Q) return true;
-    const q = SEARCH_Q.toLowerCase();
-    return (n.label || "").toLowerCase().includes(q) ||
-           (n.type  || "").toLowerCase().includes(q);
-  }
-  function searchEdgeMatches(e) {
-    // edges are kept whenever both endpoints survive node filters
-    return true;
-  }
-
-  function setLayoutForPreset(key) {
-    const p = PRESETS[key];
-    if (p.layout === "UD") {
-      NETWORK.setOptions({
-        layout: {
-          hierarchical: {
-            enabled: true,
-            direction: "UD",
-            sortMethod: "directed",
-            shakeTowards: "roots",
-            levelSeparation: 130,
-            nodeSpacing: 130,
-            treeSpacing: 200,
-            blockShifting: true,
-            edgeMinimization: true,
-            parentCentralization: true,
-          },
-        },
-        physics: {enabled: false},
-      });
-    } else if (p.layout === "LR") {
-      NETWORK.setOptions({
-        layout: {hierarchical: {enabled: true, direction: "LR",
-                                  sortMethod: "directed",
-                                  levelSeparation: 180, nodeSpacing: 100}},
-        physics: {enabled: false},
-      });
-    } else {
-      NETWORK.setOptions({
-        layout: {hierarchical: false},
-        physics: {enabled: true},
-      });
-    }
-  }
-
-  function visNodeFor(n, presetKey) {
-    const style = TYPE_STYLE[n.type] || TYPE_STYLE["WardrobeItem"];
-    const weight = n.weight || 1.0;
-    const size = Math.max(12, Math.min(46, (style.size || 20) * weight));
-    const p = PRESETS[presetKey];
-    let level = undefined;
-    if (typeof p.levels === "function") {
-      const l = p.levels(n);
-      if (typeof l === "number") level = l;
-    }
-    const fontColor = style.font ? style.font : "#0F0F0F";
-    return {
-      id: n.id,
-      label: n.label,
-      title: buildTooltip(n),
-      shape: style.shape,
-      color: {background: style.color, border: style.border,
-              highlight: {background: "#FFFFFF", border: "#C24E3B"}},
-      borderWidth: 1.5,
-      size: size,
-      font: {color: fontColor, size: 12, face: "DM Sans, sans-serif",
-              strokeWidth: style.font ? 0 : 3, strokeColor: style.color},
-      ...(level !== undefined ? {level} : {}),
-      _data: n,
-      _baseStyle: style,
-    };
-  }
-
-  function visEdgeFor(e, i) {
-    return {
-      id: `e${i}`,
-      from: e.from,
-      to: e.to,
-      label: EDGE_LABELS_ON ? prettyEdgeLabel(e.type) : "",
-      arrows: {to: {enabled: true, scaleFactor: 0.42}},
-      color: {color: "#D4D4D4", highlight: "#C24E3B", hover: "#C24E3B",
-              opacity: 1.0},
-      font: {size: 9, color: "#6B6B6B", strokeWidth: 3, strokeColor: "#FFFFFF",
-              align: "middle"},
-      smooth: {type: "cubicBezier", forceDirection: "vertical", roundness: 0.4},
-      width: 1,
-      _data: e,
-    };
-  }
-
-  function prettyEdgeLabel(type) {
-    return (type || "").toLowerCase().replace(/_/g, " ");
-  }
-
-  function buildTooltip(n) {
-    const parts = [`${n.type} · ${n.label}`,
-                    `Layer: ${n.layer}`,
-                    `Weight: ${(n.weight || 1.0).toFixed(2)}`];
-    if (n.metrics && Object.keys(n.metrics).length) {
-      const m = n.metrics;
-      const keys = ["worn_count", "versatility", "last_worn",
-                     "rule_count", "item_count", "slug", "summary"];
-      for (const k of keys) {
-        if (m[k] === undefined || m[k] === null || m[k] === "") continue;
-        const v = Array.isArray(m[k]) ? m[k].join(", ") : String(m[k]);
-        if (v.length > 80) parts.push(`${k}: ${v.slice(0, 77)}…`);
-        else parts.push(`${k}: ${v}`);
-      }
-    }
-    return parts.join("\n");
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Click → fade neighborhood
-  // ─────────────────────────────────────────────────────────────
-
-  function onSelectNode(params) {
-    if (!params.nodes || !params.nodes.length) return;
-    SELECTED_ID = params.nodes[0];
-    applyHighlight();
-    showDetails(NODES_BY_ID[SELECTED_ID]);
-  }
-
-  function onDeselectNode() {
-    SELECTED_ID = null;
-    clearHighlight();
-    showDetails(null);
-  }
-
-  function applyHighlight() {
-    if (!SELECTED_ID) return;
-    const sel = SELECTED_ID;
-    const neighbors = new Set([sel]);
-    const ds_edges = NETWORK.body.data.edges;
-    const ds_nodes = NETWORK.body.data.nodes;
-
-    ds_edges.forEach(e => {
-      if (e.from === sel) neighbors.add(e.to);
-      if (e.to   === sel) neighbors.add(e.from);
-    });
-
-    ds_nodes.forEach(vn => {
-      if (neighbors.has(vn.id)) {
-        const style = vn._baseStyle;
-        ds_nodes.update({
-          id: vn.id,
-          color: {background: style.color, border: style.border},
-          opacity: 1.0,
-          borderWidth: vn.id === sel ? 3 : 1.5,
-          font: {...vn.font, color: vn.font.color},
-        });
-      } else {
-        ds_nodes.update({
-          id: vn.id,
-          color: {background: "#F2F2F2", border: "#CFCFCF"},
-          opacity: 0.18,
-          borderWidth: 0.6,
-          font: {...vn.font, color: "#BFBFBF"},
-        });
-      }
-    });
-
-    ds_edges.forEach(e => {
-      const onPath = (e.from === sel || e.to === sel);
-      ds_edges.update({
-        id: e.id,
-        color: {color: onPath ? "#C24E3B" : "#EBEBEB",
-                highlight: "#C24E3B", hover: "#C24E3B"},
-        width: onPath ? 2 : 0.8,
-        label: onPath ? prettyEdgeLabel(e._data.type)
-                       : (EDGE_LABELS_ON ? prettyEdgeLabel(e._data.type) : ""),
-      });
-    });
-  }
-
-  function clearHighlight() {
-    const ds_edges = NETWORK.body.data.edges;
-    const ds_nodes = NETWORK.body.data.nodes;
-    ds_nodes.forEach(vn => {
-      const style = vn._baseStyle;
-      ds_nodes.update({
-        id: vn.id,
-        color: {background: style.color, border: style.border},
-        opacity: 1.0,
-        borderWidth: 1.5,
-        font: vn.font,
-      });
-    });
-    ds_edges.forEach(e => {
-      ds_edges.update({
-        id: e.id,
-        color: {color: "#D4D4D4", highlight: "#C24E3B"},
-        width: 1,
-        label: EDGE_LABELS_ON ? prettyEdgeLabel(e._data.type) : "",
-      });
-    });
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  //  Details panel
-  // ─────────────────────────────────────────────────────────────
-
-  function showDetails(node) {
-    const el = document.getElementById("details");
-    if (!node) {
-      el.innerHTML = `<div class="empty">Click any node in the graph
-                       to inspect its type, layer, metrics, and
-                       1-hop relationships.</div>`;
-      return;
-    }
-
-    const out = [];
-    const inc = [];
-    EDGES.forEach(e => {
-      if (e.from === node.id && NODES_BY_ID[e.to])   out.push(e);
-      if (e.to   === node.id && NODES_BY_ID[e.from]) inc.push(e);
-    });
-
-    const meaning = MEANING_OF[node.type] || "";
-    const metricsHtml = node.metrics
-      ? Object.entries(node.metrics).map(([k, v]) => {
-          if (v === null || v === undefined || v === "" ||
-              (Array.isArray(v) && v.length === 0)) return "";
-          const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
-          const display = valueStr.length > 70
-            ? valueStr.slice(0, 67) + "…" : valueStr;
-          return `<div class="row"><span class="k">${k}</span>${display}</div>`;
-        }).join("")
-      : "";
-
-    function relGroup(title, edges, dir) {
-      if (!edges.length) return "";
-      // Group by edge type so the relationships read clearly
-      const byType = {};
-      for (const e of edges) {
-        (byType[e.type] = byType[e.type] || []).push(e);
-      }
-      const groups = Object.entries(byType)
-        .sort((a, b) => a[0].localeCompare(b[0]))
-        .map(([t, es]) => {
-          const chips = es.map(e => {
-            const otherId = dir === "out" ? e.to : e.from;
-            const other = NODES_BY_ID[otherId];
-            const label = other ? other.label : otherId;
-            return `<button class="rel-chip" type="button" data-id="${otherId}">
-              <span class="rel-type">${prettyEdgeLabel(t)}</span>${label}
-            </button>`;
-          }).join("");
-          return chips;
-        }).join("");
-      return `<div class="rel-block"><h4>${title} (${edges.length})</h4>${groups}</div>`;
-    }
-
-    el.innerHTML = `
-      <div class="type-line">${node.type} · ${node.layer}</div>
-      <div class="label-line">${node.label}</div>
-      <span class="weight-pill">weight ${(node.weight || 1.0).toFixed(2)}</span>
-      ${meaning ? `<div class="row" style="color:var(--body); font-size:0.83rem; margin-top:0.25rem;">${meaning}</div>` : ""}
-      ${metricsHtml ? `<div style="margin-top:0.55rem;">${metricsHtml}</div>` : ""}
-      ${relGroup("Out edges", out, "out")}
-      ${relGroup("In edges", inc, "in")}
-    `;
-
-    el.querySelectorAll(".rel-chip").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const id = btn.getAttribute("data-id");
-        if (id && NODES_BY_ID[id]) {
-          // Try to select inside the current preset; if hidden, switch
-          // to Full view so the click resolves to a real node.
-          const visIds = visibleNodeIdsForPreset(CURRENT_PRESET);
-          if (!visIds.has(id)) applyPreset("full");
-          setTimeout(() => {
-            NETWORK.selectNodes([id]);
-            NETWORK.focus(id, {animation: true, scale: 1.05});
-            SELECTED_ID = id;
-            applyHighlight();
-            showDetails(NODES_BY_ID[id]);
-          }, 30);
-        }
-      });
-    });
-  }
-
-  // What does each node type *mean*? One sentence so the details
-  // panel doesn't just dump fields without context.
+  // ── One-sentence meaning per node type ────────────────────────────────
   const MEANING_OF = {
-    "User":              "The owner of this graph instance (anonymized seed = 'Demo User').",
+    "User":              "The owner of this graph instance (anonymized 'Demo User' in the public seed).",
     "FitProfile":        "Declared body shape, preferred fit, modesty, and style preferences.",
     "SkinTonePalette":   "One of three palettes the color score evaluates against.",
     "OccasionType":      "A canonical occasion tag (work / gym / dinner / formal / casual).",
@@ -995,93 +468,388 @@
     "WardrobeItemType":  "A garment type — top, bottom, dress, outerwear, shoes, accessory, activewear.",
     "ColorFamily":       "A color bucket grouping related raw colors (warm-rich, cool-neutral, soft, etc.).",
     "RulePack":          "A skill rule file in skills/wearly-styling-agent/.",
-    "Rule":              "A numbered rule (R1, R2, …) inside a rule pack, registered in rule_refs.py.",
+    "Rule":              "A numbered rule inside a rule pack, registered in rule_refs.py.",
     "WorkflowStep":      "One of the seven steps run_agent() emits into result['steps'].",
     "WardrobeItem":      "An item in the user's closet. Size = wear count × versatility.",
     "WishlistItem":      "An item the user wants to acquire next.",
     "FavoriteStore":     "A retailer the user has saved.",
     "OutfitRecommendation": "A built outfit — the agent's output for one occasion.",
-    "WardrobeGap":          "A required piece-type the user does not own for the current occasion.",
+    "WardrobeGap":          "A required piece-type the user does not own for this occasion.",
     "ShoppingSuggestion":   "A descriptive (never promotional) gap remedy.",
     "Feedback":             "A user reject/regenerate signal.",
   };
 
-  // ─────────────────────────────────────────────────────────────
-  //  Main
-  // ─────────────────────────────────────────────────────────────
+  // ── State ────────────────────────────────
+  const candidatePaths = [
+    "../../../graph/wearly-knowledge-graph.json",
+    "/styling-agent/graph/wearly-knowledge-graph.json",
+    "/graph/wearly-knowledge-graph.json",
+    "graph/wearly-knowledge-graph.json",
+  ];
+  let GRAPH_DATA = null;
+  let NETWORK    = null;
+  let ALL_NODES  = null;   // vis.DataSet
+  let ALL_EDGES  = null;   // vis.DataSet
+  let RAW_NODES_BY_ID = {};
+  let PHYSICS_ON = true;
+  let ACTIVE_LEGEND_TYPE = null;   // null = no legend filter
+
+  async function loadGraph() {
+    for (const p of candidatePaths) {
+      try {
+        const r = await fetch(p, {cache: "no-cache"});
+        if (r.ok) return await r.json();
+      } catch (e) { /* try next */ }
+    }
+    throw new Error("Could not load wearly-knowledge-graph.json");
+  }
+
+  function init(data) {
+    GRAPH_DATA = data;
+    RAW_NODES_BY_ID = Object.fromEntries(data.nodes.map(n => [n.id, n]));
+
+    // Build vis nodes with type-color, weight-scaled size, and
+    // type-shape (ellipse default; star/triangle for anchors).
+    const visNodes = data.nodes.map(n => {
+      const c = TYPE_COLORS[n.type] || {bg: "#eee", border: "#aaa", font: "#333"};
+      const weight = n.weight || 1.0;
+      // Size scaling kept subtle — 16-32px range so labels stay readable
+      // and pastels don't compete with size for attention.
+      const size = Math.max(14, Math.min(34, 16 * weight));
+      return {
+        id:    n.id,
+        label: n.label,
+        title: buildTooltip(n),
+        color: {
+          background: c.bg,
+          border:     c.border,
+          highlight:  {background: "#FFF8DC", border: "#D4B852"},
+        },
+        font: {color: c.font, size: 12, face: "DM Sans, sans-serif",
+               strokeWidth: c.font === "#FFFFFF" ? 0 : 2,
+               strokeColor: c.bg},
+        shape: shapeFor(n.type),
+        size: size,
+        borderWidth: 1.5,
+        borderWidthSelected: 3,
+        _data: n,
+      };
+    });
+
+    const visEdges = data.edges.map((e, i) => ({
+      id:    `e${i}`,
+      from:  e.from,
+      to:    e.to,
+      arrows: {to: {enabled: true, scaleFactor: 0.4}},
+      color: {color: "#cccccc", opacity: 0.55,
+              highlight: "#667eea", hover: "#667eea"},
+      smooth: {type: "continuous"},
+      width: 1,
+      _data: e,
+    }));
+
+    ALL_NODES = new vis.DataSet(visNodes);
+    ALL_EDGES = new vis.DataSet(visEdges);
+
+    const container = document.getElementById("network");
+    const options = {
+      nodes: {
+        borderWidth: 1.5,
+        borderWidthSelected: 3,
+        shadow: {enabled: true, size: 4, x: 0, y: 1, color: "rgba(0,0,0,0.10)"},
+      },
+      edges: {
+        smooth: {type: "continuous"},
+      },
+      physics: {
+        enabled: true,
+        solver: "forceAtlas2Based",
+        forceAtlas2Based: {
+          gravitationalConstant: -50,
+          centralGravity: 0.012,
+          springLength: 110,
+          springConstant: 0.08,
+          damping: 0.6,
+          avoidOverlap: 0.5,
+        },
+        stabilization: {iterations: 150, fit: true},
+        minVelocity: 0.5,
+      },
+      interaction: {
+        hover: true, tooltipDelay: 150,
+        navigationButtons: false, zoomView: true, dragView: true,
+        multiselect: false,
+      },
+    };
+    NETWORK = new vis.Network(container, {nodes: ALL_NODES, edges: ALL_EDGES}, options);
+    window._wearlyKG = NETWORK;
+
+    // Stats + legend
+    document.getElementById("nodeCount").textContent = data.nodes.length;
+    document.getElementById("edgeCount").textContent = data.edges.length;
+    document.getElementById("typeCount").textContent =
+      new Set(data.nodes.map(n => n.type)).size;
+    document.getElementById("hStats").textContent =
+      `${data.nodes.length} nodes · ${data.edges.length} edges`;
+    buildLegend(data.nodes);
+
+    // Events
+    NETWORK.on("click", function(params) {
+      if (params.nodes.length > 0) showNodeInfo(params.nodes[0]);
+      else clearNodeInfo();
+    });
+    NETWORK.on("doubleClick", function(params) {
+      if (params.nodes.length > 0) highlightConnected(params.nodes[0]);
+    });
+  }
+
+  function buildLegend(nodes) {
+    const legend = document.getElementById("legend");
+    const counts = {};
+    nodes.forEach(n => { counts[n.type] = (counts[n.type] || 0) + 1; });
+
+    // Order: User first (anchor), then by domain → user_behavior → runtime,
+    // sorted by descending count inside each group.
+    const groupOrder = {"domain": 1, "user_behavior": 2, "runtime": 3};
+    const items = Object.keys(counts).map(type => {
+      const sample = nodes.find(n => n.type === type);
+      return {
+        type,
+        count: counts[type],
+        layer: sample ? sample.layer : "domain",
+      };
+    });
+    items.sort((a, b) => {
+      if (a.type === "User") return -1;
+      if (b.type === "User") return 1;
+      const ga = groupOrder[a.layer] || 9;
+      const gb = groupOrder[b.layer] || 9;
+      if (ga !== gb) return ga - gb;
+      return b.count - a.count;
+    });
+
+    legend.innerHTML = "";
+    for (const it of items) {
+      const c = TYPE_COLORS[it.type] || {bg: "#eee", border: "#aaa"};
+      const row = document.createElement("div");
+      row.className = "legend-item";
+      row.setAttribute("data-type", it.type);
+      row.innerHTML = `
+        <div class="legend-color${it.type === "User" ? " user-anchor" : ""}"
+             style="background:${c.bg}; border-color:${c.border}"></div>
+        <span class="legend-text">${it.type}</span>
+        <span class="legend-count">${it.count}</span>
+      `;
+      row.addEventListener("click", () => toggleLegendFilter(it.type));
+      legend.appendChild(row);
+    }
+  }
+
+  function toggleLegendFilter(type) {
+    if (ACTIVE_LEGEND_TYPE === type) {
+      ACTIVE_LEGEND_TYPE = null;
+      clearOpacityFilter();
+    } else {
+      ACTIVE_LEGEND_TYPE = type;
+      applyTypeFilter(type);
+    }
+    document.querySelectorAll(".legend-item").forEach(el => {
+      el.classList.toggle("active",
+        el.getAttribute("data-type") === ACTIVE_LEGEND_TYPE);
+    });
+  }
+
+  function applyTypeFilter(type) {
+    ALL_NODES.forEach(n => {
+      const matches = n._data.type === type;
+      ALL_NODES.update({id: n.id, opacity: matches ? 1 : 0.18});
+    });
+    ALL_EDGES.forEach(e => {
+      const srcMatches = RAW_NODES_BY_ID[e.from] &&
+                          RAW_NODES_BY_ID[e.from].type === type;
+      const tgtMatches = RAW_NODES_BY_ID[e.to] &&
+                          RAW_NODES_BY_ID[e.to].type === type;
+      ALL_EDGES.update({id: e.id,
+        color: {color: (srcMatches || tgtMatches) ? "#667eea" : "#eaeaea",
+                opacity: (srcMatches || tgtMatches) ? 0.7 : 0.18}});
+    });
+    // Fit to the matching subset
+    const ids = ALL_NODES.get({filter: n => n._data.type === type})
+                          .map(n => n.id);
+    if (ids.length) NETWORK.fit({nodes: ids, animation: true});
+  }
+
+  function clearOpacityFilter() {
+    ALL_NODES.forEach(n => ALL_NODES.update({id: n.id, opacity: 1}));
+    ALL_EDGES.forEach(e => ALL_EDGES.update({id: e.id,
+      color: {color: "#cccccc", opacity: 0.55}}));
+  }
+
+  function highlightConnected(nodeId) {
+    const neighbors = new Set([nodeId, ...NETWORK.getConnectedNodes(nodeId)]);
+    ALL_NODES.forEach(n => {
+      ALL_NODES.update({id: n.id, opacity: neighbors.has(n.id) ? 1 : 0.15});
+    });
+    ALL_EDGES.forEach(e => {
+      const onPath = e.from === nodeId || e.to === nodeId;
+      ALL_EDGES.update({id: e.id,
+        color: {color: onPath ? "#667eea" : "#eaeaea",
+                opacity: onPath ? 0.85 : 0.15},
+        width: onPath ? 2 : 1});
+    });
+  }
+
+  function showNodeInfo(nodeId) {
+    const raw = RAW_NODES_BY_ID[nodeId];
+    if (!raw) return;
+    const inEdges  = GRAPH_DATA.edges.filter(e => e.to   === nodeId);
+    const outEdges = GRAPH_DATA.edges.filter(e => e.from === nodeId);
+
+    document.getElementById("nodeName").textContent = raw.label;
+    document.getElementById("nodeMeta").textContent = raw.type;
+    document.getElementById("nodeMeaning").textContent = MEANING_OF[raw.type] || "";
+    document.getElementById("nodeLayer").textContent = raw.layer.replace("_", " ");
+    document.getElementById("nodeWeight").textContent = (raw.weight || 1.0).toFixed(2);
+    document.getElementById("nodeIn").textContent = inEdges.length;
+    document.getElementById("nodeOut").textContent = outEdges.length;
+
+    // Selected metrics — only show keys that are meaningful + populated
+    const m = raw.metrics || {};
+    const interesting = ["worn_count", "last_worn", "versatility",
+                          "item_count", "rule_count", "slug", "summary"];
+    const metricsEl = document.getElementById("nodeMetrics");
+    const html = [];
+    for (const k of interesting) {
+      if (m[k] === undefined || m[k] === null || m[k] === "" ||
+          (Array.isArray(m[k]) && m[k].length === 0)) continue;
+      const v = Array.isArray(m[k]) ? m[k].join(", ") : String(m[k]);
+      const display = v.length > 60 ? v.slice(0, 57) + "…" : v;
+      html.push(`<div class="info-row"><strong>${k}</strong><span>${display}</span></div>`);
+    }
+    metricsEl.innerHTML = html.join("");
+
+    document.getElementById("nodeInfo").classList.add("active");
+
+    // Wire the highlight button
+    const hBtn = document.getElementById("highlightBtn");
+    hBtn.onclick = () => highlightConnected(nodeId);
+  }
+
+  function clearNodeInfo() {
+    document.getElementById("nodeInfo").classList.remove("active");
+  }
+
+  function buildTooltip(n) {
+    const lines = [n.type + " · " + n.label, "Layer: " + n.layer,
+                    "Weight: " + (n.weight || 1.0).toFixed(2)];
+    if (MEANING_OF[n.type]) lines.push("", MEANING_OF[n.type]);
+    return lines.join("\n");
+  }
+
+  // ── Search ──
+  function applySearch(query) {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) { clearOpacityFilter(); return; }
+    const matchingIds = new Set();
+    ALL_NODES.forEach(n => {
+      const d = n._data;
+      if ((d.label || "").toLowerCase().includes(q) ||
+          (d.type  || "").toLowerCase().includes(q)) {
+        matchingIds.add(n.id);
+      }
+    });
+    ALL_NODES.forEach(n => ALL_NODES.update({id: n.id,
+      opacity: matchingIds.has(n.id) ? 1 : 0.18}));
+    ALL_EDGES.forEach(e => {
+      const both = matchingIds.has(e.from) && matchingIds.has(e.to);
+      ALL_EDGES.update({id: e.id,
+        color: {color: both ? "#667eea" : "#eaeaea",
+                opacity: both ? 0.7 : 0.18}});
+    });
+  }
+
+  function applyLayerFilter(layer) {
+    if (!layer) { clearOpacityFilter(); return; }
+    const matchingIds = new Set();
+    ALL_NODES.forEach(n => {
+      if (n._data.layer === layer) matchingIds.add(n.id);
+    });
+    ALL_NODES.forEach(n => ALL_NODES.update({id: n.id,
+      opacity: matchingIds.has(n.id) ? 1 : 0.18}));
+    ALL_EDGES.forEach(e => {
+      const both = matchingIds.has(e.from) && matchingIds.has(e.to);
+      ALL_EDGES.update({id: e.id,
+        color: {color: both ? "#667eea" : "#eaeaea",
+                opacity: both ? 0.7 : 0.18}});
+    });
+  }
+
+  function setLayout(mode) {
+    if (mode === "hierarchical") {
+      NETWORK.setOptions({
+        layout: {hierarchical: {enabled: true, direction: "UD",
+                                  sortMethod: "directed",
+                                  nodeSpacing: 120, levelSeparation: 130,
+                                  blockShifting: true}},
+        physics: {enabled: false},
+      });
+      PHYSICS_ON = false;
+      document.getElementById("physicsBtn").textContent = "Physics off";
+    } else {
+      NETWORK.setOptions({
+        layout: {hierarchical: false},
+        physics: {enabled: true},
+      });
+      PHYSICS_ON = true;
+      document.getElementById("physicsBtn").textContent = "Pause physics";
+    }
+  }
+
+  // ── Main ──
   (async function main() {
+    let data;
     try {
-      RAW = await loadGraph();
+      data = await loadGraph();
     } catch (e) {
       document.getElementById("network").innerHTML =
         `<div class="error-state">Could not load the Wearly Knowledge Graph (${e.message}).</div>`;
       return;
     }
-    buildAllNodesAndEdges(RAW);
-    buildSidebarPresets();
-    buildLegend();
+    init(data);
 
-    // Init network with empty data; applyPreset() will populate.
-    NETWORK = new vis.Network(
-      document.getElementById("network"),
-      {nodes: new vis.DataSet([]), edges: new vis.DataSet([])},
-      {
-        nodes: {borderWidth: 1.5, shadow: false, margin: 8},
-        edges: {smooth: {type: "cubicBezier", forceDirection: "vertical",
-                          roundness: 0.4},
-                color: {color: "#D4D4D4"}, width: 1},
-        interaction: {hover: true, tooltipDelay: 150,
-                       navigationButtons: false, multiselect: false,
-                       zoomView: true, dragView: true},
-      }
-    );
-    window._wearlyKG = NETWORK;
-    NETWORK.on("selectNode", onSelectNode);
-    NETWORK.on("deselectNode", onDeselectNode);
-    NETWORK.on("doubleClick", function(params) {
-      if (params.nodes && params.nodes.length)
-        NETWORK.focus(params.nodes[0], {animation: true, scale: 1.15});
-    });
-
-    // Sidebar wiring
     document.getElementById("searchBox").addEventListener("input", function() {
-      SEARCH_Q = this.value || "";
-      applyPreset(CURRENT_PRESET);  // re-filter
+      ACTIVE_LEGEND_TYPE = null;
+      document.querySelectorAll(".legend-item.active").forEach(el => el.classList.remove("active"));
+      applySearch(this.value);
     });
-    document.getElementById("layerSel").addEventListener("change", function() {
-      LAYER_FILTER = this.value || "";
-      applyPreset(CURRENT_PRESET);
+    document.getElementById("layerSelect").addEventListener("change", function() {
+      ACTIVE_LEGEND_TYPE = null;
+      document.querySelectorAll(".legend-item.active").forEach(el => el.classList.remove("active"));
+      applyLayerFilter(this.value);
     });
-    document.getElementById("showEdgeLabels").addEventListener("change", function() {
-      EDGE_LABELS_ON = !!this.checked;
-      // Reapply to refresh edge labels
-      applyPreset(CURRENT_PRESET);
-      if (SELECTED_ID) {
-        NETWORK.selectNodes([SELECTED_ID]);
-        applyHighlight();
-      }
+    document.getElementById("layoutSelect").addEventListener("change", function() {
+      setLayout(this.value);
     });
-    document.getElementById("fitBtn").addEventListener("click", function() {
-      NETWORK.fit({animation: {duration: 320}});
+    document.getElementById("fitBtn").addEventListener("click", () => {
+      NETWORK.fit({animation: {duration: 350}});
     });
-    document.getElementById("resetBtn").addEventListener("click", function() {
+    document.getElementById("resetBtn").addEventListener("click", () => {
       document.getElementById("searchBox").value = "";
-      document.getElementById("layerSel").value = "";
-      document.getElementById("showEdgeLabels").checked = false;
-      SEARCH_Q = ""; LAYER_FILTER = ""; EDGE_LABELS_ON = false;
-      applyPreset("overview");
+      document.getElementById("layerSelect").value = "";
+      document.getElementById("layoutSelect").value = "default";
+      ACTIVE_LEGEND_TYPE = null;
+      document.querySelectorAll(".legend-item.active").forEach(el => el.classList.remove("active"));
+      clearOpacityFilter();
+      setLayout("default");
+      clearNodeInfo();
+      NETWORK.unselectAll();
+      NETWORK.fit({animation: {duration: 350}});
     });
-    document.getElementById("hintDismiss").addEventListener("click", () => {
-      document.getElementById("canvasHint").classList.add("dismissed");
+    document.getElementById("physicsBtn").addEventListener("click", function() {
+      PHYSICS_ON = !PHYSICS_ON;
+      NETWORK.setOptions({physics: {enabled: PHYSICS_ON}});
+      this.textContent = PHYSICS_ON ? "Pause physics" : "Resume physics";
     });
-
-    // Make "Open full-screen" point to this file's own URL so it
-    // works both inside the iframe and standalone.
-    const a = document.getElementById("openFsLink");
-    a.href = window.location.href.split("?")[0];
-
-    // Default to Overview
-    applyPreset("overview");
   })();
   </script>
 </body>

@@ -2,11 +2,11 @@
 
 > **Learning objective.** After working through this graph, you will
 > be able to distinguish Wearly's three structured-knowledge layers
-> (domain, user behavior, runtime archetypes), explain what node size
-> encodes in terms of user signal, and describe how the graph
-> functions as the substrate for future RAG and LLM shopping layers.
+> (domain, user behavior, runtime), explain what node size encodes
+> in terms of user signal, and describe how the graph functions as
+> the substrate for future RAG and LLM shopping layers.
 >
-> **What you're looking at.** A presenter-grade explorer over
+> **What you're looking at.** A live render of
 > [`graph/wearly-knowledge-graph.json`](../../../graph/wearly-knowledge-graph.json) —
 > 91 nodes, 187 typed edges, generated deterministically from public
 > seed data by [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py).
@@ -21,77 +21,50 @@
 
 ### → [**Open the Knowledge Graph in full screen ↗**](main.html){target="_blank"}
 
-The full-screen view escapes the book's column width and gives the
-graph proper room to breathe. Recommended for class demos or any
-deep exploration session.
+Recommended for class demos. The full-screen view escapes the book's
+column width and gives the graph proper room to breathe.
 
 <iframe
   src="main.html"
   width="100%"
-  height="820"
-  style="border: 1px solid #E8E0D8; border-radius: 6px;"
+  height="860"
+  style="border: 0; border-radius: 8px;"
   loading="lazy"
   title="Wearly Knowledge Graph">
 </iframe>
 
 ---
 
-## How this viewer is designed (and what the redesign answers)
+## How to read the graph
 
-In class, Dan asked Juan **what each link in his graph represented** —
-and praised the fact that Juan's node sizes encoded financial
-exposure rather than being decorative. Two principles for this
-viewer follow from that:
+The viewer is built in the same design language as the SEIS 666
+course learning-graph viewer: gradient page background, frosted-glass
+cards, soft pastel-per-type palette, simple toolbar.
 
-1. **Every edge has a typed name.** Click any node and the side
-   panel shows its 1-hop relationships **grouped by relation type**,
-   with the relation name visible as a chip prefix. Hover any edge in
-   the canvas (or toggle "Show edge labels" in the sidebar) to read
-   the type in place.
-2. **Node size encodes user signal, not aesthetic preference.** A
-   heavier `WardrobeItem` is worn more often (and covers more
-   occasions). A heavier `WardrobeItemType` / `ColorFamily` /
-   `OccasionType` rolls up from its connected items. Domain
-   archetypes (`RulePack`, `WeatherCondition`, `SkinTonePalette`)
-   stay at base size — they're equal-importance facts. The legend in
-   the sidebar names every shape; a callout block above the legend
-   says **what size means.**
+| Visual signal | What it encodes |
+|---|---|
+| **Color** | Node *type*. Each of the 17 types gets a distinct soft pastel; the User is the one dark anchor so the focal point is unmistakable. The legend shows every type with its count. |
+| **Shape** | Most nodes are ellipses (uniform, label-readable). The **User** is a star — single focal point. **WardrobeGap** and **ShoppingSuggestion** are triangles — warning shapes. |
+| **Size** | User signal — a wardrobe item worn more often + covering more occasions is larger; a color family used across many items is larger; a category with rich coverage is larger. Domain archetypes (rule packs, weather bands, palettes) stay at base size. |
+| **Edge color** | Light grey by default — un-emphasized. Highlighted edges (when a node is selected, search matches, or a legend type is filtered) turn periwinkle (#667eea). |
 
-## Eight preset views
+## What the controls do
 
-The graph defaults to **Overview**, not a 91-node blob. Use the
-preset buttons in the sidebar to jump between focused slices.
-
-| Preset | What you see | Best for |
-|---|---|---|
-| **Overview** *(default)* | The system spine: User · FitProfile · SkinTonePalette · 5 OccasionType · 7 RulePack · 7 WorkflowStep. ~25 nodes. | First read. The shape of Wearly in one screen. |
-| **User Pattern** | User + 27 WardrobeItems + their direct neighbors (color family, item type, suitable occasions). | *"What does Wearly know about this user?"* |
-| **Occasions** | The 5 occasions, the item types each requires, the rule packs that govern them, and the items that fit. | *"Which wardrobe items connect to which occasions?"* |
-| **Wardrobe Items** | Every item, sized by `worn_count × versatility`. Color families and item types as anchors. | *"Which items are heavy hitters in this closet?"* |
-| **Rules & Skills** | The 7 rule packs, their R-numbered rules, and the workflow steps they power. | *"Which rules and skills power the workflow?"* |
-| **Color & Skin** | 3 skin-tone palettes, 7 color families, the color-coordination rule pack and its rules. | *"How does Step 7 work?"* |
-| **Weather & Layers** | 5 temperature bands, the weather rule pack, the rules inside it, and Step 3. | *"How do layering decisions get made?"* |
-| **Full Graph** | All 91 nodes, all 187 edges. | A density check, not a reading view. |
-
-## Click any node — and watch the rest fade
-
-When you click a node, the graph **focuses on its 1-hop neighborhood**:
-
-- Selected node gets a thick accent border.
-- 1-hop neighbors keep full opacity.
-- Everything else fades to ~15% so the local subgraph becomes legible.
-- Connected edges turn warm-rust (otherwise grey) and show their
-  type as a label.
-- The side panel populates with the node's type, layer, weight, a
-  one-sentence meaning, its metrics, and **its relationships grouped
-  by edge type**.
-
-Click any chip in the side panel to hop to that node. Click any blank
-area to clear the focus.
+| Control | Behavior |
+|---|---|
+| **Search** | Type any name or type. Matching nodes stay full opacity; non-matches fade to ~18%. |
+| **Layer filter** *(sidebar)* | Filter to domain / user-behavior / runtime. |
+| **Layout dropdown** *(sidebar)* | Switch between **Physics (force-directed)** — default, lets categories cluster naturally — or **Hierarchical** (top-down). |
+| **Click any legend row** | Toggle to focus that node type. Everything else fades; the graph re-fits to the matching subset. Click the same row again to clear. |
+| **Click any node** | Open the info panel with type, layer, weight, one-sentence meaning, metrics, and in/out edge counts. |
+| **Double-click any node** | Highlight its 1-hop neighborhood; everything else fades to 15%. Click empty canvas to reset. |
+| **Fit to view** | Re-center and zoom to fit. |
+| **Reset** | Clear all filters; restore the default force-directed view. |
+| **Toggle Physics** | Pause / resume the simulation. Useful for capturing a screenshot at a stable layout. |
 
 ## What each link represents
 
-The graph carries **20 typed relations.** They fall into four families:
+The graph carries **20 typed relations**. The full catalog:
 
 ### Domain knowledge (static)
 
@@ -128,14 +101,14 @@ The graph carries **20 typed relations.** They fall into four families:
 | `REJECTS` | Feedback | WardrobeItem | User pushback. |
 | `WISHLIST_CLOSES_GAP` | WishlistItem | WardrobeGap | A wished item that would close a current gap. |
 
-## What node size means in this viewer
+## How node size is computed
 
-| Node type | What size encodes |
+| Node type | Size formula |
 |---|---|
 | **WardrobeItem** | `1.0 + 0.20 × worn_count + 0.10 × versatility` (versatility = count of distinct canonical occasion tags). A piece worn six times across three occasions reaches ~2.4. |
 | **WardrobeItemType, ColorFamily, OccasionType** | Rolled up from connected `WardrobeItem` weights. A category with many heavy items becomes a heavy category node. |
 | **FavoriteStore** | Scales with `times_chosen` (when overlay data is included). |
-| **All other types** | Base size. Domain archetypes are equal-importance facts; their value is informational, not behavioral. |
+| **All other types** | Base size — domain/runtime archetypes are equal-importance facts. |
 
 All weights clamp to [1.0, 3.0] so a heavy category never dwarfs the
 User node.
@@ -171,28 +144,25 @@ When a `WardrobeGap` is detected at runtime, the LLM shopping agent:
 3. Visits each `FavoriteStore` and queries that store's catalog with
    the graph-derived constraints.
 4. Scores any candidate against the same rule packs the runtime
-   engine uses (`color#R*`, `fit#R*`, `occasion#R*`).
+   engine uses.
 
 **The rule engine stays the safety + scoring substrate; the LLM is
-the discovery layer.** The LLM's output is auditable against the
-same graph the agent's reasoning trail traces through.
+the discovery layer.**
 
 ### Structure beats prompts
 
-- **Compact.** The full graph is ~66 KB. The equivalent flat-text
-  description of rules + wardrobe + history is an order of magnitude
-  larger.
-- **Queryable.** Filtering by layer / type / metric returns a precise
-  subgraph. No vector search needed for the structural parts.
-- **Auditable.** Every edge has a typed `from` / `to` / `type`. The
-  citation chain (`evidence → category → rule → reasoning line`) is
-  *literally a graph traversal*.
+- **Compact** — the full graph is ~66 KB; the equivalent flat-text
+  description is an order of magnitude larger.
+- **Queryable** — filtering by layer / type / metric returns a
+  precise subgraph.
+- **Auditable** — every edge has a typed `from` / `to` / `type`. The
+  citation chain is *literally a graph traversal*.
 
 ## Linked concept
 
 - *Schema reference:* [`graph/wearly-knowledge-graph-schema.md`](../../../graph/wearly-knowledge-graph-schema.md).
 - *Data file:* [`graph/wearly-knowledge-graph.json`](../../../graph/wearly-knowledge-graph.json).
-- *Generator:* [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py) — re-run after wardrobe/history changes to regenerate.
+- *Generator:* [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py).
 
 ---
 
