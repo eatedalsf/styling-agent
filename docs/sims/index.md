@@ -35,26 +35,28 @@ notice → Try this → Self-check → Linked concept → See also.*
 | **[Wear-history freshness](freshness/index.md)** | Explain why a much-loved item is never exiled and how the 0.4 floor + 3-day window cooperate. | `freshness-score` | Analyze |
 | **[Reasoning graph](knowledge-graph/index.md)** *(runtime entity model)* | Name the nine entity types and trace a `User → CalendarEvent → OutfitRecommendation → WardrobeItem` chain. | `knowledge-graph-schema` | Analyze |
 | **[Learning graph](learning-graph/index.md)** | Navigate the Wearly book by prerequisite order and explain how Bloom tags scaffold the reading. | *(meta — framework page)* | Understand |
+| **[Wearly Knowledge Graph](wearly-knowledge-graph/index.md)** *(structured-knowledge layer)* | Distinguish Wearly's three structured-knowledge layers (domain, user behavior, runtime), explain what node size means in terms of user signals, and describe how the graph enables RAG and LLM shopping layers. | *(meta — three-layer schema)* | Analyze |
 
 ---
 
-## Two graphs, two purposes
+## Three graphs, three purposes
 
-Wearly ships two interactive vis-network graphs, and they're easy to
-mistake for one another. The distinction matters:
+Wearly ships three interactive vis-network graphs. They're easy to
+confuse, so be explicit about which question each one answers:
 
-| | **Learning Graph** | **Reasoning Graph** |
-|---|---|---|
-| **What it models** | The reader's path through this book. | The agent's runtime data world. |
-| **Nodes are** | Concepts (28 total). | Entity instances (User, CalendarEvent, WardrobeItem …). |
-| **Edges are** | Prerequisites ("understand A before B"). | Typed relations from `graph/schema.md`. |
-| **Read it when** | You're trying to *learn* Wearly. | You're trying to *understand how the agent reasons*. |
-| **Source file** | `graph/learning-graph.json` | `graph/graph.json` |
+| | **Learning Graph** | **Reasoning Graph** | **Wearly Knowledge Graph** |
+|---|---|---|---|
+| **Question it answers** | *In what order should I learn Wearly's concepts?* | *How did the agent produce this specific outfit?* | *What does Wearly know about styling, this user, and the rules that connect them?* |
+| **Nodes are** | Concepts (28 total). | Entity instances for one run (User, CalendarEvent, WardrobeItem …). | Domain types + user-behavior aggregates + runtime archetypes (91 in the seed snapshot). |
+| **Edges are** | Prerequisites ("understand A before B"). | Typed relations from `graph/schema.md`. | Typed relations across all three layers (`OWNS`, `REQUIRES`, `USES_RULE`, `POWERS`, …). |
+| **Node size means** | All equal; Bloom level encoded by color. | Weighted by wear-count + outfit piece count. | Weighted by aggregated user signal — heavier nodes = more activity. |
+| **Read it when** | You're trying to *learn* Wearly. | You're trying to *audit one recommendation*. | You're trying to *understand the structured knowledge under the agent* — or build a future RAG / LLM layer on top of it. |
+| **Source file** | `graph/learning-graph.json` | `graph/graph.json` (schema) + per-run dynamic graph | `graph/wearly-knowledge-graph.json` (generated) |
 
-Both are deliberate and both belong in the book: the Learning Graph
-is the McCreary-pattern book spine; the Reasoning Graph is a
-Wearly-specific artifact that only exists because Wearly is a working
-agent, not just a textbook.
+All three are deliberate and all three belong in the book: the Learning
+Graph is the McCreary-pattern book spine; the Reasoning Graph explains
+runtime decisions; the Knowledge Graph is the *structured-knowledge
+layer* future LLM and RAG agents can query.
 
 ---
 

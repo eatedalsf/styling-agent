@@ -136,21 +136,56 @@ Body-positive throughout. Every line of the reasoning trail can be traced to a `
 
 ---
 
-## Learning Graph vs Reasoning Graph — they are different
+## Three graph layers — they answer different questions
 
-Wearly ships **two** interactive `vis-network` graphs, and they answer different questions.
+Wearly ships **three** interactive `vis-network` graphs. They sit at different altitudes of the same project and answer fundamentally different questions.
 
-| | **Learning Graph** | **Reasoning Graph** |
-|---|---|---|
-| **What it models** | The reader's path through the Intelligent Book | The agent's runtime data world |
-| **Nodes are** | Concepts (28 total) | Entity instances (User, CalendarEvent, OutfitRecommendation, WardrobeItem, ...) |
-| **Edges are** | Prerequisites — *"understand A before B"* | Typed relations from `graph/schema.md` (`has_event`, `recommends`, `flags_gap`, ...) |
-| **Read it when** | You're trying to *learn* Wearly | You're trying to *understand how the agent reasoned about today* |
-| **Source file** | [`graph/learning-graph.json`](graph/learning-graph.json) | [`graph/graph.json`](graph/graph.json) + per-run dynamic graph |
-| **Viewer** | [Book → Learning Graph](https://eatedalsf.github.io/styling-agent/docs/sims/learning-graph/) | Inside the app, expander below every outfit result |
-| **Layout default** | Hierarchical top-down (Bloom-ordered) | Hierarchical top-down (User → Event → Outfit → Items) |
+| | **Learning Graph** | **Reasoning Graph** | **Wearly Knowledge Graph** |
+|---|---|---|---|
+| **Question** | *In what order should I learn Wearly's concepts?* | *How did the agent produce this specific outfit?* | *What does Wearly **know** about styling, this user, and the rules that connect them?* |
+| **What it models** | The reader's path through the Intelligent Book | The agent's runtime data for one recommendation | The reusable structured-knowledge layer: domain rules + user-behavior aggregates + runtime archetypes |
+| **Nodes are** | Concepts (28 total) | Entity instances (User, CalendarEvent, WardrobeItem, ...) — one run | Domain types + user-behavior aggregates + runtime archetypes (91 in the seed snapshot) |
+| **Edges are** | Prerequisites (*"understand A before B"*) | Typed relations from `graph/schema.md` | Typed relations across all three layers (`OWNS`, `REQUIRES`, `USES_RULE`, `POWERS`, `EVALUATES`, `CONTAINS_RULE`, ...) |
+| **Node size means** | Equal weight; Bloom level by color | Wear-count for items, piece-count for outfit | **Aggregated user signal** — heavier nodes carry more user activity (worn often, covers more occasions, items invested in this category) |
+| **Read it when** | You're trying to *learn* Wearly | You're auditing *one* recommendation | You're trying to *understand the structured knowledge under the agent* — or build a future RAG / LLM layer on top of it |
+| **Source file** | [`graph/learning-graph.json`](graph/learning-graph.json) | [`graph/graph.json`](graph/graph.json) + per-run dynamic graph | [`graph/wearly-knowledge-graph.json`](graph/wearly-knowledge-graph.json) (generated) |
+| **Generator** | hand-curated | per-run via `graph_tool.py` | [`scripts/generate_wearly_kg.py`](scripts/generate_wearly_kg.py) — deterministic, seed-only by default |
 
-The Learning Graph carries **28 concepts and 39 prerequisite edges**, every node Bloom-tagged (Remember → Understand → Apply → Analyze). The Reasoning Graph follows a **9-entity-type / 17-relation-type schema** documented in [`graph/schema.md`](graph/schema.md).
+### Why the Knowledge Graph is not decorative
+
+The Wearly Knowledge Graph is **structured context** — the kind of input modern LLM agents perform better against than a flat-text dump of the same information. Three observable properties:
+
+- **Compact.** The committed JSON is ~50 KB even though it covers every domain entity, every user-behavior aggregate, every rule pack, and the workflow. The equivalent flat-text description of the rules + wardrobe + history + occasion table is an order of magnitude larger.
+- **Queryable.** Filtering by `layer` (domain / user_behavior / runtime), by `type`, or by `metric` returns a precise subgraph. An LLM doesn't have to vector-search the whole book to find the relevant rule.
+- **Auditable.** Every edge has a typed `from` / `to` / `type`. The citation chain (`evidence → category → rule → reasoning line`) is *literally a graph traversal* you can follow with a finger.
+
+### How node size encodes user behavior over time
+
+Domain archetypes (`RulePack`, `WeatherCondition`, `SkinTonePalette`, `WorkflowStep`) stay at base size — they're equal-importance facts. **User-behavior nodes scale with observable signals:**
+
+- A `WardrobeItem` grows with `worn_count` + versatility (count of distinct occasion tags).
+- A `WardrobeItemType`, `ColorFamily`, or `OccasionType` rolls up from its connected `WardrobeItem` nodes. A category with many heavy items becomes a heavy category node.
+- A `FavoriteStore` scales with `times_chosen` when the user-overlay data is included.
+
+A glance at the graph tells you which colors your closet returns to, which occasions you're well-covered for, and which item types you've invested in.
+
+### How this enables future LLM and RAG layers
+
+The Knowledge Graph is the **substrate** the roadmap items in the next section sit on. Two examples:
+
+1. **RAG over the Intelligent Book** — a question like *"Why does this dress work for my profile?"* becomes: start at the dress's `WardrobeItem` node → walk to `WardrobeItemType` + `ColorFamily` + `SUITABLE_FOR` occasion → follow `USES_RULE` to the powering rule packs → retrieve the book chapters keyed off those rule slugs. The LLM gets a *subgraph + relevant book passages*, not a wall of text. Retrieval is **along graph edges**, not vector embeddings, so the explanation cites the same rule the runtime agent does.
+2. **LLM shopping agent over favorite stores** — when a `WardrobeGap` is detected, walk to the connected `WardrobeItemType`, the user's `HAS_SKIN_TONE`, and `FitProfile`; visit each `FavoriteStore`; query that store's catalog with the graph-derived constraints; score any candidate against the same rule packs the runtime engine uses. **The rule engine stays the safety + scoring substrate; the LLM is the discovery layer.**
+
+This is what "structure beats prompts" looks like in practice: structured knowledge guides the LLM rather than the LLM having to discover the structure inside free-text prompts.
+
+### How to view the three graphs
+
+| Graph | Where to view |
+|---|---|
+| Learning Graph | [Book → Learning Graph](https://eatedalsf.github.io/styling-agent/docs/sims/learning-graph/) |
+| Reasoning Graph (schema) | [Book → Reasoning Graph](https://eatedalsf.github.io/styling-agent/docs/sims/knowledge-graph/) |
+| Reasoning Graph (live per-recommendation) | Inside the app, expander below every outfit result |
+| **Wearly Knowledge Graph** | [Book → Wearly Knowledge Graph](https://eatedalsf.github.io/styling-agent/docs/sims/wearly-knowledge-graph/) |
 
 ---
 

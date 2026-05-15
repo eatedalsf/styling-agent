@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wearly — Knowledge Graph</title>
+
+  <!--
+    Wearly Knowledge Graph viewer.
+
+    Loads graph/wearly-knowledge-graph.json and renders it with
+    vis-network.js. Three filters (layer, node type, edge type) so
+    the reader can isolate "what does Wearly know about styling?"
+    (domain), "what does Wearly know about this user's patterns?"
+    (user_behavior), or "what archetypes does the runtime produce?"
+    (runtime).
+
+    Distinct from the Learning Graph viewer (reader-concept DAG) and
+    the Reasoning Graph in the app (per-recommendation runtime view).
+  -->
+
+  <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+
+  <style>
+    :root {
+      --paper:       #F8F4ED;
+      --card:        #FDFAF7;
+      --ink:         #1C1917;
+      --body:        #4A3D36;
+      --secondary:   #7C6F64;
+      --eyebrow:     #A8937E;
+      --edge:        #D8CFC4;
+      --accent:      #C17F5A;
+      --accent-deep: #9F5A36;
+      --border:      #E8E0D8;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+    }
+    @media (min-width: 980px) {
+      .layout { grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; }
+      .header { grid-column: 1 / span 2; }
+    }
+    .header {
+      padding: 0.85rem 1.2rem;
+      background: var(--card);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 1rem; flex-wrap: wrap;
+    }
+    .title { font-family: "DM Serif Display", "Times New Roman", serif; font-size: 1.3rem; color: var(--ink); }
+    .subtitle { font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em; }
+
+    .sidebar {
+      background: var(--card);
+      border-right: 1px solid var(--border);
+      padding: 0.9rem 1rem;
+      overflow-y: auto;
+      font-size: 0.86rem;
+    }
+    .sidebar h3 {
+      font-size: 0.66rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--eyebrow);
+      font-weight: 700;
+      margin: 1.1rem 0 0.5rem;
+    }
+    .sidebar h3:first-child { margin-top: 0; }
+    .controls input,
+    .controls select {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      background: var(--paper);
+      font-size: 0.85rem;
+      color: var(--ink);
+      font-family: inherit;
+    }
+    .controls label {
+      display: block;
+      font-size: 0.74rem;
+      color: var(--secondary);
+      margin-bottom: 0.25rem;
+      margin-top: 0.6rem;
+    }
+    .controls label:first-child { margin-top: 0; }
+    .controls button {
+      width: 100%;
+      padding: 0.5rem;
+      border: none;
+      background: var(--accent);
+      color: var(--card);
+      font-family: inherit;
+      font-size: 0.84rem;
+      border-radius: 4px;
+      cursor: pointer;
+      margin-top: 0.5rem;
+    }
+    .controls button:hover { background: var(--accent-deep); }
+    .controls button.secondary {
+      background: var(--card);
+      color: var(--ink);
+      border: 1px solid var(--border);
+    }
+    .controls button.secondary:hover { background: var(--paper); }
+    .legend {
+      display: flex; flex-direction: column; gap: 0.35rem;
+    }
+    .legend-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.8rem; color: var(--body);
+    }
+    .legend-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%; border: 2px solid var(--edge);
+      flex-shrink: 0;
+    }
+    .legend-dot.box      { border-radius: 2px; }
+    .legend-dot.diamond  { transform: rotate(45deg); border-radius: 2px; }
+    .legend-dot.triangle { width: 0; height: 0; background: transparent !important;
+                            border: 8px solid transparent;
+                            border-bottom-color: var(--accent); }
+    .selected-node {
+      padding: 0.65rem 0.75rem;
+      background: var(--paper);
+      border-left: 3px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+      margin-top: 0.4rem;
+      font-size: 0.84rem;
+    }
+    .selected-node-label {
+      font-weight: 600; color: var(--ink); margin-bottom: 0.25rem;
+    }
+    .selected-node-meta {
+      font-size: 0.72rem; color: var(--secondary);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+    .selected-node-metrics {
+      font-size: 0.8rem; color: var(--body); margin-top: 0.3rem;
+    }
+    .selected-node-metrics .k { color: var(--secondary); display: inline-block;
+                                  min-width: 6.5rem; }
+    .selected-node-weight {
+      display: inline-block; margin-top: 0.4rem;
+      font-size: 0.66rem;
+      letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 1px 7px;
+      background: var(--paper);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      color: var(--secondary);
+    }
+    #network {
+      width: 100%; height: 100%;
+      background: var(--paper);
+      min-height: 540px;
+      position: relative;
+    }
+    .empty-state { padding: 1rem; color: var(--secondary); font-size: 0.84rem; }
+
+    .first-time-hint {
+      position: absolute;
+      left: 50%; top: 12px;
+      transform: translateX(-50%);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 4px;
+      padding: 0.55rem 0.8rem;
+      font-size: 0.82rem;
+      color: var(--body);
+      box-shadow: 0 1px 6px rgba(28, 25, 23, 0.06);
+      z-index: 10;
+      max-width: 620px;
+      line-height: 1.5;
+      transition: opacity 250ms ease, transform 250ms ease;
+    }
+    .first-time-hint.dismissed { opacity: 0; transform: translate(-50%, -8px); pointer-events: none; }
+    .first-time-hint .hint-dismiss {
+      background: none; border: none; color: var(--secondary);
+      font-size: 0.82rem; cursor: pointer; margin-left: 0.4rem; padding: 0;
+      font-family: inherit;
+    }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <div class="header">
+      <div>
+        <div class="title">Wearly — Knowledge Graph</div>
+        <div class="subtitle">
+          <span id="stats">loading…</span> ·
+          three layers: domain · user behavior · runtime ·
+          larger nodes carry more user signal
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="controls">
+        <h3>Filter</h3>
+        <label for="searchBox">Search</label>
+        <input type="text" id="searchBox" placeholder="e.g. blouse, color, occasion, rule">
+
+        <label for="layerSel">Layer</label>
+        <select id="layerSel">
+          <option value="">All layers</option>
+          <option value="domain">Domain (what Wearly knows)</option>
+          <option value="user_behavior">User behavior (this user's patterns)</option>
+          <option value="runtime">Runtime archetypes</option>
+        </select>
+
+        <label for="typeSel">Node type</label>
+        <select id="typeSel">
+          <option value="">All types</option>
+        </select>
+
+        <label for="edgeTypeSel">Edge type</label>
+        <select id="edgeTypeSel">
+          <option value="">All edges</option>
+        </select>
+
+        <label for="layoutSel">Layout</label>
+        <select id="layoutSel">
+          <option value="physics">Physics (force-directed)</option>
+          <option value="hierarchical-ud">Hierarchical (top → bottom)</option>
+        </select>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-top:0.4rem;">
+          <button id="fitBtn" title="Re-center + zoom to fit every visible node.">Fit to view</button>
+          <button id="physicsBtn" title="Pause / resume the force-directed simulation.">Pause physics</button>
+        </div>
+        <button id="userOnlyBtn" class="secondary"
+                title="Highlight only the User and its direct neighborhood.">
+          Spotlight User neighborhood
+        </button>
+        <button id="resetBtn" class="secondary" style="margin-top:0.4rem;">Reset everything</button>
+      </div>
+
+      <h3>What size means</h3>
+      <div style="font-size:0.78rem; color:var(--body); line-height:1.5;">
+        Larger nodes carry more <em>user signal</em> — a heavier <code>WardrobeItem</code>
+        is worn more often or covers more occasions; a heavier
+        <code>ColorFamily</code> shows up across more of your closet;
+        a heavier <code>OccasionType</code> has richer wardrobe coverage.
+        Domain archetypes (<code>RulePack</code>, <code>WeatherCondition</code>) stay
+        at base size — they're equal-importance facts, not user-weighted.
+      </div>
+
+      <h3>Node types</h3>
+      <div id="legend" class="legend"></div>
+
+      <h3>Selected node</h3>
+      <div id="selected" class="empty-state">Click a node to see its layer, metrics, and connections.</div>
+    </div>
+
+    <div id="network">
+      <div id="firstTimeHint" class="first-time-hint" role="status" aria-live="polite">
+        <strong>Click any node</strong> to inspect its type, layer, and metrics ·
+        use the <strong>Layer</strong> dropdown to isolate one slice (domain / user behavior / runtime).
+        <button type="button" class="hint-dismiss" id="hintDismissBtn" aria-label="Dismiss hint">×</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+  /* eslint-disable */
+
+  // Where to look for the data file (same pattern as learning-graph)
+  const candidatePaths = [
+    "../../../graph/wearly-knowledge-graph.json",
+    "/styling-agent/graph/wearly-knowledge-graph.json",
+    "/graph/wearly-knowledge-graph.json",
+    "graph/wearly-knowledge-graph.json",
+  ];
+
+  async function loadGraph() {
+    for (const path of candidatePaths) {
+      try {
+        const r = await fetch(path, {cache: "no-cache"});
+        if (r.ok) return await r.json();
+      } catch (e) { /* try next */ }
+    }
+    throw new Error("Could not load wearly-knowledge-graph.json");
+  }
+
+  function styleForType(nodeTypes, type) {
+    return nodeTypes.find(nt => nt.id === type) || nodeTypes[0];
+  }
+
+  function buildVisNodes(data) {
+    const typeMap = Object.fromEntries(data.node_types.map(t => [t.id, t]));
+    return data.nodes.map(n => {
+      const t = typeMap[n.type] || data.node_types[0];
+      const size = Math.max(12, Math.min(48, (t.base_size || 22) * (n.weight || 1.0)));
+      const node = {
+        id:    n.id,
+        label: n.label,
+        title: buildTooltip(n),
+        color: {background: t.color, border: t.border},
+        shape: t.shape,
+        size:  size,
+        _data: n,
+        _typeStyle: t,
+      };
+      if (t.font_color) {
+        node.font = {color: t.font_color, size: 13, face: "DM Sans, sans-serif",
+                     strokeWidth: 3, strokeColor: t.color};
+      } else {
+        node.font = {color: "#1C1917", size: 13, face: "DM Sans, sans-serif"};
+      }
+      return node;
+    });
+  }
+
+  function buildTooltip(n) {
+    const lines = [`${n.type} · ${n.label}`, `Layer: ${n.layer}`,
+                   `Weight: ${(n.weight || 1.0).toFixed(2)}`];
+    if (n.metrics && Object.keys(n.metrics).length) {
+      lines.push("");
+      for (const [k, v] of Object.entries(n.metrics)) {
+        if (v === null || v === undefined || v === "" ||
+            (Array.isArray(v) && v.length === 0)) continue;
+        const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
+        lines.push(`${k}: ${valueStr.length > 60 ? valueStr.slice(0, 57) + "…" : valueStr}`);
+      }
+    }
+    return lines.join("\n");
+  }
+
+  function buildVisEdges(data) {
+    return data.edges.map((e, i) => ({
+      id:    `e${i}`,
+      from:  e.from,
+      to:    e.to,
+      label: e.type,
+      arrows: {to: {enabled: true, scaleFactor: 0.45}},
+      color: {color: "#D8CFC4", highlight: "#9F5A36"},
+      font:  {size: 9, color: "#7C6F64", align: "middle",
+              strokeWidth: 3, strokeColor: "#F8F4ED"},
+      smooth: {type: "continuous"},
+      _data: e,
+    }));
+  }
+
+  function renderLegend(nodeTypes) {
+    const el = document.getElementById("legend");
+    el.innerHTML = nodeTypes.map(t => {
+      const klass = t.shape === "box" ? "box" :
+                    t.shape === "diamond" ? "diamond" :
+                    t.shape === "triangle" || t.shape === "triangleDown" ? "triangle" :
+                    "";
+      const style = (t.shape === "triangle" || t.shape === "triangleDown")
+                    ? `border-bottom-color:${t.border}`
+                    : `background:${t.color}; border-color:${t.border}`;
+      return `
+        <div class="legend-row">
+          <span class="legend-dot ${klass}" style="${style}"></span>
+          <span><strong>${t.id}</strong> <span style="color:var(--secondary)">— ${t.category}</span></span>
+        </div>`;
+    }).join("");
+  }
+
+  function populateSelects(data) {
+    const typeSel = document.getElementById("typeSel");
+    [...new Set(data.nodes.map(n => n.type))].sort().forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      typeSel.appendChild(opt);
+    });
+    const edgeSel = document.getElementById("edgeTypeSel");
+    [...new Set(data.edges.map(e => e.type))].sort().forEach(t => {
+      const opt = document.createElement("option");
+      opt.value = t; opt.textContent = t;
+      edgeSel.appendChild(opt);
+    });
+  }
+
+  function showSelected(node, edgesById, nodesById) {
+    const el = document.getElementById("selected");
+    if (!node) {
+      el.innerHTML = `<div class="empty-state">Click a node to see its layer, metrics, and connections.</div>`;
+      return;
+    }
+    const n = node._data;
+
+    // Compute degree
+    let outEdges = [];
+    let inEdges  = [];
+    for (const eid in edgesById) {
+      const e = edgesById[eid];
+      if (e.from === n.id && nodesById[e.to])   outEdges.push(e);
+      if (e.to   === n.id && nodesById[e.from]) inEdges.push(e);
+    }
+
+    function metricRow(k, v) {
+      if (v === null || v === undefined || v === "" ||
+          (Array.isArray(v) && v.length === 0)) return "";
+      const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
+      return `<div><span class="k">${k}:</span> ${valueStr}</div>`;
+    }
+
+    const metricsHtml = n.metrics
+      ? Object.entries(n.metrics).map(([k, v]) => metricRow(k, v)).join("")
+      : "";
+
+    function edgeChip(e, dir) {
+      const otherId = (dir === "out") ? e.to : e.from;
+      const other = nodesById[otherId];
+      const label = other ? other._data.label : otherId;
+      return `<button class="kg-chip" type="button" data-id="${otherId}"
+        style="font:inherit; font-size:0.72rem; color:var(--ink);
+               background:var(--paper); border:1px solid var(--border);
+               padding:1px 7px; border-radius:99px;
+               margin:0 0.25rem 0.25rem 0; cursor:pointer;"
+        title="${e.type}">${e.type.toLowerCase().replace(/_/g,' ')} → ${label}</button>`;
+    }
+
+    el.innerHTML = `
+      <div class="selected-node">
+        <div class="selected-node-meta">${n.type} · ${n.layer}</div>
+        <div class="selected-node-label">${n.label}</div>
+        <span class="selected-node-weight">weight ${(n.weight || 1.0).toFixed(2)}</span>
+        ${metricsHtml ? `<div class="selected-node-metrics">${metricsHtml}</div>` : ""}
+        ${outEdges.length ? `
+          <div style="margin-top:0.55rem;">
+            <div style="font-size:0.66rem; color:var(--secondary);
+                        letter-spacing:0.12em; text-transform:uppercase;
+                        font-weight:600; margin-bottom:0.2rem;">
+              Out edges (${outEdges.length})
+            </div>
+            <div style="line-height:1.7;">${outEdges.map(e => edgeChip(e, "out")).join("")}</div>
+          </div>` : ""}
+        ${inEdges.length ? `
+          <div style="margin-top:0.4rem;">
+            <div style="font-size:0.66rem; color:var(--secondary);
+                        letter-spacing:0.12em; text-transform:uppercase;
+                        font-weight:600; margin-bottom:0.2rem;">
+              In edges (${inEdges.length})
+            </div>
+            <div style="line-height:1.7;">${inEdges.map(e => edgeChip(e, "in")).join("")}</div>
+          </div>` : ""}
+      </div>
+    `;
+
+    el.querySelectorAll(".kg-chip").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.getAttribute("data-id");
+        if (window._wearlyKG && id) {
+          window._wearlyKG.selectNodes([id]);
+          window._wearlyKG.focus(id, {animation: true, scale: 1.05});
+          showSelected(nodesById[id], edgesById, nodesById);
+        }
+      });
+    });
+  }
+
+  (async function main() {
+    let data;
+    try {
+      data = await loadGraph();
+    } catch (e) {
+      document.getElementById("network").innerHTML =
+        `<div class="empty-state">Could not load the Wearly Knowledge Graph (${e.message}).</div>`;
+      return;
+    }
+    document.getElementById("stats").textContent =
+      `${data.metadata.node_count} nodes · ${data.metadata.edge_count} edges`;
+
+    renderLegend(data.node_types);
+    populateSelects(data);
+
+    const visNodes = buildVisNodes(data);
+    const visEdges = buildVisEdges(data);
+    const nodesById = Object.fromEntries(visNodes.map(n => [n.id, n]));
+    const edgesById = Object.fromEntries(visEdges.map(e => [e.id, e]));
+
+    const network = new vis.Network(
+      document.getElementById("network"),
+      {nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges)},
+      {
+        nodes: {borderWidth: 2},
+        edges: {smooth: {type: "continuous"}},
+        physics: {
+          enabled: true,
+          barnesHut: {gravitationalConstant: -2800, centralGravity: 0.15,
+                       springLength: 110, springConstant: 0.04, damping: 0.5},
+          minVelocity: 0.5,
+        },
+        interaction: {hover: true, tooltipDelay: 120, navigationButtons: false},
+      }
+    );
+    window._wearlyKG = network;
+
+    // First-time hint
+    const hintEl = document.getElementById("firstTimeHint");
+    function dismissHint() {
+      if (hintEl && !hintEl.classList.contains("dismissed"))
+        hintEl.classList.add("dismissed");
+    }
+    document.getElementById("hintDismissBtn").addEventListener("click", dismissHint);
+    network.on("selectNode", dismissHint);
+    setTimeout(dismissHint, 10000);
+
+    // Node click → side panel
+    network.on("selectNode", function(params) {
+      const id = params.nodes[0];
+      showSelected(nodesById[id], edgesById, nodesById);
+    });
+    network.on("deselectNode", function() {
+      showSelected(null, edgesById, nodesById);
+    });
+    network.on("doubleClick", function(params) {
+      if (params.nodes && params.nodes.length)
+        network.focus(params.nodes[0], {animation: true, scale: 1.2});
+    });
+
+    // Filter logic — applies layer + type + edge-type + search together.
+    function applyFilters() {
+      const q = (document.getElementById("searchBox").value || "").toLowerCase();
+      const layer = document.getElementById("layerSel").value;
+      const type = document.getElementById("typeSel").value;
+      const edgeType = document.getElementById("edgeTypeSel").value;
+
+      const visibleNodeIds = new Set();
+      network.body.data.nodes.forEach(n => {
+        const d = n._data;
+        const labelMatch = !q || d.label.toLowerCase().includes(q) ||
+                            d.type.toLowerCase().includes(q);
+        const layerMatch = !layer || d.layer === layer;
+        const typeMatch  = !type  || d.type  === type;
+        const visible = labelMatch && layerMatch && typeMatch;
+        network.body.data.nodes.update({id: n.id, hidden: !visible});
+        if (visible) visibleNodeIds.add(n.id);
+      });
+      network.body.data.edges.forEach(e => {
+        const visible = visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
+                        && (!edgeType || e._data.type === edgeType);
+        network.body.data.edges.update({id: e.id, hidden: !visible});
+      });
+    }
+    document.getElementById("searchBox").addEventListener("input", applyFilters);
+    document.getElementById("layerSel").addEventListener("change", applyFilters);
+    document.getElementById("typeSel").addEventListener("change", applyFilters);
+    document.getElementById("edgeTypeSel").addEventListener("change", applyFilters);
+
+    // Layout switching
+    function setLayout(mode) {
+      if (mode === "hierarchical-ud") {
+        network.setOptions({
+          layout: {hierarchical: {direction: "UD", sortMethod: "directed",
+                                   nodeSpacing: 140, levelSeparation: 120}},
+          physics: {enabled: false},
+        });
+      } else {
+        network.setOptions({
+          layout: {hierarchical: false},
+          physics: {enabled: true},
+        });
+      }
+    }
+    document.getElementById("layoutSel").addEventListener("change", function(e) {
+      setLayout(e.target.value);
+    });
+
+    document.getElementById("fitBtn").addEventListener("click", function() {
+      network.fit({animation: {duration: 350, easingFunction: "easeInOutQuad"}});
+    });
+
+    let physicsOn = true;
+    document.getElementById("physicsBtn").addEventListener("click", function() {
+      if (document.getElementById("layoutSel").value !== "physics") return;
+      physicsOn = !physicsOn;
+      network.setOptions({physics: {enabled: physicsOn}});
+      this.textContent = physicsOn ? "Pause physics" : "Resume physics";
+    });
+
+    // Spotlight User neighborhood — fade everything not within 1 hop of User.
+    document.getElementById("userOnlyBtn").addEventListener("click", function() {
+      const userNode = visNodes.find(n => n._data.type === "User");
+      if (!userNode) return;
+      const neighborIds = new Set([userNode.id]);
+      visEdges.forEach(e => {
+        if (e.from === userNode.id) neighborIds.add(e.to);
+        if (e.to   === userNode.id) neighborIds.add(e.from);
+      });
+      network.body.data.nodes.forEach(n => {
+        network.body.data.nodes.update({id: n.id, hidden: !neighborIds.has(n.id)});
+      });
+      network.body.data.edges.forEach(e => {
+        network.body.data.edges.update({id: e.id,
+          hidden: !(neighborIds.has(e.from) && neighborIds.has(e.to))});
+      });
+      network.fit({animation: true});
+    });
+
+    document.getElementById("resetBtn").addEventListener("click", function() {
+      document.getElementById("searchBox").value = "";
+      document.getElementById("layerSel").value = "";
+      document.getElementById("typeSel").value = "";
+      document.getElementById("edgeTypeSel").value = "";
+      document.getElementById("layoutSel").value = "physics";
+      applyFilters();
+      setLayout("physics");
+      physicsOn = true;
+      document.getElementById("physicsBtn").textContent = "Pause physics";
+      network.fit({animation: true});
+    });
+  })();
+  </script>
+</body>
+</html>

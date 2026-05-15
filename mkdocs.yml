@@ -191,6 +191,10 @@ nav:
   - Learning Graph:
     - "Concept map (interactive)": docs/sims/learning-graph/index.md
 
+  - Wearly Knowledge Graph:
+    - "Structured knowledge (interactive)": docs/sims/wearly-knowledge-graph/index.md
+    - "Schema":                              graph/wearly-knowledge-graph-schema.md
+
   - Micro-sims:
     - "All micro-sims (index)":         docs/sims/index.md
     - "Color harmony score":            docs/sims/color-harmony/index.md

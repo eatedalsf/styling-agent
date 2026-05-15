@@ -64,8 +64,9 @@ _REMAPPED_FILES = {
     "docs/home.md": "index.md",
     # JSON data files the micro-sims fetch at runtime via XHR. Copied
     # into the stage so they're served from the same origin as the sim HTML.
-    "graph/graph.json":           "graph/graph.json",
-    "graph/learning-graph.json":  "graph/learning-graph.json",
+    "graph/graph.json":                       "graph/graph.json",
+    "graph/learning-graph.json":              "graph/learning-graph.json",
+    "graph/wearly-knowledge-graph.json":      "graph/wearly-knowledge-graph.json",
 }
 
 # Directories where every file (not just .md) must be staged — typically

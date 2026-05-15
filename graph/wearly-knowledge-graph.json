@@ -1,0 +1,2974 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "name": "Wearly Knowledge Graph",
+    "description": "Three-layer structured-knowledge graph modeling Wearly's domain rules, user behavior, and runtime archetypes. Distinct from the Learning Graph (reader concepts) and the Reasoning Graph (one-recommendation explanation).",
+    "node_count": 91,
+    "edge_count": 187,
+    "layers": [
+      "domain",
+      "user_behavior",
+      "runtime"
+    ],
+    "generated_from": [
+      "wardrobe.json",
+      "seed_wear_history.json",
+      "color_rules.json",
+      "rule_refs.py",
+      "styling_agent"
+    ],
+    "generated_at": "2026-05-14T22:24:47",
+    "source_mode": "public_seed",
+    "rendered_by": "vis-network.js"
+  },
+  "node_types": [
+    {
+      "id": "User",
+      "category": "domain",
+      "shape": "diamond",
+      "color": "#1C1917",
+      "border": "#1C1917",
+      "base_size": 32,
+      "font_color": "#FFFFFF"
+    },
+    {
+      "id": "FitProfile",
+      "category": "domain",
+      "shape": "box",
+      "color": "#FAF3EE",
+      "border": "#9F5A36",
+      "base_size": 22
+    },
+    {
+      "id": "SkinTonePalette",
+      "category": "domain",
+      "shape": "box",
+      "color": "#F4EFE8",
+      "border": "#A85A3C",
+      "base_size": 22
+    },
+    {
+      "id": "OccasionType",
+      "category": "domain",
+      "shape": "box",
+      "color": "#F5EDE3",
+      "border": "#C17F5A",
+      "base_size": 26
+    },
+    {
+      "id": "WeatherCondition",
+      "category": "domain",
+      "shape": "box",
+      "color": "#FDFAF7",
+      "border": "#7C6F64",
+      "base_size": 22
+    },
+    {
+      "id": "WardrobeItemType",
+      "category": "domain",
+      "shape": "box",
+      "color": "#EFE3CC",
+      "border": "#7C6F64",
+      "base_size": 22
+    },
+    {
+      "id": "ColorFamily",
+      "category": "domain",
+      "shape": "dot",
+      "color": "#FAF3EE",
+      "border": "#9F5A36",
+      "base_size": 20
+    },
+    {
+      "id": "RulePack",
+      "category": "domain",
+      "shape": "hexagon",
+      "color": "#FDFAF7",
+      "border": "#1C1917",
+      "base_size": 24
+    },
+    {
+      "id": "Rule",
+      "category": "domain",
+      "shape": "dot",
+      "color": "#F5F0E9",
+      "border": "#A8937E",
+      "base_size": 16
+    },
+    {
+      "id": "WorkflowStep",
+      "category": "runtime",
+      "shape": "ellipse",
+      "color": "#F8F4ED",
+      "border": "#1C1917",
+      "base_size": 22
+    },
+    {
+      "id": "WardrobeItem",
+      "category": "user_behavior",
+      "shape": "dot",
+      "color": "#F5EDE3",
+      "border": "#A8937E",
+      "base_size": 18
+    },
+    {
+      "id": "WishlistItem",
+      "category": "user_behavior",
+      "shape": "triangle",
+      "color": "#FDF3EE",
+      "border": "#9F5A36",
+      "base_size": 18
+    },
+    {
+      "id": "FavoriteStore",
+      "category": "user_behavior",
+      "shape": "star",
+      "color": "#FAF3EE",
+      "border": "#C17F5A",
+      "base_size": 18
+    },
+    {
+      "id": "OutfitRecommendation",
+      "category": "runtime",
+      "shape": "diamond",
+      "color": "#FDFAF7",
+      "border": "#1C1917",
+      "base_size": 26
+    },
+    {
+      "id": "WardrobeGap",
+      "category": "runtime",
+      "shape": "triangleDown",
+      "color": "#FDF3EE",
+      "border": "#B91C1C",
+      "base_size": 22
+    },
+    {
+      "id": "ShoppingSuggestion",
+      "category": "runtime",
+      "shape": "triangleDown",
+      "color": "#FDF3EE",
+      "border": "#7C6F64",
+      "base_size": 18
+    },
+    {
+      "id": "Feedback",
+      "category": "runtime",
+      "shape": "square",
+      "color": "#EFE3CC",
+      "border": "#7C6F64",
+      "base_size": 18
+    }
+  ],
+  "edge_types": [
+    {
+      "id": "HAS_PROFILE",
+      "label": "has profile",
+      "layer": "domain",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "FitProfile"
+      ]
+    },
+    {
+      "id": "HAS_SKIN_TONE",
+      "label": "has skin tone",
+      "layer": "domain",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "SkinTonePalette"
+      ]
+    },
+    {
+      "id": "OWNS",
+      "label": "owns",
+      "layer": "user_behavior",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "WardrobeItem"
+      ]
+    },
+    {
+      "id": "HAS_FAVORITE_STORE",
+      "label": "has favorite store",
+      "layer": "user_behavior",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "FavoriteStore"
+      ]
+    },
+    {
+      "id": "HAS_WISHLIST_ITEM",
+      "label": "wishes for",
+      "layer": "user_behavior",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "WishlistItem"
+      ]
+    },
+    {
+      "id": "PREFERS",
+      "label": "prefers",
+      "layer": "user_behavior",
+      "source_types": [
+        "User"
+      ],
+      "target_types": [
+        "ColorFamily"
+      ]
+    },
+    {
+      "id": "REQUIRES",
+      "label": "requires",
+      "layer": "domain",
+      "source_types": [
+        "OccasionType"
+      ],
+      "target_types": [
+        "WardrobeItemType"
+      ]
+    },
+    {
+      "id": "USES_RULE",
+      "label": "uses rule",
+      "layer": "domain",
+      "source_types": [
+        "OccasionType",
+        "WeatherCondition"
+      ],
+      "target_types": [
+        "RulePack"
+      ]
+    },
+    {
+      "id": "HAS_TYPE",
+      "label": "is a",
+      "layer": "user_behavior",
+      "source_types": [
+        "WardrobeItem"
+      ],
+      "target_types": [
+        "WardrobeItemType"
+      ]
+    },
+    {
+      "id": "HAS_COLOR",
+      "label": "has color family",
+      "layer": "user_behavior",
+      "source_types": [
+        "WardrobeItem",
+        "WishlistItem"
+      ],
+      "target_types": [
+        "ColorFamily"
+      ]
+    },
+    {
+      "id": "SUITABLE_FOR",
+      "label": "suitable for",
+      "layer": "user_behavior",
+      "source_types": [
+        "WardrobeItem"
+      ],
+      "target_types": [
+        "OccasionType"
+      ]
+    },
+    {
+      "id": "SHAPES_FIT_FOR",
+      "label": "shapes fit for",
+      "layer": "domain",
+      "source_types": [
+        "FitProfile"
+      ],
+      "target_types": [
+        "WardrobeItemType"
+      ]
+    },
+    {
+      "id": "EVALUATES",
+      "label": "evaluates",
+      "layer": "domain",
+      "source_types": [
+        "Rule"
+      ],
+      "target_types": [
+        "SkinTonePalette",
+        "WardrobeItemType"
+      ]
+    },
+    {
+      "id": "CONTAINS_RULE",
+      "label": "contains",
+      "layer": "domain",
+      "source_types": [
+        "RulePack"
+      ],
+      "target_types": [
+        "Rule"
+      ]
+    },
+    {
+      "id": "POWERS",
+      "label": "powers",
+      "layer": "runtime",
+      "source_types": [
+        "RulePack"
+      ],
+      "target_types": [
+        "WorkflowStep"
+      ]
+    },
+    {
+      "id": "PRODUCES",
+      "label": "produces",
+      "layer": "runtime",
+      "source_types": [
+        "WorkflowStep"
+      ],
+      "target_types": [
+        "OutfitRecommendation",
+        "WardrobeGap",
+        "ShoppingSuggestion"
+      ]
+    },
+    {
+      "id": "CONTAINS_ITEM",
+      "label": "contains",
+      "layer": "runtime",
+      "source_types": [
+        "OutfitRecommendation"
+      ],
+      "target_types": [
+        "WardrobeItem"
+      ]
+    },
+    {
+      "id": "FLAGS_GAP",
+      "label": "flags gap",
+      "layer": "runtime",
+      "source_types": [
+        "OutfitRecommendation"
+      ],
+      "target_types": [
+        "WardrobeGap"
+      ]
+    },
+    {
+      "id": "SUGGESTS",
+      "label": "suggests",
+      "layer": "runtime",
+      "source_types": [
+        "WardrobeGap"
+      ],
+      "target_types": [
+        "ShoppingSuggestion"
+      ]
+    },
+    {
+      "id": "REJECTS",
+      "label": "rejects",
+      "layer": "runtime",
+      "source_types": [
+        "Feedback"
+      ],
+      "target_types": [
+        "WardrobeItem"
+      ]
+    },
+    {
+      "id": "WISHLIST_CLOSES_GAP",
+      "label": "closes gap",
+      "layer": "runtime",
+      "source_types": [
+        "WishlistItem"
+      ],
+      "target_types": [
+        "WardrobeGap"
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "id": "color-family:cool-neutral",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Cool Neutral",
+      "weight": 1.11,
+      "metrics": {
+        "sample_colors": [
+          "white",
+          "silver",
+          "pearl",
+          "ice blue"
+        ],
+        "item_count": 1
+      }
+    },
+    {
+      "id": "color-family:cool-rich",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Cool Rich",
+      "weight": 1.0,
+      "metrics": {
+        "sample_colors": [
+          "cobalt",
+          "emerald",
+          "royal blue",
+          "deep purple"
+        ]
+      }
+    },
+    {
+      "id": "color-family:deep-neutral",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Deep Neutral",
+      "weight": 2.3,
+      "metrics": {
+        "sample_colors": [
+          "black",
+          "charcoal",
+          "chocolate brown",
+          "navy"
+        ],
+        "item_count": 9
+      }
+    },
+    {
+      "id": "color-family:indigo",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Indigo",
+      "weight": 1.21,
+      "metrics": {
+        "sample_colors": [
+          "indigo",
+          "denim"
+        ],
+        "item_count": 1
+      }
+    },
+    {
+      "id": "color-family:soft",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Soft",
+      "weight": 1.3,
+      "metrics": {
+        "sample_colors": [
+          "blush",
+          "sage green",
+          "nude",
+          "lavender"
+        ],
+        "item_count": 2
+      }
+    },
+    {
+      "id": "color-family:warm-neutral",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Warm Neutral",
+      "weight": 1.94,
+      "metrics": {
+        "sample_colors": [
+          "cream",
+          "camel",
+          "tan",
+          "warm white"
+        ],
+        "item_count": 7
+      }
+    },
+    {
+      "id": "color-family:warm-rich",
+      "type": "ColorFamily",
+      "layer": "domain",
+      "label": "Warm Rich",
+      "weight": 1.89,
+      "metrics": {
+        "sample_colors": [
+          "terracotta",
+          "burnt orange",
+          "rust",
+          "burgundy"
+        ],
+        "item_count": 6
+      }
+    },
+    {
+      "id": "fit:demo",
+      "type": "FitProfile",
+      "layer": "domain",
+      "label": "hourglass · tailored",
+      "weight": 1.0,
+      "metrics": {
+        "body_shape": "hourglass",
+        "preferred_fit": "tailored",
+        "modesty_preference": null,
+        "style_preferences": [
+          "classic",
+          "elegant",
+          "minimal"
+        ]
+      }
+    },
+    {
+      "id": "occasion:casual",
+      "type": "OccasionType",
+      "layer": "domain",
+      "label": "Casual",
+      "weight": 3.0,
+      "metrics": {
+        "item_count": 14
+      }
+    },
+    {
+      "id": "occasion:dinner",
+      "type": "OccasionType",
+      "layer": "domain",
+      "label": "Dinner",
+      "weight": 3.0,
+      "metrics": {
+        "item_count": 13
+      }
+    },
+    {
+      "id": "occasion:formal",
+      "type": "OccasionType",
+      "layer": "domain",
+      "label": "Formal",
+      "weight": 1.4,
+      "metrics": {
+        "item_count": 3
+      }
+    },
+    {
+      "id": "occasion:gym",
+      "type": "OccasionType",
+      "layer": "domain",
+      "label": "Gym",
+      "weight": 1.57,
+      "metrics": {
+        "item_count": 5
+      }
+    },
+    {
+      "id": "occasion:work",
+      "type": "OccasionType",
+      "layer": "domain",
+      "label": "Work",
+      "weight": 3.0,
+      "metrics": {
+        "item_count": 18
+      }
+    },
+    {
+      "id": "rule:color-coordination-rules-R1",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "color-coordination-rules · R1",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "color#R1",
+        "summary": "Three skin-tone palettes inform the score."
+      }
+    },
+    {
+      "id": "rule:color-coordination-rules-R2",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "color-coordination-rules · R2",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "color#R2",
+        "summary": "Base 60, +8 best / +4 good / -10 avoid, clamped to 0-100."
+      }
+    },
+    {
+      "id": "rule:color-coordination-rules-R5",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "color-coordination-rules · R5",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "color#R5",
+        "summary": "Unknown skin tone returns a neutral score with a clear note."
+      }
+    },
+    {
+      "id": "rule:fit-silhouette-rules-R1",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "fit-silhouette-rules · R1",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "fit#R1",
+        "summary": "Body-positive language is a contract; styling reasoning frames features as honored, not as targets for change."
+      }
+    },
+    {
+      "id": "rule:fit-silhouette-rules-R2",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "fit-silhouette-rules · R2",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "fit#R2",
+        "summary": "Fit-profile fields are optional; missing fields skip the note."
+      }
+    },
+    {
+      "id": "rule:fit-silhouette-rules-R8",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "fit-silhouette-rules · R8",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "fit#R8",
+        "summary": "Measurement-derived profile suggestions are preference-based, never prescriptive — user opts in, body-positive language only."
+      }
+    },
+    {
+      "id": "rule:occasion-rules-R1",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "occasion-rules · R1",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "occasion#R1",
+        "summary": "Map free-text occasion to one of five canonical tags."
+      }
+    },
+    {
+      "id": "rule:occasion-rules-R2",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "occasion-rules · R2",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "occasion#R2",
+        "summary": "Required piece-types per occasion drive the gap check."
+      }
+    },
+    {
+      "id": "rule:occasion-rules-R3",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "occasion-rules · R3",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "occasion#R3",
+        "summary": "Dress-vs-separates branching for formal and dinner occasions."
+      }
+    },
+    {
+      "id": "rule:occasion-rules-R4",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "occasion-rules · R4",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "occasion#R4",
+        "summary": "Accessory cap of two."
+      }
+    },
+    {
+      "id": "rule:shopping-gap-rules-R1",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "shopping-gap-rules · R1",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "shopping#R1",
+        "summary": "A required piece-type missing from the outfit is a gap."
+      }
+    },
+    {
+      "id": "rule:shopping-gap-rules-R2",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "shopping-gap-rules · R2",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "shopping#R2",
+        "summary": "Cold weather without occasion-matching outerwear is a gap."
+      }
+    },
+    {
+      "id": "rule:shopping-gap-rules-R3",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "shopping-gap-rules · R3",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "shopping#R3",
+        "summary": "Suggestions are descriptive (never promotional)."
+      }
+    },
+    {
+      "id": "rule:shopping-gap-rules-R5",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "shopping-gap-rules · R5",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "shopping#R5",
+        "summary": "Tone: 'would round out your wardrobe', not 'you need'."
+      }
+    },
+    {
+      "id": "rule:wardrobe-filtering-rules-R3",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "wardrobe-filtering-rules · R3",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "wardrobe#R3",
+        "summary": "Combined occasion-tag + season filter."
+      }
+    },
+    {
+      "id": "rule:wardrobe-filtering-rules-R5",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "wardrobe-filtering-rules · R5",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "wardrobe#R5",
+        "summary": "Items in rejected_ids are excluded from candidate pools."
+      }
+    },
+    {
+      "id": "rule:wear-history-rules-R2",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "wear-history-rules · R2",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "history#R2",
+        "summary": "Freshness score is a tie-breaker with a 0.4 floor."
+      }
+    },
+    {
+      "id": "rule:wear-history-rules-R4",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "wear-history-rules · R4",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "history#R4",
+        "summary": "Recently-worn pieces get a transparent reasoning note."
+      }
+    },
+    {
+      "id": "rule:weather-rules-R1",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "weather-rules · R1",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "weather#R1",
+        "summary": "Temperature bands map to layer advice."
+      }
+    },
+    {
+      "id": "rule:weather-rules-R4",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "weather-rules · R4",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "weather#R4",
+        "summary": "Outerwear is injected only when temp < 60 F and an occasion-matching outer piece exists."
+      }
+    },
+    {
+      "id": "rule:weather-rules-R6",
+      "type": "Rule",
+      "layer": "domain",
+      "label": "weather-rules · R6",
+      "weight": 1.0,
+      "metrics": {
+        "slug": "weather#R6",
+        "summary": "On weather-fetch failure, fall back to a seasonal estimate."
+      }
+    },
+    {
+      "id": "pack:color-coordination-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Color Coordination Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "color-coordination-rules.md",
+        "rule_count": 3
+      }
+    },
+    {
+      "id": "pack:fit-silhouette-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Fit Silhouette Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "fit-silhouette-rules.md",
+        "rule_count": 3
+      }
+    },
+    {
+      "id": "pack:occasion-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Occasion Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "occasion-rules.md",
+        "rule_count": 4
+      }
+    },
+    {
+      "id": "pack:shopping-gap-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Shopping Gap Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "shopping-gap-rules.md",
+        "rule_count": 4
+      }
+    },
+    {
+      "id": "pack:wardrobe-filtering-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Wardrobe Filtering Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "wardrobe-filtering-rules.md",
+        "rule_count": 2
+      }
+    },
+    {
+      "id": "pack:wear-history-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Wear History Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "wear-history-rules.md",
+        "rule_count": 2
+      }
+    },
+    {
+      "id": "pack:weather-rules",
+      "type": "RulePack",
+      "layer": "domain",
+      "label": "Weather Rules",
+      "weight": 1.0,
+      "metrics": {
+        "file": "weather-rules.md",
+        "rule_count": 3
+      }
+    },
+    {
+      "id": "skin:cool-fair",
+      "type": "SkinTonePalette",
+      "layer": "domain",
+      "label": "Cool Fair",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "skin:deep-warm",
+      "type": "SkinTonePalette",
+      "layer": "domain",
+      "label": "Deep Warm",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "skin:warm-olive",
+      "type": "SkinTonePalette",
+      "layer": "domain",
+      "label": "Warm Olive",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "user:demo",
+      "type": "User",
+      "layer": "domain",
+      "label": "Demo User",
+      "weight": 1.0,
+      "metrics": {
+        "item_count": 27
+      }
+    },
+    {
+      "id": "type:accessory",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Accessory",
+      "weight": 1.79,
+      "metrics": {
+        "item_count": 6
+      }
+    },
+    {
+      "id": "type:activewear",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Activewear",
+      "weight": 1.33,
+      "metrics": {
+        "item_count": 3
+      }
+    },
+    {
+      "id": "type:bottom",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Bottom",
+      "weight": 1.71,
+      "metrics": {
+        "item_count": 4
+      }
+    },
+    {
+      "id": "type:dress",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Dress",
+      "weight": 1.27,
+      "metrics": {
+        "item_count": 2
+      }
+    },
+    {
+      "id": "type:outerwear",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Outerwear",
+      "weight": 1.25,
+      "metrics": {
+        "item_count": 2
+      }
+    },
+    {
+      "id": "type:shoes",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Shoes",
+      "weight": 1.64,
+      "metrics": {
+        "item_count": 5
+      }
+    },
+    {
+      "id": "type:top",
+      "type": "WardrobeItemType",
+      "layer": "domain",
+      "label": "Top",
+      "weight": 1.87,
+      "metrics": {
+        "item_count": 5
+      }
+    },
+    {
+      "id": "weather:cold",
+      "type": "WeatherCondition",
+      "layer": "domain",
+      "label": "Cold (<40°F)",
+      "weight": 1.0,
+      "metrics": {
+        "layer_advice": "heavy outerwear",
+        "band": "lt40"
+      }
+    },
+    {
+      "id": "weather:cool",
+      "type": "WeatherCondition",
+      "layer": "domain",
+      "label": "Cool (40–59°F)",
+      "weight": 1.0,
+      "metrics": {
+        "layer_advice": "light outerwear",
+        "band": "40-59"
+      }
+    },
+    {
+      "id": "weather:hot",
+      "type": "WeatherCondition",
+      "layer": "domain",
+      "label": "Hot (≥85°F)",
+      "weight": 1.0,
+      "metrics": {
+        "layer_advice": "lightweight, breathable",
+        "band": "ge85"
+      }
+    },
+    {
+      "id": "weather:mild",
+      "type": "WeatherCondition",
+      "layer": "domain",
+      "label": "Mild (60–74°F)",
+      "weight": 1.0,
+      "metrics": {
+        "layer_advice": "no outerwear",
+        "band": "60-74"
+      }
+    },
+    {
+      "id": "weather:warm",
+      "type": "WeatherCondition",
+      "layer": "domain",
+      "label": "Warm (75–84°F)",
+      "weight": 1.0,
+      "metrics": {
+        "layer_advice": "lightweight",
+        "band": "75-84"
+      }
+    },
+    {
+      "id": "step:1",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "1 · Determine Occasion",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:2",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "2 · Load Style Profile",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:3",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "3 · Check Weather",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:4",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "4 · Filter Wardrobe",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:5",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "5 · Build Outfit",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:6",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "6 · Check for Wardrobe Gaps",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "step:7",
+      "type": "WorkflowStep",
+      "layer": "runtime",
+      "label": "7 · Color Coordination Check",
+      "weight": 1.0,
+      "metrics": {}
+    },
+    {
+      "id": "item:A001",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Gold Hoop Earrings",
+      "weight": 1.4,
+      "metrics": {
+        "color": "gold",
+        "type": "accessory",
+        "formality": "versatile",
+        "tags": [
+          "work",
+          "dinner",
+          "casual",
+          "evening"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 4
+      }
+    },
+    {
+      "id": "item:A002",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Pearl Stud Earrings",
+      "weight": 1.3,
+      "metrics": {
+        "color": "white/gold",
+        "type": "accessory",
+        "formality": "formal",
+        "tags": [
+          "work",
+          "formal",
+          "dinner"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:A003",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Delicate Gold Chain Necklace",
+      "weight": 1.3,
+      "metrics": {
+        "color": "gold",
+        "type": "accessory",
+        "formality": "versatile",
+        "tags": [
+          "work",
+          "dinner",
+          "casual"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:A004",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Structured Handbag",
+      "weight": 1.3,
+      "metrics": {
+        "color": "black",
+        "type": "accessory",
+        "formality": "business",
+        "tags": [
+          "work",
+          "dinner",
+          "evening"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:A005",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Tan Leather Tote",
+      "weight": 1.3,
+      "metrics": {
+        "color": "tan",
+        "type": "accessory",
+        "formality": "casual",
+        "tags": [
+          "work",
+          "casual",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:A006",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Silk Scarf (Burnt Orange & Cream)",
+      "weight": 1.3,
+      "metrics": {
+        "color": "burnt orange",
+        "type": "accessory",
+        "formality": "smart_casual",
+        "tags": [
+          "casual",
+          "work",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C001",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "White Button-Down Blouse",
+      "weight": 1.6,
+      "metrics": {
+        "color": "white",
+        "type": "top",
+        "formality": "business",
+        "tags": [
+          "work",
+          "dinner",
+          "versatile"
+        ],
+        "worn_count": 2,
+        "last_worn": "2026-04-07",
+        "versatility": 2
+      }
+    },
+    {
+      "id": "item:C002",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Fitted Turtleneck",
+      "weight": 1.9,
+      "metrics": {
+        "color": "black",
+        "type": "top",
+        "formality": "smart_casual",
+        "tags": [
+          "work",
+          "casual",
+          "evening"
+        ],
+        "worn_count": 3,
+        "last_worn": "2026-05-09",
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C003",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Terracotta Silk Blouse",
+      "weight": 2.3,
+      "metrics": {
+        "color": "terracotta",
+        "type": "top",
+        "formality": "smart_casual",
+        "tags": [
+          "dinner",
+          "casual",
+          "evening"
+        ],
+        "worn_count": 5,
+        "last_worn": "2026-05-11",
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C004",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Navy Striped Breton Top",
+      "weight": 1.2,
+      "metrics": {
+        "color": "navy",
+        "type": "top",
+        "formality": "casual",
+        "tags": [
+          "casual",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 2
+      }
+    },
+    {
+      "id": "item:C005",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Blush Pink Wrap Blouse",
+      "weight": 1.7,
+      "metrics": {
+        "color": "blush",
+        "type": "top",
+        "formality": "smart_casual",
+        "tags": [
+          "dinner",
+          "work",
+          "date"
+        ],
+        "worn_count": 2,
+        "last_worn": "2026-05-10",
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C006",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Tailored Trousers",
+      "weight": 2.4,
+      "metrics": {
+        "color": "black",
+        "type": "bottom",
+        "formality": "business",
+        "tags": [
+          "work",
+          "dinner",
+          "versatile"
+        ],
+        "worn_count": 6,
+        "last_worn": "2026-05-02",
+        "versatility": 2
+      }
+    },
+    {
+      "id": "item:C007",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Camel Wide-Leg Trousers",
+      "weight": 1.3,
+      "metrics": {
+        "color": "camel",
+        "type": "bottom",
+        "formality": "smart_casual",
+        "tags": [
+          "work",
+          "casual",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C008",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Dark Wash Straight Jeans",
+      "weight": 2.1,
+      "metrics": {
+        "color": "dark indigo",
+        "type": "bottom",
+        "formality": "casual",
+        "tags": [
+          "casual",
+          "weekend",
+          "dinner"
+        ],
+        "worn_count": 4,
+        "last_worn": "2026-05-05",
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C009",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Olive Midi Skirt",
+      "weight": 1.3,
+      "metrics": {
+        "color": "olive",
+        "type": "bottom",
+        "formality": "smart_casual",
+        "tags": [
+          "casual",
+          "work",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C010",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Wrap Dress",
+      "weight": 1.4,
+      "metrics": {
+        "color": "black",
+        "type": "dress",
+        "formality": "smart_casual",
+        "tags": [
+          "dinner",
+          "date",
+          "evening",
+          "work"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 4
+      }
+    },
+    {
+      "id": "item:C011",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Burgundy Midi Dress",
+      "weight": 1.3,
+      "metrics": {
+        "color": "burgundy",
+        "type": "dress",
+        "formality": "formal",
+        "tags": [
+          "formal",
+          "dinner",
+          "evening",
+          "gala"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C012",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Camel Wool Coat",
+      "weight": 1.3,
+      "metrics": {
+        "color": "camel",
+        "type": "outerwear",
+        "formality": "smart_casual",
+        "tags": [
+          "work",
+          "casual",
+          "evening"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:C013",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Trench Coat",
+      "weight": 1.2,
+      "metrics": {
+        "color": "black",
+        "type": "outerwear",
+        "formality": "business",
+        "tags": [
+          "work",
+          "casual",
+          "travel"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 2
+      }
+    },
+    {
+      "id": "item:C014",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Yoga Pants",
+      "weight": 1.1,
+      "metrics": {
+        "color": "black",
+        "type": "activewear",
+        "formality": "athletic",
+        "tags": [
+          "gym",
+          "yoga",
+          "workout"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 1
+      }
+    },
+    {
+      "id": "item:C015",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Grey Performance Tank",
+      "weight": 1.1,
+      "metrics": {
+        "color": "grey",
+        "type": "activewear",
+        "formality": "athletic",
+        "tags": [
+          "gym",
+          "yoga",
+          "workout"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 1
+      }
+    },
+    {
+      "id": "item:C016",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Pale Blue Running Jacket",
+      "weight": 1.1,
+      "metrics": {
+        "color": "pale blue",
+        "type": "activewear",
+        "formality": "athletic",
+        "tags": [
+          "gym",
+          "running",
+          "outdoor"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 1
+      }
+    },
+    {
+      "id": "item:S001",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Pointed-Toe Heels",
+      "weight": 1.4,
+      "metrics": {
+        "color": "black",
+        "type": "shoes",
+        "formality": "formal",
+        "tags": [
+          "work",
+          "dinner",
+          "formal",
+          "evening"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 4
+      }
+    },
+    {
+      "id": "item:S002",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Nude Block-Heel Pumps",
+      "weight": 1.3,
+      "metrics": {
+        "color": "nude",
+        "type": "shoes",
+        "formality": "business",
+        "tags": [
+          "work",
+          "dinner",
+          "smart_casual"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:S003",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "White Leather Sneakers",
+      "weight": 1.3,
+      "metrics": {
+        "color": "white",
+        "type": "shoes",
+        "formality": "casual",
+        "tags": [
+          "casual",
+          "weekend",
+          "gym"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:S004",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Tan Leather Ankle Boots",
+      "weight": 1.3,
+      "metrics": {
+        "color": "tan",
+        "type": "shoes",
+        "formality": "smart_casual",
+        "tags": [
+          "work",
+          "casual",
+          "weekend"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 3
+      }
+    },
+    {
+      "id": "item:S005",
+      "type": "WardrobeItem",
+      "layer": "user_behavior",
+      "label": "Black Running Shoes",
+      "weight": 1.1,
+      "metrics": {
+        "color": "black",
+        "type": "shoes",
+        "formality": "athletic",
+        "tags": [
+          "gym",
+          "running",
+          "workout"
+        ],
+        "worn_count": 0,
+        "last_worn": null,
+        "versatility": 1
+      }
+    }
+  ],
+  "edges": [
+    {
+      "from": "item:A001",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A001",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A001",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A001",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A001",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A002",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A002",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A002",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A002",
+      "to": "occasion:formal",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A002",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A003",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A003",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A003",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A003",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A003",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A004",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A004",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A004",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A004",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A005",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A005",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A005",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A005",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A006",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A006",
+      "to": "type:accessory",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A006",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:A006",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C001",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C001",
+      "to": "type:top",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C001",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C001",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C002",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C002",
+      "to": "type:top",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C002",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C002",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C003",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C003",
+      "to": "type:top",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C003",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C003",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C004",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C004",
+      "to": "type:top",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C004",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C005",
+      "to": "color-family:soft",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C005",
+      "to": "type:top",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C005",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C005",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C006",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C006",
+      "to": "type:bottom",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C006",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C006",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C007",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C007",
+      "to": "type:bottom",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C007",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C007",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C008",
+      "to": "color-family:indigo",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C008",
+      "to": "type:bottom",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C008",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C008",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C009",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C009",
+      "to": "type:bottom",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C009",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C009",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C010",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C010",
+      "to": "type:dress",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C010",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C010",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C011",
+      "to": "color-family:warm-rich",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C011",
+      "to": "type:dress",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C011",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C011",
+      "to": "occasion:formal",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C012",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C012",
+      "to": "type:outerwear",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C012",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C012",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C013",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C013",
+      "to": "type:outerwear",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C013",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C013",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C014",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C014",
+      "to": "type:activewear",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C014",
+      "to": "occasion:gym",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C015",
+      "to": "color-family:cool-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C015",
+      "to": "type:activewear",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C015",
+      "to": "occasion:gym",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C016",
+      "to": "type:activewear",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:C016",
+      "to": "occasion:gym",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S001",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S001",
+      "to": "type:shoes",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S001",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S001",
+      "to": "occasion:formal",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S001",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S002",
+      "to": "color-family:soft",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S002",
+      "to": "type:shoes",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S002",
+      "to": "occasion:dinner",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S002",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S003",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S003",
+      "to": "type:shoes",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S003",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S003",
+      "to": "occasion:gym",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S004",
+      "to": "color-family:warm-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S004",
+      "to": "type:shoes",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S004",
+      "to": "occasion:casual",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S004",
+      "to": "occasion:work",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S005",
+      "to": "color-family:deep-neutral",
+      "type": "HAS_COLOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S005",
+      "to": "type:shoes",
+      "type": "HAS_TYPE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "item:S005",
+      "to": "occasion:gym",
+      "type": "SUITABLE_FOR",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "occasion:casual",
+      "to": "type:bottom",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:casual",
+      "to": "type:top",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:casual",
+      "to": "pack:occasion-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "occasion:dinner",
+      "to": "type:bottom",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:dinner",
+      "to": "type:top",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:dinner",
+      "to": "pack:occasion-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "occasion:formal",
+      "to": "type:dress",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:formal",
+      "to": "pack:occasion-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "occasion:gym",
+      "to": "type:activewear",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:gym",
+      "to": "type:activewear",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:gym",
+      "to": "pack:occasion-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "occasion:work",
+      "to": "type:bottom",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:work",
+      "to": "type:top",
+      "type": "REQUIRES",
+      "weight": 1.0,
+      "metadata": {
+        "required": true
+      }
+    },
+    {
+      "from": "occasion:work",
+      "to": "pack:occasion-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:color-coordination-rules",
+      "to": "step:7",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:fit-silhouette-rules",
+      "to": "step:2",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:fit-silhouette-rules",
+      "to": "step:5",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:occasion-rules",
+      "to": "step:1",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:occasion-rules",
+      "to": "step:5",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:shopping-gap-rules",
+      "to": "step:6",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:wardrobe-filtering-rules",
+      "to": "step:4",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:wear-history-rules",
+      "to": "step:5",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "pack:weather-rules",
+      "to": "step:3",
+      "type": "POWERS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R1",
+      "to": "skin:cool-fair",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R1",
+      "to": "skin:deep-warm",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R1",
+      "to": "skin:warm-olive",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R2",
+      "to": "skin:cool-fair",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R2",
+      "to": "skin:deep-warm",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R2",
+      "to": "skin:warm-olive",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R5",
+      "to": "skin:cool-fair",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R5",
+      "to": "skin:deep-warm",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:color-coordination-rules-R5",
+      "to": "skin:warm-olive",
+      "type": "EVALUATES",
+      "weight": 0.5,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R1",
+      "to": "type:activewear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R1",
+      "to": "type:bottom",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R1",
+      "to": "type:dress",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R1",
+      "to": "type:outerwear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R1",
+      "to": "type:top",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R2",
+      "to": "type:activewear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R2",
+      "to": "type:bottom",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R2",
+      "to": "type:dress",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R2",
+      "to": "type:outerwear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R2",
+      "to": "type:top",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R8",
+      "to": "type:activewear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R8",
+      "to": "type:bottom",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R8",
+      "to": "type:dress",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R8",
+      "to": "type:outerwear",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "rule:fit-silhouette-rules-R8",
+      "to": "type:top",
+      "type": "EVALUATES",
+      "weight": 0.4,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "fit:demo",
+      "type": "HAS_PROFILE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "skin:warm-olive",
+      "type": "HAS_SKIN_TONE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A001",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A002",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A003",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A004",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A005",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:A006",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C001",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C002",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C003",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C004",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C005",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C006",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C007",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C008",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C009",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C010",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C011",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C012",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C013",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C014",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C015",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:C016",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:S001",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:S002",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:S003",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:S004",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "user:demo",
+      "to": "item:S005",
+      "type": "OWNS",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "weather:cold",
+      "to": "pack:weather-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "weather:cool",
+      "to": "pack:weather-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "weather:hot",
+      "to": "pack:weather-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "weather:mild",
+      "to": "pack:weather-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    },
+    {
+      "from": "weather:warm",
+      "to": "pack:weather-rules",
+      "type": "USES_RULE",
+      "weight": 1.0,
+      "metadata": {}
+    }
+  ]
+}
