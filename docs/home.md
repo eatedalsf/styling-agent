@@ -12,6 +12,16 @@ Wearly is a **mobile-first, evidence-informed personal styling agent**. It recom
 
 This book documents *why* the agent is the way it is. The source code, the rule packs, the knowledge graph, the architecture, and the evidence categories all live alongside each other in a single repository — and they're presented here in one navigable site.
 
+!!! info "About the data shown in this book and the live demo"
+    Every example in this book — outfit recommendations, profile fields,
+    wardrobe items, calendar events — uses **demo data**, not real
+    personal data. The seed `wardrobe.json` belongs to a fictional
+    "Demo User." Per-user files written by the running app
+    (`user_wardrobe.json`, `user_profile.json`, `wishlist.json`,
+    `favorite_stores.json`, `routine.json`, `wear_history.json`) are
+    `.gitignore`d and never published. Each developer who runs the app
+    keeps their own local overlay.
+
 ---
 
 ## 🚀 Try the live app
@@ -26,10 +36,14 @@ The repository itself: **[github.com/eatedalsf/styling-agent](https://github.com
 
 | Section | What you'll find |
 |---|---|
-| **[The Book](book/index.md)** | Twelve chapters covering vision, user problem, the seven-step agent workflow, the styling knowledge base, wardrobe intelligence, fit-profile logic, calendar / weather context, shopping gap logic, the before/after demo, privacy, the roadmap, and the evidence framing. |
-| **[Evidence](docs/evidence-and-references.md)** | The canonical references document. Nine source categories every rule pack draws on, current verification status, and how to add a citation. |
+| **[The Book](book/index.md)** | Three parts: Part I — twelve chapters explaining the Wearly agent (vision, user problem, seven-step workflow, knowledge base, wardrobe intelligence, fit-profile logic, calendar/weather context, shopping-gap logic, before/after, privacy, roadmap). Part II — eight Styling Rule Reference chapters teaching color, silhouette, occasion, weather/layering, wardrobe construction, freshness, honest gaps, and body-positive framing. Part III — evidence & provenance. |
+| **[Glossary](docs/glossary.md)** + **[FAQ](docs/faq.md)** + **[References](docs/references.md)** | A project-wide glossary, a top-questions FAQ, and a numbered bibliography of every verified source the rules trace back to. |
+| **[Audit](docs/audit-2026-05.md)** | A consistency audit between the app and the book — every contract (numbers, vocabulary, rules) cross-checked. |
+| **[Evidence](docs/evidence-and-references.md)** | The canonical references document. Nine source categories every rule pack draws on, with verification status. |
 | **[Skills](skills/wearly-styling-agent/SKILL.md)** | The Wearly Styling Agent skill package — `SKILL.md` plus eight rule packs (occasion, weather, fit & silhouette, wardrobe filtering, color coordination, wear history, shopping gap, privacy). Every rule pack ends with a *Source basis* footer. |
-| **[Knowledge Graph](graph/schema.md)** | The schema describing how Wearly models the world — nine entity types, fourteen relation types. The diagram view renders the graph as a Mermaid map; the running app renders it interactively. |
+| **[Reasoning Graph](graph/schema.md)** | The runtime schema — nine entity types, seventeen relation types. The diagram view renders the graph as a Mermaid map; the running app renders it interactively per recommendation. |
+| **[Learning Graph](docs/sims/learning-graph/index.md)** | The book's concept DAG — 28 concepts, 39 prerequisite edges, every node Bloom-tagged. Hierarchical view by default; a "Suggested reading path" button highlights one canonical chain. |
+| **[MicroSims](docs/sims/index.md)** | Four interactive simulations: color harmony, wear-history freshness, reasoning graph, learning graph. Each one lets you try a rule by hand. |
 | **[Architecture](docs/architecture.md)** | System-level snapshot — code layout, tool boundaries, data files, dependencies. |
 | **[Project Vision](Wearly_Product_Brief.md)** | The product brief and the academic / course context that frames this project. |
 
