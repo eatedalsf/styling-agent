@@ -94,8 +94,9 @@ class TestGetFitProfile(_ProfileSnapshotMixin, unittest.TestCase):
         r = get_fit_profile()
         self.assertTrue(r["success"])
         p = r["profile"]
-        # The seed wardrobe.json owner is Eatedal with warm-olive skin tone.
-        self.assertEqual(p["name"], "Eatedal")
+        # The seed wardrobe.json owner is the anonymized "Demo User"
+        # with warm-olive skin tone.
+        self.assertEqual(p["name"], "Demo User")
         self.assertEqual(p["skin_tone"], "warm olive")
         self.assertEqual(p["body_shape"], "hourglass")
 
@@ -113,7 +114,7 @@ class TestGetFitProfile(_ProfileSnapshotMixin, unittest.TestCase):
         self.assertEqual(p["modesty_preference"], "moderate")
         self.assertEqual(p["comfort_needs"], ["soft fabrics"])
         # Seed fields untouched.
-        self.assertEqual(p["name"], "Eatedal")
+        self.assertEqual(p["name"], "Demo User")
 
     def test_partial_save_keeps_other_fields(self):
         save_fit_profile({"style_goals": ["elevated", "modernized"]})
@@ -225,7 +226,7 @@ class TestFitAlignmentNote(unittest.TestCase):
 class TestAgentFitIntegration(_ProfileSnapshotMixin, unittest.TestCase):
 
     def test_seed_owner_style_preferences_surface_in_reasoning(self):
-        # Eatedal's seed profile has classic / elegant / minimal preferences.
+        # The seed profile (Demo User) has classic / elegant / minimal preferences.
         # The reasoning trail should mention them on at least one versatile piece.
         from styling_agent import run_agent
         r = run_agent(mode="everyday", everyday_request="work")

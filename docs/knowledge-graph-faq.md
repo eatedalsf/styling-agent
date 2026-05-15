@@ -271,7 +271,7 @@ actually computed during `run_agent()`:
 | Reasoning trail line | Graph counterpart |
 |---|---|
 | Step 1: "Found 'Movie' on 2026-05-15" | `CalendarEvent: Movie` node + `has_event` edge from User |
-| Step 2: "Owner: Eatedal · warm olive · classic" | `FitProfile` node + `informs` edge to Outfit |
+| Step 2: "Owner: Demo User · warm olive · classic" | `FitProfile` node + `informs` edge to Outfit |
 | Step 3: "Minneapolis: 58°F, partly cloudy" | `WeatherSnapshot` node + `informs` edge to Outfit |
 | Step 4: "Found 8 clothing items for occasion: casual in spring" | Determines the pool the next graph nodes come from |
 | Step 5: "Selected '...' as a one-piece solution" | `recommends` edges from Outfit to each picked `WardrobeItem` |

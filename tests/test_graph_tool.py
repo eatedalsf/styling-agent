@@ -50,7 +50,7 @@ class TestSchemaGraph(unittest.TestCase):
         from graph_tool import render_schema_graph_html
         html = render_schema_graph_html()
         # Sample of entity labels we know are in graph.json.
-        for label in ("Eatedal", "OutfitRecommendation",
+        for label in ("Demo User", "OutfitRecommendation",
                       "Team Strategy Meeting", "Minneapolis"):
             self.assertIn(label, html,
                           f"Schema graph should mention '{label}' from graph.json")
@@ -84,11 +84,42 @@ class TestRunGraph(unittest.TestCase):
             cls._history_path = None
             cls._history_original = None
 
+        # Snapshot + temporarily move aside the user profile overlay so
+        # the test renders against the SEED owner ("Demo User" in the
+        # public seed wardrobe.json), not against whatever the
+        # developer happens to have in their local user_profile.json.
+        # Otherwise a local overlay (e.g. a real name imported during
+        # testing) would make this test pass on CI but fail locally.
+        try:
+            from fit_tool import _profile_overlay_path  # type: ignore
+            cls._profile_path = _profile_overlay_path()
+        except Exception:
+            # Fall back to the conventional path if the helper isn't exposed.
+            cls._profile_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                "user_profile.json",
+            )
+        cls._profile_original = None
+        if cls._profile_path and os.path.exists(cls._profile_path):
+            try:
+                with open(cls._profile_path, "r", encoding="utf-8") as f:
+                    cls._profile_original = f.read()
+                os.remove(cls._profile_path)
+            except Exception:
+                cls._profile_original = None
+
     @classmethod
     def tearDownClass(cls):
         if cls._history_path and cls._history_original is not None:
             with open(cls._history_path, "w", encoding="utf-8") as f:
                 f.write(cls._history_original)
+        # Restore the user profile overlay if we moved it aside.
+        if cls._profile_path and cls._profile_original is not None:
+            try:
+                with open(cls._profile_path, "w", encoding="utf-8") as f:
+                    f.write(cls._profile_original)
+            except Exception:
+                pass
 
     def _agent_result(self):
         from styling_agent import run_agent
@@ -105,7 +136,7 @@ class TestRunGraph(unittest.TestCase):
         from graph_tool import render_run_graph_html
         html = render_run_graph_html(self._agent_result())
         # The User node is labelled with the owner's name.
-        self.assertIn("Eatedal", html)
+        self.assertIn("Demo User", html)
         # The Outfit centerpiece carries piece count.
         self.assertIn("Outfit", html)
 

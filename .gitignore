@@ -78,3 +78,8 @@ desktop.ini
 
 # Logs
 *.log
+
+
+# Local backups (created by manual operations like data restoration or anonymization)
+.data-backups/
+.anonymization-backups/

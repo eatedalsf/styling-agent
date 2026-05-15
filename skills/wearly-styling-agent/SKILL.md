@@ -4,7 +4,7 @@ description: |
   Recommend a complete outfit (top, bottom or dress, shoes, accessories, optional outerwear) for a person on a specific day, given their wardrobe, fit profile, calendar event, current weather, and any past wear history or rejection feedback. Use this skill when the request is to plan what to wear for an occasion — formal, work, dinner, gym, casual — and the user expects a personalized, explainable recommendation rather than a generic suggestion. Produces a numbered reasoning trail, a 0–100 color-harmony score with per-item flags, and a list of wardrobe gaps with descriptive (non-promotional) shopping suggestions. Do NOT trigger this skill for generic fashion-trend questions, body-image judgment, or weight-loss styling requests. Language is body-positive by contract: never frame body features as flaws.
 version: "0.4.0"
 license: "MIT"
-author: "Wearly project (eatedalsf)"
+author: "Wearly project"
 homepage: "https://eatedalsf.github.io/styling-agent/skills/wearly-styling-agent/SKILL/"
 repository: "https://github.com/eatedalsf/styling-agent"
 tags:

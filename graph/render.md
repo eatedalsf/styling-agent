@@ -32,7 +32,7 @@ graph LR
     classDef gap         fill:#FDF3EE,stroke:#C17F5A,stroke-dasharray:4 2,color:#8A4A20;
     classDef feedback    fill:#EFE3CC,stroke:#7C6F64,color:#1C1917;
 
-    User((Eatedal · User))
+    User((Demo User))
     Fit[Fit Profile<br/>hourglass · warm olive · tailored]
     Event1[Calendar Event<br/>Team Strategy Meeting · 2026-05-12]
     Wx[Weather<br/>Minneapolis · 58°F · Partly Cloudy]

@@ -11,7 +11,7 @@ The graph is intentionally minimal — 9 entity types, 17 relation types. Small 
 
 | ID | Label | Example | Source |
 |---|---|---|---|
-| `User` | The wearer | "Eatedal" | `wardrobe.json` → `owner` |
+| `User` | The wearer | "Demo User" | `wardrobe.json` → `owner` |
 | `FitProfile` | Body shape, skin tone, modesty, fit preferences | "hourglass, warm olive, tailored" | `wardrobe.json` → `owner` (Phase 3 splits this out) |
 | `CalendarEvent` | An upcoming calendar entry | "Team Strategy Meeting, 2026-05-12" | `calendar_events.json` |
 | `WeatherSnapshot` | A point-in-time weather reading | "Minneapolis, 58°F, partly cloudy" | `weather_tool.get_weather()` |

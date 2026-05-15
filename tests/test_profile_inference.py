@@ -598,7 +598,7 @@ class TestProfileHash(unittest.TestCase):
         invalidate the cached agent result."""
         from fit_tool import profile_hash
         a = profile_hash({"body_shape": "pear",
-                          "name": "Eatedal",
+                          "name": "Demo User",
                           "timezone": "America/Chicago"})
         b = profile_hash({"body_shape": "pear",
                           "name": "Different Name",

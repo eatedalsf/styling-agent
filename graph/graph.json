@@ -1,8 +1,8 @@
 {
   "comment": "Wearly Knowledge Graph — sample triples drawn from the live demo data. Triple shape: [subject, predicate, object].",
   "entities": [
-    {"id": "user:eatedal", "type": "User", "label": "Eatedal"},
-    {"id": "fit:eatedal", "type": "FitProfile", "label": "hourglass · warm olive · tailored · classic/elegant/minimal"},
+    {"id": "user:demo", "type": "User", "label": "Demo User"},
+    {"id": "fit:demo", "type": "FitProfile", "label": "hourglass · warm olive · tailored · classic/elegant/minimal"},
     {"id": "evt:strategy_mtg", "type": "CalendarEvent", "label": "Team Strategy Meeting · 2026-05-12 · 10:00 AM"},
     {"id": "evt:client_dinner", "type": "CalendarEvent", "label": "Dinner with Clients · 2026-05-15 · 7:00 PM"},
     {"id": "evt:gym", "type": "CalendarEvent", "label": "Morning Gym Session · 2026-05-14 · 7:00 AM"},
@@ -19,19 +19,19 @@
     {"id": "fb:too_formal", "type": "Feedback", "label": "rejected · Too formal"}
   ],
   "edges": [
-    ["user:eatedal", "has_fit_profile", "fit:eatedal"],
-    ["user:eatedal", "has_event", "evt:strategy_mtg"],
-    ["user:eatedal", "has_event", "evt:client_dinner"],
-    ["user:eatedal", "has_event", "evt:gym"],
-    ["user:eatedal", "sees_weather", "wx:msp_58"],
-    ["user:eatedal", "owns", "item:C001"],
-    ["user:eatedal", "owns", "item:C006"],
-    ["user:eatedal", "owns", "item:C012"],
-    ["user:eatedal", "owns", "item:S001"],
-    ["user:eatedal", "owns", "item:A001"],
-    ["user:eatedal", "owns", "item:A002"],
+    ["user:demo", "has_fit_profile", "fit:demo"],
+    ["user:demo", "has_event", "evt:strategy_mtg"],
+    ["user:demo", "has_event", "evt:client_dinner"],
+    ["user:demo", "has_event", "evt:gym"],
+    ["user:demo", "sees_weather", "wx:msp_58"],
+    ["user:demo", "owns", "item:C001"],
+    ["user:demo", "owns", "item:C006"],
+    ["user:demo", "owns", "item:C012"],
+    ["user:demo", "owns", "item:S001"],
+    ["user:demo", "owns", "item:A001"],
+    ["user:demo", "owns", "item:A002"],
 
-    ["fit:eatedal", "prefers_color_palette", "warm-olive-best"],
+    ["fit:demo", "prefers_color_palette", "warm-olive-best"],
 
     ["evt:strategy_mtg", "has_occasion_type", "work"],
     ["evt:client_dinner", "has_occasion_type", "dinner"],

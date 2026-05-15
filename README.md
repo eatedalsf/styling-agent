@@ -258,7 +258,7 @@ Running `python main.py` with a "Team Strategy Meeting" on the calendar produces
 
 ⚙️ AGENT WORKFLOW STEPS
   Step 1 [✓] Determine Occasion → Found: 'Team Strategy Meeting'
-  Step 2 [✓] Load Style Profile → Owner: Eatedal | warm olive | classic, elegant, minimal
+  Step 2 [✓] Load Style Profile → Owner: Demo User | warm olive | classic, elegant, minimal
   Step 3 [⚠] Check Weather     → Fallback estimate: 52°F (live API blocked in sandbox)
   Step 4 [✓] Filter Wardrobe   → 10 clothing, 4 shoes, 6 accessories for work/fall
   Step 5 [✓] Build Outfit      → 6 pieces selected
