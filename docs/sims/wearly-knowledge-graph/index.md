@@ -3,10 +3,10 @@
 > **Learning objective.** After working through this graph, you will
 > be able to distinguish Wearly's three structured-knowledge layers
 > (domain, user behavior, runtime archetypes), explain what node size
-> means in terms of user signals, and describe how the graph enables
-> future RAG and LLM shopping layers without giving up auditability.
+> encodes in terms of user signal, and describe how the graph
+> functions as the substrate for future RAG and LLM shopping layers.
 >
-> **What you're looking at.** A live render of
+> **What you're looking at.** A presenter-grade explorer over
 > [`graph/wearly-knowledge-graph.json`](../../../graph/wearly-knowledge-graph.json) —
 > 91 nodes, 187 typed edges, generated deterministically from public
 > seed data by [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py).
@@ -19,10 +19,16 @@
 > Wearly reasons over — reusable across users, queryable by future
 > LLM layers.
 
+### → [**Open the Knowledge Graph in full screen ↗**](main.html){target="_blank"}
+
+The full-screen view escapes the book's column width and gives the
+graph proper room to breathe. Recommended for class demos or any
+deep exploration session.
+
 <iframe
   src="main.html"
   width="100%"
-  height="780"
+  height="820"
   style="border: 1px solid #E8E0D8; border-radius: 6px;"
   loading="lazy"
   title="Wearly Knowledge Graph">
@@ -30,178 +36,169 @@
 
 ---
 
-## Three layers in one graph
+## How this viewer is designed (and what the redesign answers)
 
-| Layer | Question it answers | What changes when… |
+In class, Dan asked Juan **what each link in his graph represented** —
+and praised the fact that Juan's node sizes encoded financial
+exposure rather than being decorative. Two principles for this
+viewer follow from that:
+
+1. **Every edge has a typed name.** Click any node and the side
+   panel shows its 1-hop relationships **grouped by relation type**,
+   with the relation name visible as a chip prefix. Hover any edge in
+   the canvas (or toggle "Show edge labels" in the sidebar) to read
+   the type in place.
+2. **Node size encodes user signal, not aesthetic preference.** A
+   heavier `WardrobeItem` is worn more often (and covers more
+   occasions). A heavier `WardrobeItemType` / `ColorFamily` /
+   `OccasionType` rolls up from its connected items. Domain
+   archetypes (`RulePack`, `WeatherCondition`, `SkinTonePalette`)
+   stay at base size — they're equal-importance facts. The legend in
+   the sidebar names every shape; a callout block above the legend
+   says **what size means.**
+
+## Eight preset views
+
+The graph defaults to **Overview**, not a 91-node blob. Use the
+preset buttons in the sidebar to jump between focused slices.
+
+| Preset | What you see | Best for |
 |---|---|---|
-| **Domain** | *What does Wearly know about styling?* | Never. These are the rules + entity types + relations the agent is built around. |
-| **User behavior** | *What does Wearly know about this user's patterns?* | The user wears, rejects, wishes, or saves something. Node weights aggregate the underlying signal. |
-| **Runtime archetypes** | *What kinds of outputs can the agent produce, and which rules power them?* | New rule packs are added or workflow steps change. |
+| **Overview** *(default)* | The system spine: User · FitProfile · SkinTonePalette · 5 OccasionType · 7 RulePack · 7 WorkflowStep. ~25 nodes. | First read. The shape of Wearly in one screen. |
+| **User Pattern** | User + 27 WardrobeItems + their direct neighbors (color family, item type, suitable occasions). | *"What does Wearly know about this user?"* |
+| **Occasions** | The 5 occasions, the item types each requires, the rule packs that govern them, and the items that fit. | *"Which wardrobe items connect to which occasions?"* |
+| **Wardrobe Items** | Every item, sized by `worn_count × versatility`. Color families and item types as anchors. | *"Which items are heavy hitters in this closet?"* |
+| **Rules & Skills** | The 7 rule packs, their R-numbered rules, and the workflow steps they power. | *"Which rules and skills power the workflow?"* |
+| **Color & Skin** | 3 skin-tone palettes, 7 color families, the color-coordination rule pack and its rules. | *"How does Step 7 work?"* |
+| **Weather & Layers** | 5 temperature bands, the weather rule pack, the rules inside it, and Step 3. | *"How do layering decisions get made?"* |
+| **Full Graph** | All 91 nodes, all 187 edges. | A density check, not a reading view. |
 
-Use the **Layer dropdown** in the viewer to isolate one slice at a
-time. Use **Spotlight User neighborhood** to see the user's first-hop
-connections — that view answers *"what does the agent know about me
-right now?"*
+## Click any node — and watch the rest fade
 
-## How to read the graph
+When you click a node, the graph **focuses on its 1-hop neighborhood**:
 
-| Visual signal | What it means |
+- Selected node gets a thick accent border.
+- 1-hop neighbors keep full opacity.
+- Everything else fades to ~15% so the local subgraph becomes legible.
+- Connected edges turn warm-rust (otherwise grey) and show their
+  type as a label.
+- The side panel populates with the node's type, layer, weight, a
+  one-sentence meaning, its metrics, and **its relationships grouped
+  by edge type**.
+
+Click any chip in the side panel to hop to that node. Click any blank
+area to clear the focus.
+
+## What each link represents
+
+The graph carries **20 typed relations.** They fall into four families:
+
+### Domain knowledge (static)
+
+| Edge | Source | Target | Meaning |
+|---|---|---|---|
+| `HAS_PROFILE` | User | FitProfile | The user's declared style + fit preferences. |
+| `HAS_SKIN_TONE` | User | SkinTonePalette | The user's color-palette anchor. |
+| `REQUIRES` | OccasionType | WardrobeItemType | The occasion's minimum required pieces. |
+| `USES_RULE` | OccasionType / WeatherCondition | RulePack | Which rule pack governs this context. |
+| `CONTAINS_RULE` | RulePack | Rule | Each pack's R-numbered rules. |
+| `EVALUATES` | Rule | SkinTonePalette / WardrobeItemType | Which axes a specific rule scores against. |
+
+### User behavior (computed from the user's data)
+
+| Edge | Source | Target | Meaning |
+|---|---|---|---|
+| `OWNS` | User | WardrobeItem | The item is in the user's closet. |
+| `HAS_TYPE` | WardrobeItem | WardrobeItemType | Classification. |
+| `HAS_COLOR` | WardrobeItem / WishlistItem | ColorFamily | Color bucket. |
+| `SUITABLE_FOR` | WardrobeItem | OccasionType | Has an occasion tag. |
+| `HAS_FAVORITE_STORE` | User | FavoriteStore | Saved retailer. |
+| `HAS_WISHLIST_ITEM` | User | WishlistItem | Wants to acquire. |
+| `PREFERS` | User | ColorFamily | Aggregate preference signal. |
+
+### Runtime archetypes (the bridge to the Reasoning Graph)
+
+| Edge | Source | Target | Meaning |
+|---|---|---|---|
+| `POWERS` | RulePack | WorkflowStep | The rule pack runs at this step. |
+| `PRODUCES` | WorkflowStep | OutfitRecommendation / WardrobeGap / ShoppingSuggestion | Each step's output archetype. |
+| `CONTAINS_ITEM` | OutfitRecommendation | WardrobeItem | Items in an outfit. |
+| `FLAGS_GAP` | OutfitRecommendation | WardrobeGap | Per-run gaps. |
+| `SUGGESTS` | WardrobeGap | ShoppingSuggestion | Gap-driven suggestion. |
+| `REJECTS` | Feedback | WardrobeItem | User pushback. |
+| `WISHLIST_CLOSES_GAP` | WishlistItem | WardrobeGap | A wished item that would close a current gap. |
+
+## What node size means in this viewer
+
+| Node type | What size encodes |
 |---|---|
-| **Node size** | Aggregated user signal — heavier nodes carry more activity (worn often, covers many occasions, many items in this category). Domain nodes stay at base size because they're equal-importance facts. |
-| **Shape** | Encodes node *type*: diamonds for `User` and `OutfitRecommendation`, boxes for declared entities (`OccasionType`, `FitProfile`), hexagons for `RulePack`, dots for instances, triangles for `WardrobeGap` / `ShoppingSuggestion`, stars for `FavoriteStore`. |
-| **Color** | Same Wearly book palette — paper / card / warm-rust accent on the domain rules, warmer ivory on the user behavior nodes. Skin-tone-related nodes pick up the deep-warm accent. |
-| **Edge label** | Typed relation (`OWNS`, `REQUIRES`, `HAS_TYPE`, `USES_RULE`, `POWERS`, etc.). Hover an edge to read the relation; click either endpoint to expand from there. |
+| **WardrobeItem** | `1.0 + 0.20 × worn_count + 0.10 × versatility` (versatility = count of distinct canonical occasion tags). A piece worn six times across three occasions reaches ~2.4. |
+| **WardrobeItemType, ColorFamily, OccasionType** | Rolled up from connected `WardrobeItem` weights. A category with many heavy items becomes a heavy category node. |
+| **FavoriteStore** | Scales with `times_chosen` (when overlay data is included). |
+| **All other types** | Base size. Domain archetypes are equal-importance facts; their value is informational, not behavioral. |
 
-## What's on the graph today (seed-only snapshot)
-
-The committed JSON is built from **public seed data** — the anonymized
-"Demo User" closet, the demo wear history, the seven workflow steps,
-the eight rule packs, and the 21 registered rule slugs. The schema
-contains user-behavior nodes for `WishlistItem` and `FavoriteStore`,
-but the seed has none — those slots are reserved for the local
-overlay.
-
-Snapshot at the time of writing:
-
-| Node type | Count | Why this number |
-|---|---|---|
-| `User` | 1 | One owner per snapshot. |
-| `FitProfile` | 1 | The seed owner's fit profile. |
-| `SkinTonePalette` | 3 | Three palettes defined in `color_rules.json`. |
-| `OccasionType` | 5 | `work`, `gym`, `dinner`, `formal`, `casual`. |
-| `WeatherCondition` | 5 | Temperature bands the agent uses. |
-| `WardrobeItemType` | 7 | The garment-type taxonomy. |
-| `ColorFamily` | 7 | Color buckets so the graph doesn't degenerate into 50 leaf colors. |
-| `RulePack` | 7 | One per `.md` file in `skills/wearly-styling-agent/`. |
-| `Rule` | 21 | One per `R<N>` heading registered in `rule_refs.py`. |
-| `WorkflowStep` | 7 | The seven steps of `run_agent()`. |
-| `WardrobeItem` | 27 | The 16 + 5 + 6 items in the seed wardrobe. |
-| **Total** | **91 nodes** | |
-| **Edges** | **187** | Typed relations across all three layers. |
-
-## What size means
-
-Every node has a `weight` (1.0–3.0). The viewer scales the rendered
-size proportionally so **big = more user signal**, **small = lightly
-used or domain archetype**.
-
-- **`WardrobeItem`**: starts at 1.0, grows with `worn_count` and
-  versatility (count of occasion tags). A piece worn six times for
-  three different occasions reaches ~2.4.
-- **`WardrobeItemType`, `ColorFamily`, `OccasionType`**: roll up
-  from their connected `WardrobeItem` nodes. A category with many
-  heavy items becomes a heavy category node.
-- **`FavoriteStore`**: scales with how often it's chosen (when overlay
-  data is included).
-- **Domain nodes** (`RulePack`, `Rule`, `SkinTonePalette`,
-  `WeatherCondition`, `WorkflowStep`): stay at base size — they're
-  facts, not user-weighted.
-
-A small `WardrobeItemType` node = a category you've barely invested
-in. A large `OccasionType` node = an occasion your wardrobe is rich
-for. The graph reads at a glance.
-
-## What to notice
-
-- **The `User` node is the densest hub.** Every recommendation
-  traces back to it. Click the **Spotlight User neighborhood** button
-  to see what the agent knows about *you* before any one run.
-- **`OccasionType` nodes connect both ways.** They `REQUIRE` item
-  types (domain knowledge) and items `SUITABLE_FOR` them
-  (user-behavior coverage). When the two sides match, you have full
-  coverage; when they don't, there's a structural wardrobe gap.
-- **The `RulePack` hexagons are the bridge** between domain knowledge
-  and the runtime workflow. Each one `POWERS` one or more
-  `WorkflowStep` nodes. That edge is *literally* the citation chain
-  the agent emits at runtime — `<pack>#R<N>` slugs trace through
-  this exact edge.
-- **Switch the layout to hierarchical top-down.** The User pushes
-  down to its wardrobe items, the items to types and color families,
-  the types and palettes to the rules that evaluate them, the rules
-  to the packs and the packs to the workflow steps. The graph
-  literally diagrams *"how the agent gets from a user to an outfit."*
-
-## Try this
-
-1. **Filter to layer = `domain`.** What's left is everything Wearly
-   knows independent of any user — the styling vocabulary itself.
-2. **Filter to layer = `user_behavior`.** Now you see the items, the
-   wishlist (empty in the seed), and the favorite stores (empty in
-   the seed). Node sizes show what the user actually does.
-3. **Click on `pack:color-coordination-rules`** in the sidebar.
-   Follow `CONTAINS_RULE` → one of the color rules → `EVALUATES`
-   → a `SkinTonePalette`. That's a literal traversal of the chain
-   the runtime engine walks at Step 7.
-4. **Switch layout to hierarchical top-down.** Read top-to-bottom.
-   This is the agent's reasoning architecture at a glance.
-5. **Spotlight User neighborhood.** See exactly what's in the
-   agent's context for any decision.
+All weights clamp to [1.0, 3.0] so a heavy category never dwarfs the
+User node.
 
 ## How this enables RAG and an LLM shopping agent
 
-The graph is **structured context**. Three observable consequences:
+The graph is **structured context** — the kind of input modern LLM
+agents perform better against than a flat-text dump of the same
+information.
 
 ### RAG over the Intelligent Book
 
-When a future LLM layer takes a question like *"Why does this dress
-work for my profile?"*, a retrieval pipeline walks the graph:
+A question like *"Why does this dress work for my profile?"* becomes:
 
 1. Start at the dress's `WardrobeItem` node.
-2. Walk one hop to `WardrobeItemType`, `ColorFamily`, and
+2. Walk one hop to `WardrobeItemType` + `ColorFamily` +
    `SUITABLE_FOR` occasion(s).
-3. Follow `USES_RULE` to the rule packs that govern those
-   contexts.
+3. Follow `USES_RULE` to the rule packs that govern those contexts.
 4. Retrieve the **book chapters keyed off the rule slugs** the agent
    already emits in its reasoning trail.
 
 The LLM gets a **compact subgraph + the relevant book passages**.
-The retrieval is *along graph edges*, not vector embeddings of free
-text — so the explanation cites the same rule the runtime agent
-would.
+Retrieval happens *along graph edges*, not vector embeddings, so the
+explanation cites the same rule the runtime agent does.
 
 ### LLM shopping agent over favorite stores
 
 When a `WardrobeGap` is detected at runtime, the LLM shopping agent:
 
 1. Reads the gap's connected `WardrobeItemType` and `OccasionType`.
-2. Walks the user's `HAS_SKIN_TONE` edge for the target palette and
-   `HAS_PROFILE` edge for the silhouette.
-3. Visits each `FavoriteStore` node and queries that store's
-   catalog with the graph-derived constraints (type + color family
-   + occasion).
+2. Walks the user's `HAS_SKIN_TONE` for the target palette and
+   `HAS_PROFILE` for the silhouette.
+3. Visits each `FavoriteStore` and queries that store's catalog with
+   the graph-derived constraints.
 4. Scores any candidate against the same rule packs the runtime
    engine uses (`color#R*`, `fit#R*`, `occasion#R*`).
 
-**The rule engine stays the safety + scoring substrate.** The LLM
-becomes the *discovery* layer — but its output is auditable against
-the same graph the user's reasoning trail traces through.
+**The rule engine stays the safety + scoring substrate; the LLM is
+the discovery layer.** The LLM's output is auditable against the
+same graph the agent's reasoning trail traces through.
 
 ### Structure beats prompts
 
-- **Compact**: this whole graph is ~50 KB. The equivalent flat-text
-  description of the rule packs + wardrobe + history + occasion table
-  is an order of magnitude larger.
-- **Queryable**: filtering by `layer`, `type`, or `metric` returns a
-  precise subgraph. The LLM doesn't have to vector-search the entire
-  book.
-- **Auditable**: every edge has a typed `from` → `to` → `type`. The
-  citation chain is *literally a graph traversal*.
-
-That's the property the SEIS 666 class kept returning to: structured
-knowledge guides the LLM. Wearly's three graphs (Learning, Reasoning,
-Knowledge) are three angles on the same body of structured knowledge.
+- **Compact.** The full graph is ~66 KB. The equivalent flat-text
+  description of rules + wardrobe + history is an order of magnitude
+  larger.
+- **Queryable.** Filtering by layer / type / metric returns a precise
+  subgraph. No vector search needed for the structural parts.
+- **Auditable.** Every edge has a typed `from` / `to` / `type`. The
+  citation chain (`evidence → category → rule → reasoning line`) is
+  *literally a graph traversal*.
 
 ## Linked concept
 
 - *Schema reference:* [`graph/wearly-knowledge-graph-schema.md`](../../../graph/wearly-knowledge-graph-schema.md).
 - *Data file:* [`graph/wearly-knowledge-graph.json`](../../../graph/wearly-knowledge-graph.json).
-- *Generator:* [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py) — re-run after wardrobe/history changes.
+- *Generator:* [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py) — re-run after wardrobe/history changes to regenerate.
 
 ---
 
 ## See also
 
-- **[Learning Graph](../learning-graph/index.md)** — the *reader's* concept DAG (28 concepts, 39 prerequisite edges, Bloom-tagged).
-- **[Reasoning Graph](../knowledge-graph/index.md)** — the runtime *per-recommendation* entity model.
-- **[Skill package overview](../../../skills/wearly-styling-agent/SKILL.md)** — the eight rule packs the Knowledge Graph models as `RulePack` nodes.
+- **[Learning Graph](../learning-graph/index.md)** — the *reader's* concept DAG.
+- **[Reasoning Graph](../knowledge-graph/index.md)** — the *runtime per-recommendation* entity model.
+- **[Skill package overview](../../../skills/wearly-styling-agent/SKILL.md)** — the eight rule packs the Knowledge Graph models.
 - **[Evidence & references](../../../docs/evidence-and-references.md)** — what informs the rules every `Rule` node represents.

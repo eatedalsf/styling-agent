@@ -6,271 +6,375 @@
   <title>Wearly — Knowledge Graph</title>
 
   <!--
-    Wearly Knowledge Graph viewer.
+    Wearly Knowledge Graph — viewer v0.2.
 
-    Loads graph/wearly-knowledge-graph.json and renders it with
-    vis-network.js. Three filters (layer, node type, edge type) so
-    the reader can isolate "what does Wearly know about styling?"
-    (domain), "what does Wearly know about this user's patterns?"
-    (user_behavior), or "what archetypes does the runtime produce?"
-    (runtime).
+    A presenter-grade exploration tool for the three-layer
+    knowledge graph at graph/wearly-knowledge-graph.json.
 
-    Distinct from the Learning Graph viewer (reader-concept DAG) and
-    the Reasoning Graph in the app (per-recommendation runtime view).
+    Designed around the class feedback that good graphs (Juan's
+    financial-risk graph in particular) (a) gave every link a clear
+    meaning, (b) sized nodes by something meaningful, and (c)
+    explained the domain rather than displaying a cluster of dots.
+
+    Key decisions:
+      - Default to the OVERVIEW preset (~25 structural nodes), not
+        the full 91-node blob. Eight named presets total.
+      - Hierarchical layout per preset, with explicit per-node
+        `level` so the relationships read top-to-bottom.
+      - Edge labels OFF by default; visible only when a node is
+        selected (the click reveals what each link to/from it means)
+        or when the "Show edge labels" toggle is on.
+      - Click-to-highlight: selected + 1-hop neighbors stay full
+        opacity; everything else fades to 12%. Edges get accent.
+      - Node size driven by the weight field already present in
+        the JSON; legend explicitly names what size encodes.
+      - Standalone-friendly: this HTML works both inside an iframe
+        and when opened directly in a new tab (presenter mode).
   -->
 
   <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
 
   <style>
     :root {
-      --paper:       #F8F4ED;
-      --card:        #FDFAF7;
-      --ink:         #1C1917;
-      --body:        #4A3D36;
-      --secondary:   #7C6F64;
-      --eyebrow:     #A8937E;
-      --edge:        #D8CFC4;
-      --accent:      #C17F5A;
-      --accent-deep: #9F5A36;
-      --border:      #E8E0D8;
+      --bg:           #FFFFFF;
+      --ink:          #0F0F0F;
+      --body:         #303030;
+      --secondary:   #6B6B6B;
+      --eyebrow:     #9A9A9A;
+      --border:      #E5E5E5;
+      --soft:        #F5F5F2;
+      --paper:       #FAFAF7;
+      --accent:      #C24E3B;
+      --accent-deep: #8E2C1E;
+      --rule:        #2E5B8A;
+      --user:        #0F0F0F;
+      --warn:        #B45A2E;
+      --fade:        rgba(120, 120, 120, 0.16);
     }
+    * { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
-      background: var(--paper);
+      background: var(--bg);
       color: var(--ink);
-      font-family: "DM Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                   Roboto, system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      height: 100%;
     }
     .layout {
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto 1fr;
       height: 100vh;
     }
-    @media (min-width: 980px) {
-      .layout { grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; }
+    @media (min-width: 1000px) {
+      .layout { grid-template-columns: 320px 1fr; grid-template-rows: auto 1fr; }
       .header { grid-column: 1 / span 2; }
     }
     .header {
-      padding: 0.85rem 1.2rem;
-      background: var(--card);
+      padding: 0.9rem 1.4rem;
+      background: var(--bg);
       border-bottom: 1px solid var(--border);
       display: flex; align-items: baseline; justify-content: space-between;
       gap: 1rem; flex-wrap: wrap;
     }
-    .title { font-family: "DM Serif Display", "Times New Roman", serif; font-size: 1.3rem; color: var(--ink); }
-    .subtitle { font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em; }
+    .header .title {
+      font-family: "DM Serif Display", "Times New Roman", serif;
+      font-size: 1.45rem; color: var(--ink);
+      letter-spacing: -0.01em;
+    }
+    .header .subtitle {
+      font-size: 0.78rem; color: var(--secondary); letter-spacing: 0.04em;
+    }
+    .header .stats { font-weight: 600; color: var(--ink); }
+    .header .openfs {
+      font-size: 0.78rem; color: var(--accent-deep);
+      text-decoration: none; border-bottom: 1px solid var(--accent-deep);
+    }
+    .header .openfs:hover { color: var(--accent); border-color: var(--accent); }
 
+    /* ── Sidebar ───────────────────────────── */
     .sidebar {
-      background: var(--card);
+      background: var(--paper);
       border-right: 1px solid var(--border);
-      padding: 0.9rem 1rem;
+      padding: 1rem 1.1rem 1.4rem;
       overflow-y: auto;
       font-size: 0.86rem;
     }
     .sidebar h3 {
       font-size: 0.66rem;
-      letter-spacing: 0.14em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
       color: var(--eyebrow);
       font-weight: 700;
-      margin: 1.1rem 0 0.5rem;
+      margin: 1.2rem 0 0.55rem;
     }
     .sidebar h3:first-child { margin-top: 0; }
-    .controls input,
-    .controls select {
-      width: 100%;
-      padding: 0.45rem 0.6rem;
+
+    .preset-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;
+    }
+    .preset-btn {
+      font-family: inherit;
+      font-size: 0.79rem;
+      padding: 0.5rem 0.55rem;
       border: 1px solid var(--border);
-      border-radius: 4px;
-      background: var(--paper);
-      font-size: 0.85rem;
+      background: var(--bg);
       color: var(--ink);
-      font-family: inherit;
-    }
-    .controls label {
-      display: block;
-      font-size: 0.74rem;
-      color: var(--secondary);
-      margin-bottom: 0.25rem;
-      margin-top: 0.6rem;
-    }
-    .controls label:first-child { margin-top: 0; }
-    .controls button {
-      width: 100%;
-      padding: 0.5rem;
-      border: none;
-      background: var(--accent);
-      color: var(--card);
-      font-family: inherit;
-      font-size: 0.84rem;
       border-radius: 4px;
       cursor: pointer;
-      margin-top: 0.5rem;
+      text-align: left;
+      line-height: 1.2;
+      transition: all 120ms ease;
     }
-    .controls button:hover { background: var(--accent-deep); }
-    .controls button.secondary {
-      background: var(--card);
-      color: var(--ink);
-      border: 1px solid var(--border);
+    .preset-btn:hover {
+      border-color: var(--ink);
+      background: var(--soft);
     }
-    .controls button.secondary:hover { background: var(--paper); }
-    .legend {
-      display: flex; flex-direction: column; gap: 0.35rem;
+    .preset-btn.active {
+      background: var(--ink);
+      color: #FFFFFF;
+      border-color: var(--ink);
     }
-    .legend-row {
-      display: flex; align-items: center; gap: 0.5rem;
-      font-size: 0.8rem; color: var(--body);
-    }
-    .legend-dot {
-      width: 14px; height: 14px;
-      border-radius: 50%; border: 2px solid var(--edge);
-      flex-shrink: 0;
-    }
-    .legend-dot.box      { border-radius: 2px; }
-    .legend-dot.diamond  { transform: rotate(45deg); border-radius: 2px; }
-    .legend-dot.triangle { width: 0; height: 0; background: transparent !important;
-                            border: 8px solid transparent;
-                            border-bottom-color: var(--accent); }
-    .selected-node {
-      padding: 0.65rem 0.75rem;
-      background: var(--paper);
-      border-left: 3px solid var(--accent);
-      border-radius: 0 4px 4px 0;
-      margin-top: 0.4rem;
-      font-size: 0.84rem;
-    }
-    .selected-node-label {
-      font-weight: 600; color: var(--ink); margin-bottom: 0.25rem;
-    }
-    .selected-node-meta {
-      font-size: 0.72rem; color: var(--secondary);
-      letter-spacing: 0.08em; text-transform: uppercase;
-      margin-bottom: 0.4rem;
-    }
-    .selected-node-metrics {
-      font-size: 0.8rem; color: var(--body); margin-top: 0.3rem;
-    }
-    .selected-node-metrics .k { color: var(--secondary); display: inline-block;
-                                  min-width: 6.5rem; }
-    .selected-node-weight {
-      display: inline-block; margin-top: 0.4rem;
+    .preset-btn .preset-meta {
+      display: block;
       font-size: 0.66rem;
-      letter-spacing: 0.1em; text-transform: uppercase;
-      padding: 1px 7px;
-      background: var(--paper);
-      border: 1px solid var(--border);
-      border-radius: 99px;
       color: var(--secondary);
+      font-weight: 400;
+      margin-top: 0.15rem;
     }
+    .preset-btn.active .preset-meta { color: rgba(255,255,255,0.7); }
+
+    .control-row {
+      display: flex; align-items: center; gap: 0.5rem;
+      font-size: 0.82rem; color: var(--body); margin: 0.45rem 0;
+    }
+    .control-row input[type="checkbox"] { accent-color: var(--accent); }
+    .control-row input[type="text"] {
+      flex: 1; padding: 0.4rem 0.55rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      font: inherit; font-size: 0.84rem; background: var(--bg); color: var(--ink);
+    }
+    .control-row select {
+      flex: 1; padding: 0.4rem 0.55rem;
+      border: 1px solid var(--border); border-radius: 4px;
+      background: var(--bg); font: inherit; font-size: 0.84rem; color: var(--ink);
+    }
+
+    .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+    .btn {
+      font-family: inherit; font-size: 0.79rem;
+      padding: 0.45rem 0.55rem; border-radius: 4px; cursor: pointer;
+      transition: all 120ms ease;
+    }
+    .btn-primary {
+      background: var(--accent); color: #FFFFFF; border: 1px solid var(--accent);
+    }
+    .btn-primary:hover { background: var(--accent-deep); border-color: var(--accent-deep); }
+    .btn-secondary {
+      background: var(--bg); color: var(--ink); border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--ink); background: var(--soft); }
+
+    /* ── Legend ───────────────────────────── */
+    .legend {
+      display: flex; flex-direction: column; gap: 0.32rem;
+      font-size: 0.78rem; color: var(--body);
+    }
+    .legend-row { display: flex; align-items: center; gap: 0.5rem; line-height: 1.3; }
+    .legend-glyph {
+      flex-shrink: 0;
+      width: 16px; height: 16px;
+      display: inline-block;
+    }
+    .legend-glyph.circle   { border-radius: 50%; }
+    .legend-glyph.box      { border-radius: 2px; }
+    .legend-glyph.diamond  { transform: rotate(45deg); border-radius: 2px; }
+    .legend-glyph.star     { clip-path: polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%); }
+    .legend-glyph.hexagon  { clip-path: polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%); }
+    .legend-glyph.triangle { clip-path: polygon(50% 100%,0 20%,100% 20%); }
+    .legend-glyph.cloud    { border-radius: 999px; }
+
+    .size-explain {
+      background: var(--soft);
+      border-left: 3px solid var(--accent);
+      padding: 0.55rem 0.7rem;
+      font-size: 0.76rem;
+      color: var(--body);
+      line-height: 1.45;
+      border-radius: 0 4px 4px 0;
+    }
+    .size-explain strong { color: var(--ink); }
+
+    /* ── Details panel ───────────────────────────── */
+    .details {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.7rem 0.85rem;
+      font-size: 0.82rem;
+      color: var(--body);
+      line-height: 1.45;
+    }
+    .details .empty { color: var(--secondary); font-style: italic; font-size: 0.78rem; }
+    .details .row { margin: 0.18rem 0; }
+    .details .k {
+      color: var(--secondary); display: inline-block;
+      min-width: 6.5rem; font-size: 0.74rem;
+      text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .details .label-line {
+      font-weight: 600; color: var(--ink);
+      font-size: 1rem; margin-bottom: 0.3rem;
+    }
+    .details .type-line {
+      font-size: 0.7rem; color: var(--secondary);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin-bottom: 0.55rem;
+    }
+    .details .weight-pill {
+      display: inline-block;
+      font-size: 0.66rem; padding: 1px 7px;
+      background: var(--soft); border: 1px solid var(--border);
+      border-radius: 99px; color: var(--secondary);
+      letter-spacing: 0.08em; text-transform: uppercase;
+      margin-bottom: 0.45rem;
+    }
+    .rel-block { margin-top: 0.45rem; }
+    .rel-block h4 {
+      font-size: 0.66rem; color: var(--secondary);
+      letter-spacing: 0.12em; text-transform: uppercase;
+      margin: 0.35rem 0 0.2rem; font-weight: 700;
+    }
+    .rel-chip {
+      display: inline-block;
+      font: inherit; font-size: 0.73rem;
+      padding: 1px 7px; margin: 0 0.25rem 0.25rem 0;
+      background: var(--bg); color: var(--ink);
+      border: 1px solid var(--border); border-radius: 99px;
+      cursor: pointer; line-height: 1.4;
+      transition: all 100ms ease;
+    }
+    .rel-chip:hover { border-color: var(--accent); color: var(--accent-deep); }
+    .rel-chip .rel-type {
+      color: var(--secondary); font-size: 0.68rem; margin-right: 0.3rem;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Canvas ───────────────────────────── */
     #network {
       width: 100%; height: 100%;
-      background: var(--paper);
+      background: var(--bg);
       min-height: 540px;
       position: relative;
     }
-    .empty-state { padding: 1rem; color: var(--secondary); font-size: 0.84rem; }
-
-    .first-time-hint {
+    .canvas-hint {
       position: absolute;
-      left: 50%; top: 12px;
-      transform: translateX(-50%);
-      background: var(--card);
+      left: 18px; top: 18px;
+      background: rgba(255,255,255,0.95);
       border: 1px solid var(--border);
       border-left: 3px solid var(--accent);
-      border-radius: 4px;
-      padding: 0.55rem 0.8rem;
-      font-size: 0.82rem;
+      padding: 0.5rem 0.75rem;
+      font-size: 0.78rem;
       color: var(--body);
-      box-shadow: 0 1px 6px rgba(28, 25, 23, 0.06);
-      z-index: 10;
-      max-width: 620px;
-      line-height: 1.5;
+      max-width: 360px;
+      line-height: 1.45;
+      border-radius: 4px;
+      box-shadow: 0 1px 6px rgba(0,0,0,0.04);
+      z-index: 5;
       transition: opacity 250ms ease, transform 250ms ease;
     }
-    .first-time-hint.dismissed { opacity: 0; transform: translate(-50%, -8px); pointer-events: none; }
-    .first-time-hint .hint-dismiss {
+    .canvas-hint.dismissed {
+      opacity: 0; transform: translateY(-8px); pointer-events: none;
+    }
+    .canvas-hint .preset-name { color: var(--accent-deep); font-weight: 600; }
+    .canvas-hint button {
       background: none; border: none; color: var(--secondary);
-      font-size: 0.82rem; cursor: pointer; margin-left: 0.4rem; padding: 0;
-      font-family: inherit;
+      cursor: pointer; padding: 0; margin-left: 0.4rem;
+      font: inherit; font-size: 0.78rem;
+    }
+
+    .error-state {
+      padding: 1rem; color: var(--secondary); font-size: 0.84rem;
     }
   </style>
 </head>
 <body>
   <div class="layout">
+
+    <!-- ─── Header ─────────────────────────────────────────── -->
     <div class="header">
       <div>
         <div class="title">Wearly — Knowledge Graph</div>
         <div class="subtitle">
-          <span id="stats">loading…</span> ·
-          three layers: domain · user behavior · runtime ·
-          larger nodes carry more user signal
+          <span id="stats" class="stats">loading…</span> ·
+          <span>three layers: domain · user behavior · runtime</span> ·
+          <span>click any node to focus its neighborhood</span>
         </div>
       </div>
+      <a href="main.html" target="_blank" rel="noopener" class="openfs"
+         id="openFsLink">Open full-screen ↗</a>
     </div>
 
+    <!-- ─── Sidebar ────────────────────────────────────────── -->
     <div class="sidebar">
-      <div class="controls">
-        <h3>Filter</h3>
-        <label for="searchBox">Search</label>
-        <input type="text" id="searchBox" placeholder="e.g. blouse, color, occasion, rule">
 
-        <label for="layerSel">Layer</label>
+      <h3>Preset view</h3>
+      <div class="preset-grid" id="presetGrid"></div>
+
+      <h3>Filter</h3>
+      <div class="control-row">
+        <input type="text" id="searchBox" placeholder="Search nodes…">
+      </div>
+      <div class="control-row">
+        <label for="layerSel" style="font-size:0.74rem; color:var(--secondary);">Layer</label>
         <select id="layerSel">
           <option value="">All layers</option>
-          <option value="domain">Domain (what Wearly knows)</option>
-          <option value="user_behavior">User behavior (this user's patterns)</option>
-          <option value="runtime">Runtime archetypes</option>
+          <option value="domain">domain</option>
+          <option value="user_behavior">user behavior</option>
+          <option value="runtime">runtime</option>
         </select>
-
-        <label for="typeSel">Node type</label>
-        <select id="typeSel">
-          <option value="">All types</option>
-        </select>
-
-        <label for="edgeTypeSel">Edge type</label>
-        <select id="edgeTypeSel">
-          <option value="">All edges</option>
-        </select>
-
-        <label for="layoutSel">Layout</label>
-        <select id="layoutSel">
-          <option value="physics">Physics (force-directed)</option>
-          <option value="hierarchical-ud">Hierarchical (top → bottom)</option>
-        </select>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.4rem; margin-top:0.4rem;">
-          <button id="fitBtn" title="Re-center + zoom to fit every visible node.">Fit to view</button>
-          <button id="physicsBtn" title="Pause / resume the force-directed simulation.">Pause physics</button>
-        </div>
-        <button id="userOnlyBtn" class="secondary"
-                title="Highlight only the User and its direct neighborhood.">
-          Spotlight User neighborhood
-        </button>
-        <button id="resetBtn" class="secondary" style="margin-top:0.4rem;">Reset everything</button>
+      </div>
+      <div class="control-row">
+        <input type="checkbox" id="showEdgeLabels">
+        <label for="showEdgeLabels">Show edge labels</label>
       </div>
 
-      <h3>What size means</h3>
-      <div style="font-size:0.78rem; color:var(--body); line-height:1.5;">
-        Larger nodes carry more <em>user signal</em> — a heavier <code>WardrobeItem</code>
-        is worn more often or covers more occasions; a heavier
-        <code>ColorFamily</code> shows up across more of your closet;
-        a heavier <code>OccasionType</code> has richer wardrobe coverage.
-        Domain archetypes (<code>RulePack</code>, <code>WeatherCondition</code>) stay
-        at base size — they're equal-importance facts, not user-weighted.
+      <div class="btn-row" style="margin-top:0.55rem;">
+        <button class="btn btn-secondary" id="fitBtn"
+                title="Center + zoom to fit every visible node.">Fit to view</button>
+        <button class="btn btn-secondary" id="resetBtn"
+                title="Return to Overview preset.">Reset</button>
+      </div>
+
+      <h3>What node size means</h3>
+      <div class="size-explain">
+        Larger nodes carry <strong>more user signal</strong> — a
+        wardrobe item worn more often, a color family used across
+        more pieces, an occasion your closet is rich for. Domain
+        archetypes (rule packs, weather bands, skin-tone palettes)
+        stay at base size — they're equal-importance facts.
       </div>
 
       <h3>Node types</h3>
       <div id="legend" class="legend"></div>
 
       <h3>Selected node</h3>
-      <div id="selected" class="empty-state">Click a node to see its layer, metrics, and connections.</div>
+      <div class="details" id="details">
+        <div class="empty">Click any node in the graph to inspect its
+        type, layer, metrics, and 1-hop relationships.</div>
+      </div>
     </div>
 
+    <!-- ─── Canvas ─────────────────────────────────────────── -->
     <div id="network">
-      <div id="firstTimeHint" class="first-time-hint" role="status" aria-live="polite">
-        <strong>Click any node</strong> to inspect its type, layer, and metrics ·
-        use the <strong>Layer</strong> dropdown to isolate one slice (domain / user behavior / runtime).
-        <button type="button" class="hint-dismiss" id="hintDismissBtn" aria-label="Dismiss hint">×</button>
+      <div id="canvasHint" class="canvas-hint" role="status" aria-live="polite">
+        <strong>Current view:</strong>
+        <span class="preset-name" id="hintPresetName">Overview</span>.
+        <br>
+        <span id="hintPresetBlurb">The system structure — User, rule
+        packs, occasion types, and the seven workflow steps.</span>
+        <button id="hintDismiss" type="button" aria-label="Dismiss">dismiss</button>
       </div>
     </div>
   </div>
@@ -278,14 +382,171 @@
   <script>
   /* eslint-disable */
 
-  // Where to look for the data file (same pattern as learning-graph)
+  // ─────────────────────────────────────────────────────────────
+  //  Constants — preset definitions, type styling, weight scaling
+  // ─────────────────────────────────────────────────────────────
+
+  // Per-node-type visual styling. Shape comes from the user's
+  // requested mapping (User=star, RulePack=box, etc.). The base
+  // size is multiplied by the node's `weight` (1.0–3.0) so user
+  // signal visibly grows or shrinks the rendered radius.
+  //
+  // `level` here is the DEFAULT level used by the Overview preset.
+  // Other presets override it per-node.
+  const TYPE_STYLE = {
+    "User":              {shape: "star",         color: "#0F0F0F", border: "#0F0F0F", size: 28, font: "#FFFFFF", level: 0},
+    "FitProfile":        {shape: "diamond",      color: "#FAF3EE", border: "#8E2C1E", size: 20,                  level: 1},
+    "SkinTonePalette":   {shape: "diamond",      color: "#F4E9DE", border: "#A55C3F", size: 20,                  level: 1},
+    "OccasionType":      {shape: "hexagon",      color: "#FFFFFF", border: "#0F0F0F", size: 26,                  level: 2},
+    "WeatherCondition":  {shape: "ellipse",      color: "#F5F5F2", border: "#6B6B6B", size: 22,                  level: 2},
+    "WardrobeItemType":  {shape: "box",          color: "#F1ECE4", border: "#6B6B6B", size: 20,                  level: 3},
+    "ColorFamily":       {shape: "dot",          color: "#F4E9DE", border: "#9A9A9A", size: 18,                  level: 3},
+    "RulePack":          {shape: "box",          color: "#E9EEF6", border: "#2E5B8A", size: 22,                  level: 4},
+    "Rule":              {shape: "box",          color: "#F4F7FB", border: "#7A93B4", size: 14,                  level: 5},
+    "WorkflowStep":      {shape: "ellipse",      color: "#FFFFFF", border: "#0F0F0F", size: 22,                  level: 6},
+    // ── User-behavior layer ──
+    "WardrobeItem":      {shape: "dot",          color: "#F1ECE4", border: "#6B6B6B", size: 16,                  level: 3},
+    "WishlistItem":      {shape: "triangle",     color: "#FDF3EE", border: "#8E2C1E", size: 16,                  level: 3},
+    "FavoriteStore":     {shape: "star",         color: "#FFFFFF", border: "#C24E3B", size: 18,                  level: 3},
+    // ── Runtime archetypes (declared in schema; the seed JSON has none) ──
+    "OutfitRecommendation": {shape: "diamond",   color: "#FFFFFF", border: "#0F0F0F", size: 24,                  level: 5},
+    "WardrobeGap":          {shape: "triangleDown", color: "#FDF3EE", border: "#B45A2E", size: 20,               level: 5},
+    "ShoppingSuggestion":   {shape: "triangleDown", color: "#FDF3EE", border: "#6B6B6B", size: 18,               level: 5},
+    "Feedback":             {shape: "square",    color: "#F4F7FB", border: "#7A93B4", size: 16,                  level: 5},
+  };
+
+  // Preset views. Each one is a deliberate slice of the full graph.
+  //
+  //   include       — array of node TYPES to include
+  //   alsoInclude   — array of explicit node IDS to include (regardless of type)
+  //   levels        — function (node) -> integer; overrides default level
+  //   layout        — "UD" | "LR" | "none" (no hierarchy)
+  //   blurb         — one-line description shown in the canvas hint
+  //
+  // The Overview is intentionally SMALL (~25 nodes) so a first-time
+  // viewer sees the system's structure rather than a 91-node blob.
+  const PRESETS = {
+    overview: {
+      label: "Overview",
+      blurb: "The system structure — User, rule packs, occasion types, and the seven workflow steps.",
+      include: ["User", "FitProfile", "SkinTonePalette",
+                 "OccasionType", "RulePack", "WorkflowStep"],
+      levels: function(n) {
+        return ({"User": 0, "FitProfile": 1, "SkinTonePalette": 1,
+                  "OccasionType": 2, "RulePack": 3, "WorkflowStep": 4})[n.type];
+      },
+      layout: "UD",
+    },
+    user_pattern: {
+      label: "User Pattern",
+      blurb: "The user, their items, and what each item is connected to (type, color, occasion).",
+      include: ["User", "FitProfile", "WardrobeItem", "WardrobeItemType",
+                 "ColorFamily", "OccasionType"],
+      levels: function(n) {
+        return ({"User": 0, "FitProfile": 1,
+                  "OccasionType": 2, "WardrobeItem": 3,
+                  "WardrobeItemType": 4, "ColorFamily": 4})[n.type];
+      },
+      layout: "UD",
+    },
+    occasion: {
+      label: "Occasions",
+      blurb: "Each occasion shows the item types it requires, the rule pack governing it, and the items that fit.",
+      include: ["OccasionType", "WardrobeItemType", "WardrobeItem", "RulePack"],
+      levels: function(n) {
+        if (n.type === "WardrobeItemType") return 0;
+        if (n.type === "OccasionType")     return 1;
+        if (n.type === "WardrobeItem")     return 2;
+        if (n.type === "RulePack")         return 3;
+        return 2;
+      },
+      layout: "UD",
+    },
+    wardrobe: {
+      label: "Wardrobe Items",
+      blurb: "Every item in the closet. Size = wear count × versatility. Color/type/occasion as anchors.",
+      include: ["WardrobeItem", "WardrobeItemType", "ColorFamily", "OccasionType"],
+      levels: function(n) {
+        if (n.type === "WardrobeItemType") return 0;
+        if (n.type === "ColorFamily")      return 0;
+        if (n.type === "WardrobeItem")     return 1;
+        if (n.type === "OccasionType")     return 2;
+        return 1;
+      },
+      layout: "UD",
+    },
+    rules: {
+      label: "Rules & Skills",
+      blurb: "Each rule pack contains its R-numbered rules and powers one or more workflow steps.",
+      include: ["RulePack", "Rule", "WorkflowStep", "OccasionType", "WeatherCondition"],
+      levels: function(n) {
+        if (n.type === "OccasionType" || n.type === "WeatherCondition") return 0;
+        if (n.type === "RulePack") return 1;
+        if (n.type === "Rule")     return 2;
+        if (n.type === "WorkflowStep") return 3;
+        return 1;
+      },
+      layout: "UD",
+    },
+    color: {
+      label: "Color & Skin",
+      blurb: "Three skin-tone palettes, the color families in the closet, and the color rules that evaluate them.",
+      include: ["SkinTonePalette", "ColorFamily", "WardrobeItem", "Rule", "RulePack"],
+      extraFilterRule: function(n) {
+        // Only the color-coordination rule pack and its rules
+        if (n.type === "RulePack") return n.id === "pack:color-coordination-rules";
+        if (n.type === "Rule")     return (n.metrics && (n.metrics.slug || "").startsWith("color#"));
+        return true;
+      },
+      levels: function(n) {
+        if (n.type === "SkinTonePalette") return 0;
+        if (n.type === "Rule")            return 1;
+        if (n.type === "RulePack")        return 2;
+        if (n.type === "ColorFamily")     return 3;
+        if (n.type === "WardrobeItem")    return 4;
+        return 1;
+      },
+      layout: "UD",
+    },
+    weather: {
+      label: "Weather & Layers",
+      blurb: "The five temperature bands, the weather rule pack, and Step 3 of the workflow.",
+      include: ["WeatherCondition", "RulePack", "Rule", "WorkflowStep"],
+      extraFilterRule: function(n) {
+        if (n.type === "RulePack") return n.id === "pack:weather-rules";
+        if (n.type === "Rule")     return (n.metrics && (n.metrics.slug || "").startsWith("weather#"));
+        if (n.type === "WorkflowStep") return n.id === "step:3";
+        return true;
+      },
+      levels: function(n) {
+        if (n.type === "WeatherCondition") return 0;
+        if (n.type === "RulePack")         return 1;
+        if (n.type === "Rule")             return 2;
+        if (n.type === "WorkflowStep")     return 3;
+        return 1;
+      },
+      layout: "UD",
+    },
+    full: {
+      label: "Full Graph",
+      blurb: "All 91 nodes, 187 edges. Useful for an overall density check; less readable than the focused views.",
+      include: null,  // null = include every type
+      levels: function(n) {
+        return TYPE_STYLE[n.type] ? TYPE_STYLE[n.type].level : 3;
+      },
+      layout: "UD",
+    },
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  //  Data loading
+  // ─────────────────────────────────────────────────────────────
   const candidatePaths = [
     "../../../graph/wearly-knowledge-graph.json",
     "/styling-agent/graph/wearly-knowledge-graph.json",
     "/graph/wearly-knowledge-graph.json",
     "graph/wearly-knowledge-graph.json",
   ];
-
   async function loadGraph() {
     for (const path of candidatePaths) {
       try {
@@ -296,328 +557,531 @@
     throw new Error("Could not load wearly-knowledge-graph.json");
   }
 
-  function styleForType(nodeTypes, type) {
-    return nodeTypes.find(nt => nt.id === type) || nodeTypes[0];
+  // ─────────────────────────────────────────────────────────────
+  //  Setup
+  // ─────────────────────────────────────────────────────────────
+
+  let RAW;                  // entire JSON
+  let NETWORK;              // vis.Network instance
+  let NODES_BY_ID = {};     // {id: rawNode}
+  let EDGES;                // raw edges array
+  let CURRENT_PRESET = "overview";
+  let SELECTED_ID = null;
+  let EDGE_LABELS_ON = false;
+  let LAYER_FILTER = "";    // "" | "domain" | "user_behavior" | "runtime"
+  let SEARCH_Q = "";
+
+  function buildSidebarPresets() {
+    const grid = document.getElementById("presetGrid");
+    grid.innerHTML = "";
+    const order = ["overview", "user_pattern", "occasion", "wardrobe",
+                    "rules", "color", "weather", "full"];
+    const blurbs = {
+      overview:     "≈ 25 nodes · structural",
+      user_pattern: "User & their items",
+      occasion:     "What each occasion needs",
+      wardrobe:     "Items, sized by use",
+      rules:        "Rule packs & rules",
+      color:        "Color × skin tone",
+      weather:      "Temperature bands",
+      full:         "91 · everything",
+    };
+    for (const key of order) {
+      const p = PRESETS[key];
+      if (!p) continue;
+      const btn = document.createElement("button");
+      btn.className = "preset-btn" + (key === CURRENT_PRESET ? " active" : "");
+      btn.setAttribute("data-preset", key);
+      btn.innerHTML = `${p.label}<span class="preset-meta">${blurbs[key] || ""}</span>`;
+      btn.addEventListener("click", () => applyPreset(key));
+      grid.appendChild(btn);
+    }
   }
 
-  function buildVisNodes(data) {
-    const typeMap = Object.fromEntries(data.node_types.map(t => [t.id, t]));
-    return data.nodes.map(n => {
-      const t = typeMap[n.type] || data.node_types[0];
-      const size = Math.max(12, Math.min(48, (t.base_size || 22) * (n.weight || 1.0)));
-      const node = {
-        id:    n.id,
-        label: n.label,
-        title: buildTooltip(n),
-        color: {background: t.color, border: t.border},
-        shape: t.shape,
-        size:  size,
-        _data: n,
-        _typeStyle: t,
-      };
-      if (t.font_color) {
-        node.font = {color: t.font_color, size: 13, face: "DM Sans, sans-serif",
-                     strokeWidth: 3, strokeColor: t.color};
-      } else {
-        node.font = {color: "#1C1917", size: 13, face: "DM Sans, sans-serif"};
-      }
-      return node;
+  function buildLegend() {
+    const order = ["User", "OccasionType", "RulePack", "Rule",
+                    "WardrobeItemType", "WardrobeItem", "ColorFamily",
+                    "SkinTonePalette", "FitProfile", "WeatherCondition",
+                    "WorkflowStep", "WishlistItem", "FavoriteStore",
+                    "WardrobeGap", "ShoppingSuggestion"];
+    const el = document.getElementById("legend");
+    el.innerHTML = order
+      .filter(t => TYPE_STYLE[t])
+      .map(t => {
+        const s = TYPE_STYLE[t];
+        let cls = "circle";
+        if (s.shape === "box" || s.shape === "square") cls = "box";
+        else if (s.shape === "diamond")     cls = "diamond";
+        else if (s.shape === "star")        cls = "star";
+        else if (s.shape === "hexagon")     cls = "hexagon";
+        else if (s.shape === "triangle" || s.shape === "triangleDown") cls = "triangle";
+        else if (s.shape === "ellipse")     cls = "cloud";
+        // Star/hex/triangle use clip-path which doesn't honor border, so paint
+        // the glyph background with the border color so it still reads.
+        const isClipped = cls === "star" || cls === "hexagon" || cls === "triangle";
+        const styleStr = isClipped
+          ? `background:${s.border}`
+          : `background:${s.color}; border: 2px solid ${s.border}`;
+        return `<div class="legend-row">
+          <span class="legend-glyph ${cls}" style="${styleStr}"></span>
+          <span>${t}</span>
+        </div>`;
+      }).join("");
+  }
+
+  function buildAllNodesAndEdges(raw) {
+    NODES_BY_ID = Object.fromEntries(raw.nodes.map(n => [n.id, n]));
+    EDGES = raw.edges;
+    document.getElementById("stats").textContent =
+      `${raw.metadata.node_count} nodes · ${raw.metadata.edge_count} edges`;
+  }
+
+  function isNodeIncludedInPreset(presetKey, n) {
+    const p = PRESETS[presetKey];
+    if (!p) return false;
+    if (p.include !== null && !p.include.includes(n.type)) return false;
+    if (typeof p.extraFilterRule === "function" && !p.extraFilterRule(n)) return false;
+    return true;
+  }
+
+  function visibleNodeIdsForPreset(presetKey) {
+    return new Set(RAW.nodes
+      .filter(n => isNodeIncludedInPreset(presetKey, n))
+      .map(n => n.id));
+  }
+
+  function applyPreset(key) {
+    if (!PRESETS[key]) return;
+    CURRENT_PRESET = key;
+    // Update preset-button active state
+    document.querySelectorAll(".preset-btn").forEach(btn => {
+      btn.classList.toggle("active",
+        btn.getAttribute("data-preset") === key);
     });
+
+    // Compute visible node set + their levels.
+    const visibleIds = visibleNodeIdsForPreset(key);
+    const visNodes = RAW.nodes
+      .filter(n => visibleIds.has(n.id))
+      .filter(n => layerMatches(n) && searchMatches(n))
+      .map(n => visNodeFor(n, key));
+
+    const visEdges = EDGES
+      .filter(e => visibleIds.has(e.from) && visibleIds.has(e.to))
+      .filter(e =>
+        layerMatches(NODES_BY_ID[e.from]) &&
+        layerMatches(NODES_BY_ID[e.to]) &&
+        searchEdgeMatches(e))
+      .map((e, i) => visEdgeFor(e, i));
+
+    // Clear selection on preset switch
+    SELECTED_ID = null;
+    showDetails(null);
+
+    // Push to network
+    NETWORK.setData({nodes: new vis.DataSet(visNodes),
+                      edges: new vis.DataSet(visEdges)});
+    // Apply layout
+    setLayoutForPreset(key);
+
+    // Update canvas hint
+    const hint = document.getElementById("canvasHint");
+    document.getElementById("hintPresetName").textContent = PRESETS[key].label;
+    document.getElementById("hintPresetBlurb").textContent = PRESETS[key].blurb;
+    hint.classList.remove("dismissed");
+    // Auto-dismiss after 8s on preset switch
+    if (window._kgHintTimer) clearTimeout(window._kgHintTimer);
+    window._kgHintTimer = setTimeout(() => hint.classList.add("dismissed"), 8000);
+
+    setTimeout(() => NETWORK.fit({animation: {duration: 300}}), 60);
+  }
+
+  function layerMatches(n) {
+    if (!n) return false;
+    return !LAYER_FILTER || n.layer === LAYER_FILTER;
+  }
+  function searchMatches(n) {
+    if (!SEARCH_Q) return true;
+    const q = SEARCH_Q.toLowerCase();
+    return (n.label || "").toLowerCase().includes(q) ||
+           (n.type  || "").toLowerCase().includes(q);
+  }
+  function searchEdgeMatches(e) {
+    // edges are kept whenever both endpoints survive node filters
+    return true;
+  }
+
+  function setLayoutForPreset(key) {
+    const p = PRESETS[key];
+    if (p.layout === "UD") {
+      NETWORK.setOptions({
+        layout: {
+          hierarchical: {
+            enabled: true,
+            direction: "UD",
+            sortMethod: "directed",
+            shakeTowards: "roots",
+            levelSeparation: 130,
+            nodeSpacing: 130,
+            treeSpacing: 200,
+            blockShifting: true,
+            edgeMinimization: true,
+            parentCentralization: true,
+          },
+        },
+        physics: {enabled: false},
+      });
+    } else if (p.layout === "LR") {
+      NETWORK.setOptions({
+        layout: {hierarchical: {enabled: true, direction: "LR",
+                                  sortMethod: "directed",
+                                  levelSeparation: 180, nodeSpacing: 100}},
+        physics: {enabled: false},
+      });
+    } else {
+      NETWORK.setOptions({
+        layout: {hierarchical: false},
+        physics: {enabled: true},
+      });
+    }
+  }
+
+  function visNodeFor(n, presetKey) {
+    const style = TYPE_STYLE[n.type] || TYPE_STYLE["WardrobeItem"];
+    const weight = n.weight || 1.0;
+    const size = Math.max(12, Math.min(46, (style.size || 20) * weight));
+    const p = PRESETS[presetKey];
+    let level = undefined;
+    if (typeof p.levels === "function") {
+      const l = p.levels(n);
+      if (typeof l === "number") level = l;
+    }
+    const fontColor = style.font ? style.font : "#0F0F0F";
+    return {
+      id: n.id,
+      label: n.label,
+      title: buildTooltip(n),
+      shape: style.shape,
+      color: {background: style.color, border: style.border,
+              highlight: {background: "#FFFFFF", border: "#C24E3B"}},
+      borderWidth: 1.5,
+      size: size,
+      font: {color: fontColor, size: 12, face: "DM Sans, sans-serif",
+              strokeWidth: style.font ? 0 : 3, strokeColor: style.color},
+      ...(level !== undefined ? {level} : {}),
+      _data: n,
+      _baseStyle: style,
+    };
+  }
+
+  function visEdgeFor(e, i) {
+    return {
+      id: `e${i}`,
+      from: e.from,
+      to: e.to,
+      label: EDGE_LABELS_ON ? prettyEdgeLabel(e.type) : "",
+      arrows: {to: {enabled: true, scaleFactor: 0.42}},
+      color: {color: "#D4D4D4", highlight: "#C24E3B", hover: "#C24E3B",
+              opacity: 1.0},
+      font: {size: 9, color: "#6B6B6B", strokeWidth: 3, strokeColor: "#FFFFFF",
+              align: "middle"},
+      smooth: {type: "cubicBezier", forceDirection: "vertical", roundness: 0.4},
+      width: 1,
+      _data: e,
+    };
+  }
+
+  function prettyEdgeLabel(type) {
+    return (type || "").toLowerCase().replace(/_/g, " ");
   }
 
   function buildTooltip(n) {
-    const lines = [`${n.type} · ${n.label}`, `Layer: ${n.layer}`,
-                   `Weight: ${(n.weight || 1.0).toFixed(2)}`];
+    const parts = [`${n.type} · ${n.label}`,
+                    `Layer: ${n.layer}`,
+                    `Weight: ${(n.weight || 1.0).toFixed(2)}`];
     if (n.metrics && Object.keys(n.metrics).length) {
-      lines.push("");
-      for (const [k, v] of Object.entries(n.metrics)) {
-        if (v === null || v === undefined || v === "" ||
-            (Array.isArray(v) && v.length === 0)) continue;
-        const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
-        lines.push(`${k}: ${valueStr.length > 60 ? valueStr.slice(0, 57) + "…" : valueStr}`);
+      const m = n.metrics;
+      const keys = ["worn_count", "versatility", "last_worn",
+                     "rule_count", "item_count", "slug", "summary"];
+      for (const k of keys) {
+        if (m[k] === undefined || m[k] === null || m[k] === "") continue;
+        const v = Array.isArray(m[k]) ? m[k].join(", ") : String(m[k]);
+        if (v.length > 80) parts.push(`${k}: ${v.slice(0, 77)}…`);
+        else parts.push(`${k}: ${v}`);
       }
     }
-    return lines.join("\n");
+    return parts.join("\n");
   }
 
-  function buildVisEdges(data) {
-    return data.edges.map((e, i) => ({
-      id:    `e${i}`,
-      from:  e.from,
-      to:    e.to,
-      label: e.type,
-      arrows: {to: {enabled: true, scaleFactor: 0.45}},
-      color: {color: "#D8CFC4", highlight: "#9F5A36"},
-      font:  {size: 9, color: "#7C6F64", align: "middle",
-              strokeWidth: 3, strokeColor: "#F8F4ED"},
-      smooth: {type: "continuous"},
-      _data: e,
-    }));
+  // ─────────────────────────────────────────────────────────────
+  //  Click → fade neighborhood
+  // ─────────────────────────────────────────────────────────────
+
+  function onSelectNode(params) {
+    if (!params.nodes || !params.nodes.length) return;
+    SELECTED_ID = params.nodes[0];
+    applyHighlight();
+    showDetails(NODES_BY_ID[SELECTED_ID]);
   }
 
-  function renderLegend(nodeTypes) {
-    const el = document.getElementById("legend");
-    el.innerHTML = nodeTypes.map(t => {
-      const klass = t.shape === "box" ? "box" :
-                    t.shape === "diamond" ? "diamond" :
-                    t.shape === "triangle" || t.shape === "triangleDown" ? "triangle" :
-                    "";
-      const style = (t.shape === "triangle" || t.shape === "triangleDown")
-                    ? `border-bottom-color:${t.border}`
-                    : `background:${t.color}; border-color:${t.border}`;
-      return `
-        <div class="legend-row">
-          <span class="legend-dot ${klass}" style="${style}"></span>
-          <span><strong>${t.id}</strong> <span style="color:var(--secondary)">— ${t.category}</span></span>
-        </div>`;
-    }).join("");
+  function onDeselectNode() {
+    SELECTED_ID = null;
+    clearHighlight();
+    showDetails(null);
   }
 
-  function populateSelects(data) {
-    const typeSel = document.getElementById("typeSel");
-    [...new Set(data.nodes.map(n => n.type))].sort().forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t; opt.textContent = t;
-      typeSel.appendChild(opt);
+  function applyHighlight() {
+    if (!SELECTED_ID) return;
+    const sel = SELECTED_ID;
+    const neighbors = new Set([sel]);
+    const ds_edges = NETWORK.body.data.edges;
+    const ds_nodes = NETWORK.body.data.nodes;
+
+    ds_edges.forEach(e => {
+      if (e.from === sel) neighbors.add(e.to);
+      if (e.to   === sel) neighbors.add(e.from);
     });
-    const edgeSel = document.getElementById("edgeTypeSel");
-    [...new Set(data.edges.map(e => e.type))].sort().forEach(t => {
-      const opt = document.createElement("option");
-      opt.value = t; opt.textContent = t;
-      edgeSel.appendChild(opt);
+
+    ds_nodes.forEach(vn => {
+      if (neighbors.has(vn.id)) {
+        const style = vn._baseStyle;
+        ds_nodes.update({
+          id: vn.id,
+          color: {background: style.color, border: style.border},
+          opacity: 1.0,
+          borderWidth: vn.id === sel ? 3 : 1.5,
+          font: {...vn.font, color: vn.font.color},
+        });
+      } else {
+        ds_nodes.update({
+          id: vn.id,
+          color: {background: "#F2F2F2", border: "#CFCFCF"},
+          opacity: 0.18,
+          borderWidth: 0.6,
+          font: {...vn.font, color: "#BFBFBF"},
+        });
+      }
+    });
+
+    ds_edges.forEach(e => {
+      const onPath = (e.from === sel || e.to === sel);
+      ds_edges.update({
+        id: e.id,
+        color: {color: onPath ? "#C24E3B" : "#EBEBEB",
+                highlight: "#C24E3B", hover: "#C24E3B"},
+        width: onPath ? 2 : 0.8,
+        label: onPath ? prettyEdgeLabel(e._data.type)
+                       : (EDGE_LABELS_ON ? prettyEdgeLabel(e._data.type) : ""),
+      });
     });
   }
 
-  function showSelected(node, edgesById, nodesById) {
-    const el = document.getElementById("selected");
+  function clearHighlight() {
+    const ds_edges = NETWORK.body.data.edges;
+    const ds_nodes = NETWORK.body.data.nodes;
+    ds_nodes.forEach(vn => {
+      const style = vn._baseStyle;
+      ds_nodes.update({
+        id: vn.id,
+        color: {background: style.color, border: style.border},
+        opacity: 1.0,
+        borderWidth: 1.5,
+        font: vn.font,
+      });
+    });
+    ds_edges.forEach(e => {
+      ds_edges.update({
+        id: e.id,
+        color: {color: "#D4D4D4", highlight: "#C24E3B"},
+        width: 1,
+        label: EDGE_LABELS_ON ? prettyEdgeLabel(e._data.type) : "",
+      });
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  //  Details panel
+  // ─────────────────────────────────────────────────────────────
+
+  function showDetails(node) {
+    const el = document.getElementById("details");
     if (!node) {
-      el.innerHTML = `<div class="empty-state">Click a node to see its layer, metrics, and connections.</div>`;
+      el.innerHTML = `<div class="empty">Click any node in the graph
+                       to inspect its type, layer, metrics, and
+                       1-hop relationships.</div>`;
       return;
     }
-    const n = node._data;
 
-    // Compute degree
-    let outEdges = [];
-    let inEdges  = [];
-    for (const eid in edgesById) {
-      const e = edgesById[eid];
-      if (e.from === n.id && nodesById[e.to])   outEdges.push(e);
-      if (e.to   === n.id && nodesById[e.from]) inEdges.push(e);
-    }
+    const out = [];
+    const inc = [];
+    EDGES.forEach(e => {
+      if (e.from === node.id && NODES_BY_ID[e.to])   out.push(e);
+      if (e.to   === node.id && NODES_BY_ID[e.from]) inc.push(e);
+    });
 
-    function metricRow(k, v) {
-      if (v === null || v === undefined || v === "" ||
-          (Array.isArray(v) && v.length === 0)) return "";
-      const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
-      return `<div><span class="k">${k}:</span> ${valueStr}</div>`;
-    }
-
-    const metricsHtml = n.metrics
-      ? Object.entries(n.metrics).map(([k, v]) => metricRow(k, v)).join("")
+    const meaning = MEANING_OF[node.type] || "";
+    const metricsHtml = node.metrics
+      ? Object.entries(node.metrics).map(([k, v]) => {
+          if (v === null || v === undefined || v === "" ||
+              (Array.isArray(v) && v.length === 0)) return "";
+          const valueStr = Array.isArray(v) ? v.join(", ") : String(v);
+          const display = valueStr.length > 70
+            ? valueStr.slice(0, 67) + "…" : valueStr;
+          return `<div class="row"><span class="k">${k}</span>${display}</div>`;
+        }).join("")
       : "";
 
-    function edgeChip(e, dir) {
-      const otherId = (dir === "out") ? e.to : e.from;
-      const other = nodesById[otherId];
-      const label = other ? other._data.label : otherId;
-      return `<button class="kg-chip" type="button" data-id="${otherId}"
-        style="font:inherit; font-size:0.72rem; color:var(--ink);
-               background:var(--paper); border:1px solid var(--border);
-               padding:1px 7px; border-radius:99px;
-               margin:0 0.25rem 0.25rem 0; cursor:pointer;"
-        title="${e.type}">${e.type.toLowerCase().replace(/_/g,' ')} → ${label}</button>`;
+    function relGroup(title, edges, dir) {
+      if (!edges.length) return "";
+      // Group by edge type so the relationships read clearly
+      const byType = {};
+      for (const e of edges) {
+        (byType[e.type] = byType[e.type] || []).push(e);
+      }
+      const groups = Object.entries(byType)
+        .sort((a, b) => a[0].localeCompare(b[0]))
+        .map(([t, es]) => {
+          const chips = es.map(e => {
+            const otherId = dir === "out" ? e.to : e.from;
+            const other = NODES_BY_ID[otherId];
+            const label = other ? other.label : otherId;
+            return `<button class="rel-chip" type="button" data-id="${otherId}">
+              <span class="rel-type">${prettyEdgeLabel(t)}</span>${label}
+            </button>`;
+          }).join("");
+          return chips;
+        }).join("");
+      return `<div class="rel-block"><h4>${title} (${edges.length})</h4>${groups}</div>`;
     }
 
     el.innerHTML = `
-      <div class="selected-node">
-        <div class="selected-node-meta">${n.type} · ${n.layer}</div>
-        <div class="selected-node-label">${n.label}</div>
-        <span class="selected-node-weight">weight ${(n.weight || 1.0).toFixed(2)}</span>
-        ${metricsHtml ? `<div class="selected-node-metrics">${metricsHtml}</div>` : ""}
-        ${outEdges.length ? `
-          <div style="margin-top:0.55rem;">
-            <div style="font-size:0.66rem; color:var(--secondary);
-                        letter-spacing:0.12em; text-transform:uppercase;
-                        font-weight:600; margin-bottom:0.2rem;">
-              Out edges (${outEdges.length})
-            </div>
-            <div style="line-height:1.7;">${outEdges.map(e => edgeChip(e, "out")).join("")}</div>
-          </div>` : ""}
-        ${inEdges.length ? `
-          <div style="margin-top:0.4rem;">
-            <div style="font-size:0.66rem; color:var(--secondary);
-                        letter-spacing:0.12em; text-transform:uppercase;
-                        font-weight:600; margin-bottom:0.2rem;">
-              In edges (${inEdges.length})
-            </div>
-            <div style="line-height:1.7;">${inEdges.map(e => edgeChip(e, "in")).join("")}</div>
-          </div>` : ""}
-      </div>
+      <div class="type-line">${node.type} · ${node.layer}</div>
+      <div class="label-line">${node.label}</div>
+      <span class="weight-pill">weight ${(node.weight || 1.0).toFixed(2)}</span>
+      ${meaning ? `<div class="row" style="color:var(--body); font-size:0.83rem; margin-top:0.25rem;">${meaning}</div>` : ""}
+      ${metricsHtml ? `<div style="margin-top:0.55rem;">${metricsHtml}</div>` : ""}
+      ${relGroup("Out edges", out, "out")}
+      ${relGroup("In edges", inc, "in")}
     `;
 
-    el.querySelectorAll(".kg-chip").forEach(btn => {
+    el.querySelectorAll(".rel-chip").forEach(btn => {
       btn.addEventListener("click", () => {
         const id = btn.getAttribute("data-id");
-        if (window._wearlyKG && id) {
-          window._wearlyKG.selectNodes([id]);
-          window._wearlyKG.focus(id, {animation: true, scale: 1.05});
-          showSelected(nodesById[id], edgesById, nodesById);
+        if (id && NODES_BY_ID[id]) {
+          // Try to select inside the current preset; if hidden, switch
+          // to Full view so the click resolves to a real node.
+          const visIds = visibleNodeIdsForPreset(CURRENT_PRESET);
+          if (!visIds.has(id)) applyPreset("full");
+          setTimeout(() => {
+            NETWORK.selectNodes([id]);
+            NETWORK.focus(id, {animation: true, scale: 1.05});
+            SELECTED_ID = id;
+            applyHighlight();
+            showDetails(NODES_BY_ID[id]);
+          }, 30);
         }
       });
     });
   }
 
+  // What does each node type *mean*? One sentence so the details
+  // panel doesn't just dump fields without context.
+  const MEANING_OF = {
+    "User":              "The owner of this graph instance (anonymized seed = 'Demo User').",
+    "FitProfile":        "Declared body shape, preferred fit, modesty, and style preferences.",
+    "SkinTonePalette":   "One of three palettes the color score evaluates against.",
+    "OccasionType":      "A canonical occasion tag (work / gym / dinner / formal / casual).",
+    "WeatherCondition":  "A temperature band the agent uses for layering decisions.",
+    "WardrobeItemType":  "A garment type — top, bottom, dress, outerwear, shoes, accessory, activewear.",
+    "ColorFamily":       "A color bucket grouping related raw colors (warm-rich, cool-neutral, soft, etc.).",
+    "RulePack":          "A skill rule file in skills/wearly-styling-agent/.",
+    "Rule":              "A numbered rule (R1, R2, …) inside a rule pack, registered in rule_refs.py.",
+    "WorkflowStep":      "One of the seven steps run_agent() emits into result['steps'].",
+    "WardrobeItem":      "An item in the user's closet. Size = wear count × versatility.",
+    "WishlistItem":      "An item the user wants to acquire next.",
+    "FavoriteStore":     "A retailer the user has saved.",
+    "OutfitRecommendation": "A built outfit — the agent's output for one occasion.",
+    "WardrobeGap":          "A required piece-type the user does not own for the current occasion.",
+    "ShoppingSuggestion":   "A descriptive (never promotional) gap remedy.",
+    "Feedback":             "A user reject/regenerate signal.",
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  //  Main
+  // ─────────────────────────────────────────────────────────────
   (async function main() {
-    let data;
     try {
-      data = await loadGraph();
+      RAW = await loadGraph();
     } catch (e) {
       document.getElementById("network").innerHTML =
-        `<div class="empty-state">Could not load the Wearly Knowledge Graph (${e.message}).</div>`;
+        `<div class="error-state">Could not load the Wearly Knowledge Graph (${e.message}).</div>`;
       return;
     }
-    document.getElementById("stats").textContent =
-      `${data.metadata.node_count} nodes · ${data.metadata.edge_count} edges`;
+    buildAllNodesAndEdges(RAW);
+    buildSidebarPresets();
+    buildLegend();
 
-    renderLegend(data.node_types);
-    populateSelects(data);
-
-    const visNodes = buildVisNodes(data);
-    const visEdges = buildVisEdges(data);
-    const nodesById = Object.fromEntries(visNodes.map(n => [n.id, n]));
-    const edgesById = Object.fromEntries(visEdges.map(e => [e.id, e]));
-
-    const network = new vis.Network(
+    // Init network with empty data; applyPreset() will populate.
+    NETWORK = new vis.Network(
       document.getElementById("network"),
-      {nodes: new vis.DataSet(visNodes), edges: new vis.DataSet(visEdges)},
+      {nodes: new vis.DataSet([]), edges: new vis.DataSet([])},
       {
-        nodes: {borderWidth: 2},
-        edges: {smooth: {type: "continuous"}},
-        physics: {
-          enabled: true,
-          barnesHut: {gravitationalConstant: -2800, centralGravity: 0.15,
-                       springLength: 110, springConstant: 0.04, damping: 0.5},
-          minVelocity: 0.5,
-        },
-        interaction: {hover: true, tooltipDelay: 120, navigationButtons: false},
+        nodes: {borderWidth: 1.5, shadow: false, margin: 8},
+        edges: {smooth: {type: "cubicBezier", forceDirection: "vertical",
+                          roundness: 0.4},
+                color: {color: "#D4D4D4"}, width: 1},
+        interaction: {hover: true, tooltipDelay: 150,
+                       navigationButtons: false, multiselect: false,
+                       zoomView: true, dragView: true},
       }
     );
-    window._wearlyKG = network;
-
-    // First-time hint
-    const hintEl = document.getElementById("firstTimeHint");
-    function dismissHint() {
-      if (hintEl && !hintEl.classList.contains("dismissed"))
-        hintEl.classList.add("dismissed");
-    }
-    document.getElementById("hintDismissBtn").addEventListener("click", dismissHint);
-    network.on("selectNode", dismissHint);
-    setTimeout(dismissHint, 10000);
-
-    // Node click → side panel
-    network.on("selectNode", function(params) {
-      const id = params.nodes[0];
-      showSelected(nodesById[id], edgesById, nodesById);
-    });
-    network.on("deselectNode", function() {
-      showSelected(null, edgesById, nodesById);
-    });
-    network.on("doubleClick", function(params) {
+    window._wearlyKG = NETWORK;
+    NETWORK.on("selectNode", onSelectNode);
+    NETWORK.on("deselectNode", onDeselectNode);
+    NETWORK.on("doubleClick", function(params) {
       if (params.nodes && params.nodes.length)
-        network.focus(params.nodes[0], {animation: true, scale: 1.2});
+        NETWORK.focus(params.nodes[0], {animation: true, scale: 1.15});
     });
 
-    // Filter logic — applies layer + type + edge-type + search together.
-    function applyFilters() {
-      const q = (document.getElementById("searchBox").value || "").toLowerCase();
-      const layer = document.getElementById("layerSel").value;
-      const type = document.getElementById("typeSel").value;
-      const edgeType = document.getElementById("edgeTypeSel").value;
-
-      const visibleNodeIds = new Set();
-      network.body.data.nodes.forEach(n => {
-        const d = n._data;
-        const labelMatch = !q || d.label.toLowerCase().includes(q) ||
-                            d.type.toLowerCase().includes(q);
-        const layerMatch = !layer || d.layer === layer;
-        const typeMatch  = !type  || d.type  === type;
-        const visible = labelMatch && layerMatch && typeMatch;
-        network.body.data.nodes.update({id: n.id, hidden: !visible});
-        if (visible) visibleNodeIds.add(n.id);
-      });
-      network.body.data.edges.forEach(e => {
-        const visible = visibleNodeIds.has(e.from) && visibleNodeIds.has(e.to)
-                        && (!edgeType || e._data.type === edgeType);
-        network.body.data.edges.update({id: e.id, hidden: !visible});
-      });
-    }
-    document.getElementById("searchBox").addEventListener("input", applyFilters);
-    document.getElementById("layerSel").addEventListener("change", applyFilters);
-    document.getElementById("typeSel").addEventListener("change", applyFilters);
-    document.getElementById("edgeTypeSel").addEventListener("change", applyFilters);
-
-    // Layout switching
-    function setLayout(mode) {
-      if (mode === "hierarchical-ud") {
-        network.setOptions({
-          layout: {hierarchical: {direction: "UD", sortMethod: "directed",
-                                   nodeSpacing: 140, levelSeparation: 120}},
-          physics: {enabled: false},
-        });
-      } else {
-        network.setOptions({
-          layout: {hierarchical: false},
-          physics: {enabled: true},
-        });
+    // Sidebar wiring
+    document.getElementById("searchBox").addEventListener("input", function() {
+      SEARCH_Q = this.value || "";
+      applyPreset(CURRENT_PRESET);  // re-filter
+    });
+    document.getElementById("layerSel").addEventListener("change", function() {
+      LAYER_FILTER = this.value || "";
+      applyPreset(CURRENT_PRESET);
+    });
+    document.getElementById("showEdgeLabels").addEventListener("change", function() {
+      EDGE_LABELS_ON = !!this.checked;
+      // Reapply to refresh edge labels
+      applyPreset(CURRENT_PRESET);
+      if (SELECTED_ID) {
+        NETWORK.selectNodes([SELECTED_ID]);
+        applyHighlight();
       }
-    }
-    document.getElementById("layoutSel").addEventListener("change", function(e) {
-      setLayout(e.target.value);
     });
-
     document.getElementById("fitBtn").addEventListener("click", function() {
-      network.fit({animation: {duration: 350, easingFunction: "easeInOutQuad"}});
+      NETWORK.fit({animation: {duration: 320}});
     });
-
-    let physicsOn = true;
-    document.getElementById("physicsBtn").addEventListener("click", function() {
-      if (document.getElementById("layoutSel").value !== "physics") return;
-      physicsOn = !physicsOn;
-      network.setOptions({physics: {enabled: physicsOn}});
-      this.textContent = physicsOn ? "Pause physics" : "Resume physics";
-    });
-
-    // Spotlight User neighborhood — fade everything not within 1 hop of User.
-    document.getElementById("userOnlyBtn").addEventListener("click", function() {
-      const userNode = visNodes.find(n => n._data.type === "User");
-      if (!userNode) return;
-      const neighborIds = new Set([userNode.id]);
-      visEdges.forEach(e => {
-        if (e.from === userNode.id) neighborIds.add(e.to);
-        if (e.to   === userNode.id) neighborIds.add(e.from);
-      });
-      network.body.data.nodes.forEach(n => {
-        network.body.data.nodes.update({id: n.id, hidden: !neighborIds.has(n.id)});
-      });
-      network.body.data.edges.forEach(e => {
-        network.body.data.edges.update({id: e.id,
-          hidden: !(neighborIds.has(e.from) && neighborIds.has(e.to))});
-      });
-      network.fit({animation: true});
-    });
-
     document.getElementById("resetBtn").addEventListener("click", function() {
       document.getElementById("searchBox").value = "";
       document.getElementById("layerSel").value = "";
-      document.getElementById("typeSel").value = "";
-      document.getElementById("edgeTypeSel").value = "";
-      document.getElementById("layoutSel").value = "physics";
-      applyFilters();
-      setLayout("physics");
-      physicsOn = true;
-      document.getElementById("physicsBtn").textContent = "Pause physics";
-      network.fit({animation: true});
+      document.getElementById("showEdgeLabels").checked = false;
+      SEARCH_Q = ""; LAYER_FILTER = ""; EDGE_LABELS_ON = false;
+      applyPreset("overview");
     });
+    document.getElementById("hintDismiss").addEventListener("click", () => {
+      document.getElementById("canvasHint").classList.add("dismissed");
+    });
+
+    // Make "Open full-screen" point to this file's own URL so it
+    // works both inside the iframe and standalone.
+    const a = document.getElementById("openFsLink");
+    a.href = window.location.href.split("?")[0];
+
+    // Default to Overview
+    applyPreset("overview");
   })();
   </script>
 </body>
