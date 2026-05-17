@@ -1866,7 +1866,7 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
         _render_reasoning_story(reasons, recommendation=outfit)
 
     # ── Reasoning graph (live, interactive — built from THIS result) ──────────
-    # This is the "agent, not chatbot" feature in graph form. The schema view
+    # This is the agentic feature in graph form. The schema view
     # lives on the Before / After screen; here we render the actual traversal
     # the agent just performed: User → CalendarEvent → Weather → wardrobe
     # items → OutfitRecommendation, with any gaps or rejection feedback
@@ -1966,7 +1966,7 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
     # ── Wear-today: record this outfit in wear history ──────────
     # Tells Wearly "I'm actually wearing this." Next time the agent runs,
     # the freshness tie-breaker prefers items you haven't just worn.
-    # This is the second "agent, not chatbot" signal (paired with reject/regenerate):
+    # This is the second agentic signal (paired with reject/regenerate):
     # the system LEARNS from accepted recommendations, not just from declined ones.
     if outfit:
         outfit_key = "|".join(sorted(i.get("id", "") for i in outfit))
@@ -2009,7 +2009,7 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
             st.success("Marked worn — Wearly will prefer fresher pieces next time.")
 
     # ── Refine this outfit (reject & regenerate) ──────────
-    # This is the "agent, not chatbot" moment — the user can push back
+    # This is the agentic moment — the user can push back
     # on the recommendation with specific reasons and the agent re-runs
     # with those constraints, surfacing every reason in the reasoning
     # trail so the user sees WHY the new outfit is different.
@@ -2253,7 +2253,7 @@ def _render_home():
             <span style="{pill}"><span style="{num}">05</span> Outfit</span>
         </div>
         <p style="font-size:0.82rem; color:#6E6E73; margin:1rem auto 0; max-width:24rem; line-height:1.55;">
-            An <strong style="color:#1C1917;">agent</strong>, not a chatbot.
+            An <strong style="color:#1C1917;">agent</strong>.
             Wearly reads your context first, then recommends — and explains every choice.
         </p>
     </div>

@@ -15,9 +15,10 @@
 
 ## A
 
-**Agent** — A system that reads context first and recommends with a visible
-reasoning trail. Distinct from a *chatbot*, which responds to a free-text
-prompt. See [Chapter 1 · Product vision](../book/01-vision.md) and
+**Agent** — A system defined by five properties Wearly's runtime exhibits:
+context-first stance, multi-step reasoning with a visible trail, tool use,
+memory across sessions, and an iterative reject-and-regenerate loop. See
+[Chapter 1 · Product vision](../book/01-vision.md) and
 [Chapter 3 · Agent workflow](../book/03-agent-workflow.md).
 
 **Agentic loop** — The reject-and-regenerate cycle: the user pushes back on

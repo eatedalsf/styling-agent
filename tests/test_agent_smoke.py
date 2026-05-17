@@ -83,7 +83,7 @@ class TestAgentEverydayMode(unittest.TestCase):
 
 class TestRejectAndRegenerate(unittest.TestCase):
     """The reject/regenerate flow must exclude rejected items AND surface
-    the user's reason in the reasoning trail (the agent-not-chatbot moment)."""
+    the user's reason in the reasoning trail (the agentic moment)."""
 
     @classmethod
     def setUpClass(cls):

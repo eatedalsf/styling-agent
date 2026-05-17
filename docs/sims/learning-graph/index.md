@@ -70,7 +70,7 @@ rather than order.
 Filter to one category at a time:
 
 - **Foundation** → start here. The user problem and the
-  agent-vs-chatbot framing.
+  agent-properties framing.
 - **Workflow** → the seven steps, each step linked to its rule pack.
 - **Knowledge** → the rule systems and data models the agent reasons
   over (wardrobe model, color harmony, required pieces).
@@ -83,7 +83,7 @@ Filter to one category at a time:
 
 The **Suggested reading path** button surfaces one canonical chain a
 first-time reader can follow end-to-end: *personal styling problem →
-agent vs. chatbot → seven-step workflow → outfit construction →
+agent properties → seven-step workflow → outfit construction →
 result-dict contract.*
 
 ## Bloom levels
@@ -95,7 +95,7 @@ template, each concept carries a Bloom cognitive-tier label:
 - **Remember** — recognize or recall the concept (for example, the
   five canonical occasion tags).
 - **Understand** — explain the concept in your own words (for
-  example, the agent-vs-chatbot framing).
+  example, the agent-properties framing).
 - **Apply** — use the concept correctly in a new context (for
   example, evaluating an outfit against the gap rules).
 - **Analyze** — break the concept into its parts and see how they

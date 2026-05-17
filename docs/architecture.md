@@ -115,7 +115,7 @@ This contract is the only contract between agent and UI. Both `main.py` and `app
 
 ### Reject & regenerate
 
-If `rejected_ids` are supplied, Step 4 (wardrobe filter) drops them from every pool. Step 5 prepends one `"Skipping 'X' — you flagged it as: Y"` line per rejection reason to the reasoning trail. Step 4's `output` notes the exclusion count. This is the agent-not-chatbot signal: the user can push back with a reason, the agent re-runs, and the change is explained.
+If `rejected_ids` are supplied, Step 4 (wardrobe filter) drops them from every pool. Step 5 prepends one `"Skipping 'X' — you flagged it as: Y"` line per rejection reason to the reasoning trail. Step 4's `output` notes the exclusion count. This is the agentic signal: the user can push back with a reason, the agent re-runs, and the change is explained.
 
 ---
 

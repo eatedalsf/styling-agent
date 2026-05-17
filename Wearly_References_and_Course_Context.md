@@ -117,7 +117,7 @@ Synthesized from prior class project feedback:
 
 - The instructor prefers a **working MVP**, not just a PDF or slide deck.
 - The demo should show the system working **live**.
-- The project should clearly show **why it is an agent, not a chatbot**.
+- The project should clearly show **why it is an agent**.
 - The project should have a **clear target audience**.
 - The project should include a **strong before/after comparison**.
 - The project should explain the **decision process**, not only show the final output.

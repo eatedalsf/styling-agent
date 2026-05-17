@@ -32,7 +32,7 @@ It is two things at once:
 
 Every morning, deciding what to wear can take real time — and it isn't just "pick a shirt." The decision depends on the calendar, the weather, what's actually in the closet, the occasion, fit preferences, skin tone, and sometimes what's *missing* from the wardrobe. Most styling tools just suggest clothes. I wanted an **agent I could argue with**: one that reads context first, explains its reasoning step by step, identifies real wardrobe gaps without inventing forced fits, and gets out of the way when its choice is wrong.
 
-The agent runs through a **seven-step reasoning loop** every time. Each step writes to a visible trail with rule citations like `[color-coordination-rules#R2]`. Users can reject any pick with a reason, and the agent re-runs with that rejection recorded as a constraint. That loop — context → decision → explanation → pushback → re-run — is the agent stance, distinct from a chatbot that waits for a prompt and responds to it.
+The agent runs through a **seven-step reasoning loop** every time. Each step writes to a visible trail with rule citations like `[color-coordination-rules#R2]`. Users can reject any pick with a reason, and the agent re-runs with that rejection recorded as a constraint. That loop — context → decision → explanation → pushback → re-run — is the agent stance: context-first, multi-step, reviewable end-to-end.
 
 ---
 

@@ -78,7 +78,7 @@ CHAPTERS = {
         self_check=[
             ("Remember", "Name the four rules of Wearly's honesty contract."),
             ("Understand", "Why does Wearly insist on the agent / chatbot distinction in its product vision?"),
-            ("Apply", "Pick one item on the agent-not-chatbot list and identify the screen in the running app where it shows up."),
+            ("Apply", "Pick one item on the agentic list and identify the screen in the running app where it shows up."),
         ],
     ),
     "02-user-problem.md": dict(

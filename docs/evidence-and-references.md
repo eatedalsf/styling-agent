@@ -198,13 +198,13 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 - HAI / Stanford HAI publications.
 - Research on **mixed-initiative systems** and **AI agency / user control trade-offs**.
 
-**Current basis.** Wearly was explicitly designed around the principle "an agent, not a chatbot" — phrasing taken from the SEIS 666 course materials and consistent with the human-centered-AI school of thought. Every recommendation is a starting point the user can push back on.
+**Current basis.** Wearly was explicitly designed around the principle "an agent" — phrasing taken from the SEIS 666 course materials and consistent with the human-centered-AI school of thought. Every recommendation is a starting point the user can push back on.
 
 **Verified citations.**
 
 > **Cited:** Amershi, S., Weld, D., Vorvoreanu, M., Fourney, A., Nushi, B., Collisson, P., Suh, J., Iqbal, S., Bennett, P., Bennett, P. N., Inkpen, K., Teevan, J., Kikin-Gil, R., & Horvitz, E. (2019). Guidelines for Human-AI Interaction. In *Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems* (paper 3, pp. 1–13). DOI: [10.1145/3290605.3300233](https://doi.org/10.1145/3290605.3300233). Project page: [microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction](https://www.microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction/).
 > **Claim it supports:** 18 design guidelines for AI-infused products covering "initially," "during interaction," "when wrong," and "over time." Wearly's reject-and-regenerate loop, the editable fit profile, the body-positive language contract, and the never-auto-submit confirmations are direct expressions of guidelines such as "support efficient correction," "make clear what the system can do," and "remember recent interactions."
-> **Relevant rule(s):** the agent-not-chatbot stance; `wardrobe-filtering-rules.md` R5; `privacy-guidelines.md` R5 (user pushback is authoritative).
+> **Relevant rule(s):** the agentic stance; `wardrobe-filtering-rules.md` R5; `privacy-guidelines.md` R5 (user pushback is authoritative).
 
 > **Cited:** Google PAIR (People + AI Research). *People + AI Guidebook*. [pair.withgoogle.com/guidebook](https://pair.withgoogle.com/guidebook/). Open-access design guidance for human-centered AI products.
 > **Claim it supports:** Practical patterns for user-needs framing, mental-model alignment, explainability, feedback, errors, and trust calibration in AI products. Wearly's UX (the seven-step reasoning trail, the wardrobe-gap "honest gaps over forced fits" stance, the calendar/weather context surfaces) aligns with the Guidebook's mental-model and trust-calibration chapters.

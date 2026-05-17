@@ -1,7 +1,7 @@
 # Wearly — 10-Minute Demo Script (May 14, 2026)
 
 > **Audience:** SEIS 666 instructor (Daniel Yarmoluk) + class.
-> **Goal:** Show a working, reasoning **agent** — not a chatbot or slide deck.
+> **Goal:** Show a working, reasoning **agent** — a working agent.
 > **One-line pitch:** *"Other styling apps tell you what to wear. Wearly tells you why, and lets you argue back."*
 
 ---
@@ -46,10 +46,10 @@ Pivot:
 
 ---
 
-## 2. What makes this an agent, not a chatbot (0:45)
+## 2. What makes this an agent (0:45)
 
 **Say:**
-> *"Wearly is a Track B project. Track B says: build a multi-step agent that uses tools, makes decisions, and completes a real workflow autonomously. Here's what makes Wearly an agent rather than a chatbot:"*
+> *"Wearly is a Track B project. Track B says: build a multi-step agent that uses tools, makes decisions, and completes a real workflow autonomously. Here's how Wearly hits every property of that definition:"*
 
 Show the 7-step workflow diagram (book/03 in tab 2). One breath each:
 
@@ -61,7 +61,7 @@ Show the 7-step workflow diagram (book/03 in tab 2). One breath each:
 - **Keeps persistent memory**: wear history with a 0.4 freshness floor.
 - **Every output line ties back to a numbered rule.**
 
-> *"A chatbot returns a string. Wearly executes a plan, consults rules, and explains itself."*
+> *"Wearly executes a plan, consults rules, and explains itself line by line."*
 
 ---
 
@@ -71,7 +71,7 @@ Show the 7-step workflow diagram (book/03 in tab 2). One breath each:
 
 Open Streamlit → **Before / After Demo** screen.
 
-| Metric | Before (manual / generic chatbot) | After (Wearly agent) |
+| Metric | Before (manual / generic AI styling tool) | After (Wearly agent) |
 |---|---|---|
 | Time to decision | ~15 min | <30 sec |
 | Reasoning lines exposed | 0 | 7–12 per outfit |
@@ -108,7 +108,7 @@ In the Streamlit app:
 
 ## 5. Reject + regenerate (1:00)
 
-**Say:** *"This is the 'agent, not chatbot' loop."*
+**Say:** *"This is the agentic loop."*
 
 Reject one item with the reason *"too formal for today"*. Click **Regenerate**.
 
@@ -116,7 +116,7 @@ The new outfit appears. Point at:
 - The new reasoning line beginning *"Skipping '...' — you flagged it as: too formal for today.   `[wardrobe-filtering-rules#R5]`"*
 - The new freshness or fit-alignment note that fired because the pool shifted.
 
-> *"I argued with the system. It responded. It told me what changed and why. A chatbot would have apologized and given me the same thing again."*
+> *"I argued with the system. It responded. It told me what changed and why — line by line, with citations."*
 
 ---
 

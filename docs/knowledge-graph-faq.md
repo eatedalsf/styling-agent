@@ -232,8 +232,8 @@ forceAtlas2 layouts have been retuned to give plenty of breathing room.
 ## 12. How does each graph help the user?
 
 - **Schema graph** — tells a reviewer in one image *what kind of system
-  Wearly is*: agent vs chatbot, structured vs free-text. Lives on the
-  Before/After page.
+  Wearly is*: a structured-reasoning agent with named entities and
+  typed relations. Lives on the Before/After page.
 - **Live-run reasoning graph** — turns the seven prose-form reasoning
   steps into a single picture. The user can see at a glance which
   context the agent read, which pieces it chose, which it rejected, and

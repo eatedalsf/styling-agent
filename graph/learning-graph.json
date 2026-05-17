@@ -19,7 +19,7 @@
   ],
   "concepts": [
     {"id": "personal-styling-problem",  "label": "The personal styling problem",  "category": "foundation", "bloom": "Understand", "url": "book/02-user-problem.md", "summary": "The fifteen-minute closet decision: calendar, weather, closet, fit all converge under time pressure."},
-    {"id": "agent-not-chatbot",         "label": "Agent vs. chatbot",             "category": "foundation", "bloom": "Understand", "url": "book/01-vision.md",      "summary": "Wearly reads context FIRST and recommends with a visible reasoning trail — not a free-text response from a prompt."},
+    {"id": "agentic",         "label": "Agent vs. chatbot",             "category": "foundation", "bloom": "Understand", "url": "book/01-vision.md",      "summary": "Wearly reads context FIRST and recommends with a visible reasoning trail — not a free-text response from a prompt."},
     {"id": "honesty-contract",          "label": "The honesty contract",          "category": "framing",    "bloom": "Understand", "url": "book/12-evidence-and-references.md", "summary": "Styling is not an exact science. Wearly says 'tends to work well', never 'is correct'."},
     {"id": "body-positive-language",    "label": "Body-positive language contract", "category": "framing",  "bloom": "Apply",      "url": "book/S8-body-positive-framing.md",    "summary": "No corrective vocabulary. Forbidden tokens enforced at runtime AND in documentation."},
     {"id": "evidence-categories",       "label": "Evidence categories",           "category": "framing",    "bloom": "Analyze",    "url": "docs/evidence-and-references.md",     "summary": "Nine source categories every rule traces back to — color harmony, recommender systems, XAI, etc."},
@@ -41,7 +41,7 @@
     {"id": "body-shape-framing",        "label": "Body-shape framing",            "category": "personalization", "bloom": "Analyze","url": "book/S2-silhouette-and-fit.md",       "summary": "Body-shape labels are industry heuristic, not scientific taxonomy. Always user-declared, never inferred."},
     {"id": "wear-history",              "label": "Wear history",                  "category": "personalization", "bloom": "Apply",  "url": "book/S6-rotation-and-freshness.md",   "summary": "Worn-count + last-worn-date per item, written when user confirms an outfit."},
     {"id": "freshness-score",           "label": "Freshness score (0.4 floor)",   "category": "personalization", "bloom": "Analyze","url": "book/S6-rotation-and-freshness.md",   "summary": "Frequency penalty + recency penalty. Floor 0.4: a much-loved piece is never exiled."},
-    {"id": "reject-regenerate",         "label": "Reject & regenerate",           "category": "personalization", "bloom": "Analyze","url": "book/03-agent-workflow.md",           "summary": "The agent-not-chatbot moment. User pushes back; agent re-runs with constraints; trail surfaces the rejection reasons."},
+    {"id": "reject-regenerate",         "label": "Reject & regenerate",           "category": "personalization", "bloom": "Analyze","url": "book/03-agent-workflow.md",           "summary": "The agentic moment. User pushes back; agent re-runs with constraints; trail surfaces the rejection reasons."},
     {"id": "favorite-stores",           "label": "Favorite stores + wishlist",    "category": "personalization", "bloom": "Apply",  "url": "book/08-shopping-gap-logic.md",       "summary": "Local-only saved retailer hints + saved wishlist items with priority + linked_gap."},
 
     {"id": "result-dict-contract",      "label": "The result-dict contract",      "category": "system",     "bloom": "Understand", "url": "docs/architecture.md",                "summary": "Single boundary between agent and UI — steps, recommendation, reasoning, gaps, color_score, weather, event, profile."},
@@ -52,9 +52,9 @@
     {"id": "before-after-delta",        "label": "Before / after delta",          "category": "system",     "bloom": "Understand", "url": "book/09-before-after-demo.md",        "summary": "15 minutes of manual planning → 3 seconds of agent reasoning, with the work made visible."}
   ],
   "edges": [
-    ["personal-styling-problem", "agent-not-chatbot",      "motivates"],
-    ["agent-not-chatbot",        "seven-step-workflow",    "is implemented as"],
-    ["agent-not-chatbot",        "reject-regenerate",      "is demonstrated by"],
+    ["personal-styling-problem", "agentic",      "motivates"],
+    ["agentic",        "seven-step-workflow",    "is implemented as"],
+    ["agentic",        "reject-regenerate",      "is demonstrated by"],
 
     ["seven-step-workflow",      "occasion-classification","step 1 uses"],
     ["seven-step-workflow",      "calendar-context",       "step 1 reads"],

@@ -27,7 +27,7 @@ Eight rows. Designed to be readable in one glance:
 | Confidence | Low–medium | High (structured) |
 | Coat reminder | Missed it | Included |
 
-The "Coat reminder · Missed it / Included" row is small but it lands the point: a chatbot wouldn't have noticed the weather. The agent does.
+The "Coat reminder · Missed it / Included" row is small but it lands the point: Wearly *reads* the weather as part of its context-loading step, so it can act on it.
 
 ## Visual choices
 
@@ -48,7 +48,7 @@ Nothing on this screen requires the user to imagine. Everything they see is real
 Per `docs/demo_script.md`:
 
 1. **Hook / problem** (45s) — the 15-minute closet.
-2. **What Wearly is** (45s) — an agent, not a chatbot.
+2. **What Wearly is** (45s) — an agent.
 3. **Before / After** (90s) — *this chapter's screen*.
 4. **Calendar + weather reasoning** (90s).
 5. **Wardrobe + color reasoning** (90s).

@@ -89,7 +89,7 @@ Each step is a decision point with its own rule pack. Full per-rule detail in th
 6. **Check wardrobe gaps** — compare the built outfit against the occasion's required-piece set. Generate descriptive shopping suggestions augmented with the user's favorite stores. See [`shopping-gap-rules.md`](shopping-gap-rules.md).
 7. **Score color coordination** — score every outfit item against the user's skin-tone palette. Return a 0–100 score with per-item flags. See [`color-coordination-rules.md`](color-coordination-rules.md).
 
-The reject-and-regenerate loop is the skill's "agent, not chatbot" signal: when the user supplies `rejected_ids` + `rejection_reasons`, Step 4 excludes them, Step 5 prepends a reasoning line per rejection ("Skipping 'X' — you flagged it as: Y"), and the new outfit is auditable line-by-line.
+The reject-and-regenerate loop is the skill's agentic signal: when the user supplies `rejected_ids` + `rejection_reasons`, Step 4 excludes them, Step 5 prepends a reasoning line per rejection ("Skipping 'X' — you flagged it as: Y"), and the new outfit is auditable line-by-line.
 
 ---
 

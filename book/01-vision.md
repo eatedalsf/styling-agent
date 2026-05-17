@@ -21,7 +21,7 @@ Future versions extend to:
 
 Wearly is deliberately **not**:
 
-- a **chatbot** that returns generic suggestions from a prompt — every recommendation is structured by data and explained by a visible reasoning trail;
+- a **prompt-and-response surface** — every recommendation is structured by data and explained by a visible reasoning trail;
 - a **shopping app** wearing a "styling" hat — shopping appears only when a wardrobe gap is detected;
 - a **photo-feed inspiration app** — there are no influencer outfits, no infinite scroll;
 - an **AI fashion oracle** that claims one correct answer — outfit choices are inherently personal, and the system says so.
@@ -50,7 +50,7 @@ That promise governs every design decision in the app: every screen must move th
 ## Self-check
 
 1. *(Remember)* Name the four rules of Wearly's honesty contract.
-2. *(Understand)* Why does Wearly insist on the agent / chatbot distinction in its product vision?
-3. *(Apply)* Pick one item on the agent-not-chatbot list and identify the screen in the running app where it shows up.
+2. *(Understand)* Which agentic properties does Wearly assert in its product vision, and how does each one show up at runtime?
+3. *(Apply)* Pick one item on the agentic list and identify the screen in the running app where it shows up.
 
 *Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

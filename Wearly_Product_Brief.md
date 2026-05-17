@@ -36,7 +36,7 @@ Future versions should support:
 
 The goal is to make outfit planning **faster, more personal, and more context-aware**.
 
-Wearly AI should **not** behave like a generic fashion chatbot. It should behave like an **agent** that reasons through:
+Wearly AI behaves like an **agent** — it reasons end-to-end through:
 
 - calendar context,
 - weather,
@@ -219,7 +219,7 @@ After rejection, the agent should **regenerate a better recommendation and expla
 
 ### 7.8 Agentic Reasoning Trace
 
-The app must clearly show that Wearly AI is an **agent, not a chatbot**.
+The app must clearly show that Wearly AI is an **agent**.
 
 The reasoning trace should include:
 
@@ -240,7 +240,7 @@ The reasoning trace should include:
 
 The project should include a clear before/after demo.
 
-- **Before** — A generic chatbot gives a simple, generic outfit suggestion.
+- **Before** — A generic styling tool gives a simple, context-free outfit suggestion.
 - **After** — Wearly AI uses calendar, weather, wardrobe, fit profile, wear history, and favorite stores to create a personalized outfit with reasoning and alternatives.
 
 ---

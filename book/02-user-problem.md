@@ -11,7 +11,7 @@ Most people spend somewhere around **fifteen minutes** every morning standing in
 3. **What's in the closet, and what fits the occasion?** Half the items don't suit today, half are in the laundry.
 4. **What flatters me?** Color, fit, body shape, modesty preferences, comfort.
 
-A chatbot can answer one of these. A human stylist can hold all four at once but isn't in the user's closet every morning. A structured agent that *reasons through all four* is the missing thing.
+A prompt-and-response surface can answer one of these at a time. A human stylist can hold all four at once but isn't in the user's closet every morning. A structured agent that *reasons through all four* is the missing thing.
 
 ## The cost of the decision
 

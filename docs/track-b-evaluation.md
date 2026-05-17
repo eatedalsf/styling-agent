@@ -44,7 +44,7 @@
 
 ---
 
-## Why Wearly is an agent (and not a chatbot)
+## Why Wearly is an agent
 
 | Property | Chatbot | True Agent | Wearly |
 |---|---|---|---|

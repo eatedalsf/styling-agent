@@ -30,7 +30,7 @@ Every rule pack in `skills/wearly-styling-agent/` and every reasoning line in th
 | 3 | Color harmony | Step 7 color scoring, `color_rules.json` palettes |
 | 4 | Body-shape-aware / fit-aware styling | Step 5 fit-alignment notes, `fit-silhouette-rules.md` |
 | 5 | Explainable recommendation systems | The entire `result["reasoning"]` array |
-| 6 | Human-centered AI / personalization | The "agent, not a chatbot" stance, reject-and-regenerate |
+| 6 | Human-centered AI / personalization | The "agent" stance, reject-and-regenerate |
 | 7 | Wardrobe management / digital closets | Wardrobe builder, wear-history rotation, gap detection |
 | 8 | Personalization and user feedback | Explicit feedback loops (reject, mark-worn, edit profile) |
 | 9 | Privacy and personal data | Minimum-necessary data handling, no third parties |

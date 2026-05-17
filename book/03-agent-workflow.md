@@ -103,7 +103,7 @@ When the user pushes back on an item (Today → "Not quite right?" → multisele
 3. Step 5 *prepends* a `"Skipping '{name}' — you flagged it as: {reason}"` line to the reasoning trail for each rejection.
 4. The result dict carries `rejected_context: {ids, reasons}` so the UI can render the **"What changed in this run"** banner.
 
-This is the single feature that most demonstrates Wearly is an **agent**, not a chatbot. The user *argues with the system*, the system *responds*, and both sides of that conversation are visible in the reasoning trail.
+This is the single feature that most demonstrates Wearly's **agentic** behavior. The user *argues with the system*, the system *responds*, and both sides of that conversation are visible in the reasoning trail.
 
 ---
 

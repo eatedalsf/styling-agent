@@ -53,13 +53,14 @@ weather call), or judge your wardrobe. See
 
 ## Agent reasoning
 
-### Why call it an "agent" and not a "chatbot"?
+### What makes Wearly an agent?
 
-A chatbot waits for free-text and responds. An agent reads context
-*first* — your calendar, the weather, your closet, your fit profile —
-then recommends with a visible reasoning trail. The whole product is
-designed around that distinction. See [Chapter 1](../book/01-vision.md)
-and [Chapter 3](../book/03-agent-workflow.md).
+Wearly reads context *first* — your calendar, the weather, your
+closet, your fit profile — then recommends with a visible reasoning
+trail that cites a named rule for every decision. Add reject-and-
+regenerate plus persistent state across sessions and you have the
+full agent stance. See [Chapter 1](../book/01-vision.md) and
+[Chapter 3](../book/03-agent-workflow.md).
 
 ### What are the "seven steps"?
 

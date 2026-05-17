@@ -115,7 +115,7 @@ Project page:
 [microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction](https://www.microsoft.com/en-us/research/project/guidelines-for-human-ai-interaction/).
 
 - *Supports*: [evidence § 3.6 Human-centered AI](evidence-and-references.md);
-  the agent-not-chatbot stance and the reject-and-regenerate loop.
+  the agentic stance and the reject-and-regenerate loop.
 - *Rule packs*: [`wardrobe-filtering-rules.md`](../skills/wearly-styling-agent/wardrobe-filtering-rules.md) R5; [`privacy-guidelines.md`](../skills/wearly-styling-agent/privacy-guidelines.md) R5.
 
 **[10]** Google PAIR (People + AI Research). *People + AI Guidebook*.

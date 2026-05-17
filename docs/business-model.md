@@ -11,7 +11,7 @@ People spend a measurable amount of time and mental energy on outfit decisions e
 - **Weather apps** tell you the forecast — not what to wear in it.
 - **Calendar apps** tell you what you're doing — not what's appropriate.
 - **Closet-organizer apps** catalog items — they don't reason about them.
-- **AI chatbots** suggest outfits — but with no knowledge of *your* closet, *your* fit preferences, or *your* schedule, and with no audit trail.
+- **Generic styling AI tools** suggest outfits — but with no knowledge of *your* closet, *your* fit preferences, or *your* schedule, and with no audit trail.
 
 Wearly composes those four data sources into one rule-driven recommendation with a full reasoning trail.
 
