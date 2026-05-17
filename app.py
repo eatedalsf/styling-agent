@@ -1405,6 +1405,8 @@ with _bar_right:
             _goto("profile")
         if st.button("Before / after demo", key="menu_demo_btn", use_container_width=True):
             _goto("demo")
+        if st.button("Knowledge Graph", key="menu_kg_btn", use_container_width=True):
+            _goto("knowledge_graph")
 
         st.divider()
 
@@ -6415,18 +6417,30 @@ def _render_demo():
 # SECTION ROUTER
 # ─────────────────────────────────────────────
 
+def _render_knowledge_graph():
+    """Dedicated full-page Knowledge Graph view — accessible from the
+    user-menu dropdown. Uses the same viewer as the book; the JSON is
+    inlined into the iframe so it works without a static-file server."""
+    try:
+        from wearly_kg_embed import render_knowledge_graph_page
+        render_knowledge_graph_page()
+    except Exception as _e:
+        st.error(f"Knowledge Graph page unavailable: {_e}")
+
+
 _router = {
-    "home":         _render_home,
-    "today":        _render_today,
-    "planner":      _render_planner,
-    "routine":      _render_routine_week,
+    "home":            _render_home,
+    "today":           _render_today,
+    "planner":         _render_planner,
+    "routine":         _render_routine_week,
     # Sub-route used by Planner / Routine "Plan in detail" buttons.
     # NOT in the top-nav list — the originating Planner or Routine
     # pill stays highlighted (see _nav_active above _SECTIONS).
-    "event_detail": _render_event_detail,
-    "wardrobe":     _render_wardrobe,
-    "shop":         _render_shop,
-    "profile":      _render_profile,
-    "demo":         _render_demo,
+    "event_detail":    _render_event_detail,
+    "wardrobe":        _render_wardrobe,
+    "shop":            _render_shop,
+    "profile":         _render_profile,
+    "demo":            _render_demo,
+    "knowledge_graph": _render_knowledge_graph,
 }
 _router.get(st.session_state["section"], _render_home)()

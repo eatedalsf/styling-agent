@@ -699,6 +699,209 @@ def load_seed_sources(include_user: bool = False):
 # Top-level
 # ─────────────────────────────────────────────
 
+def _enrich_with_user_signals(nodes: List[Dict[str, Any]],
+                              edges: List[Dict[str, Any]],
+                              src: Dict[str, Any]) -> None:
+    """In-place enrichment of an already-built graph with richer
+    user-behavior signals — only safe to call when include_user=True.
+
+    Adds (when input data is present):
+      • WardrobeGap nodes for (occasion, required_type) pairs the user
+        does NOT own a matching item for
+      • OutfitRecommendation nodes for the last 5 confirmed wears
+      • CONTAINS_ITEM edges from each OutfitRecommendation to its items
+      • PRODUCES edges from WorkflowSteps to the new archetype nodes
+      • WISHLIST_CLOSES_GAP edges when a wishlist item could close a gap
+      • event_count metric on every OccasionType (calendar-derived)
+      • days_since_worn metric on every WardrobeItem (wear-history-
+        derived) + a small recency bonus to weight (worn in the last
+        14 days)
+      • mvp_score metric on WardrobeItem (versatility ≥ 3 + worn ≥ 3)
+    """
+    from datetime import datetime, timedelta
+
+    nodes_by_id = {n["id"]: n for n in nodes}
+    today = datetime.now()
+
+    # ── 1. days_since_worn + recency bonus on WardrobeItem ─────────
+    for n in nodes:
+        if n["type"] != "WardrobeItem":
+            continue
+        last_worn = (n.get("metrics") or {}).get("last_worn")
+        if not last_worn:
+            continue
+        try:
+            d = datetime.fromisoformat(last_worn[:10])
+            days = (today - d).days
+            n["metrics"]["days_since_worn"] = days
+            # Recency bonus: worn in last 14 days → +0.2 weight (capped 3.0)
+            if 0 <= days <= 14:
+                n["weight"] = round(min(3.0, float(n.get("weight", 1.0)) + 0.2), 2)
+        except Exception:
+            pass
+
+    # ── 2. MVP score (versatile + frequently worn) ─────────────────
+    for n in nodes:
+        if n["type"] != "WardrobeItem":
+            continue
+        m = n.get("metrics") or {}
+        if (m.get("versatility", 0) or 0) >= 3 and (m.get("worn_count", 0) or 0) >= 3:
+            m["mvp"] = True
+
+    # ── 3. Calendar event_count on OccasionType ────────────────────
+    def _events_from(blob):
+        if isinstance(blob, dict):
+            return blob.get("events") or []
+        if isinstance(blob, list):
+            return blob
+        return []
+    cal_events = _load_json(os.path.join(_ROOT, "calendar_events.json"),
+                            default=None)
+    seed_cal   = _load_json(os.path.join(_ROOT, "seed_calendar_events.json"),
+                            default=None)
+    all_events = _events_from(cal_events) + _events_from(seed_cal)
+    from collections import Counter
+    occ_counts = Counter()
+    try:
+        from styling_agent import OCCASION_TAG_MAP  # type: ignore
+    except Exception:
+        OCCASION_TAG_MAP = {}
+    for e in all_events:
+        # Calendar event tag may live under "type", "occasion", or
+        # "event_type" depending on the source (.ics import / manual).
+        tag = (e.get("type") or e.get("occasion") or
+               e.get("event_type") or "").lower().strip()
+        canon = OCCASION_TAG_MAP.get(tag, tag if tag in {"work","gym","dinner","formal","casual"} else None)
+        if canon:
+            occ_counts[canon] += 1
+    for occ, cnt in occ_counts.items():
+        nid = f"occasion:{occ}"
+        if nid in nodes_by_id:
+            nodes_by_id[nid]["metrics"]["event_count"] = cnt
+            # Small bump per event, capped
+            base = float(nodes_by_id[nid].get("weight", 1.0))
+            nodes_by_id[nid]["weight"] = round(min(3.0, base + 0.10 * cnt), 2)
+
+    # ── 4. WardrobeGap detection per (occasion, required_type) ─────
+    owned_by_pair: Dict[tuple, int] = {}
+    try:
+        from styling_agent import OCCASION_TAG_MAP, REQUIRED_PIECES  # type: ignore
+    except Exception:
+        return
+    for it in src["items"]:
+        t = (it.get("type") or "").lower()
+        if not t:
+            continue
+        canonical_tags = set()
+        for tag in (it.get("tags") or []):
+            canon = OCCASION_TAG_MAP.get(tag.lower())
+            if canon:
+                canonical_tags.add(canon)
+        for occ in canonical_tags:
+            owned_by_pair[(occ, t)] = owned_by_pair.get((occ, t), 0) + 1
+
+    gap_idx = 0
+    new_gap_nodes: List[Dict[str, Any]] = []
+    new_gap_edges: List[Dict[str, Any]] = []
+    for occ, required_types in REQUIRED_PIECES.items():
+        for t in set(required_types):
+            owned = owned_by_pair.get((occ, t), 0)
+            if owned == 0:
+                gid = f"gap:{occ}-{t}"
+                gap_idx += 1
+                new_gap_nodes.append({
+                    "id": gid,
+                    "type": "WardrobeGap",
+                    "layer": "runtime",
+                    "label": f"No {t} for {occ}",
+                    "weight": round(min(3.0, 1.5 + 0.1 * gap_idx), 2),
+                    "metrics": {
+                        "occasion":      occ,
+                        "missing_type":  t,
+                        "owned_count":   0,
+                    },
+                })
+                new_gap_edges.append({
+                    "from": f"occasion:{occ}", "to": gid,
+                    "type": "REQUIRES",   # the occasion still "requires" this
+                    "weight": 1.0,
+                    "metrics": {"gap": True},
+                })
+                new_gap_edges.append({
+                    "from": "step:3", "to": gid,
+                    "type": "PRODUCES",
+                    "weight": 1.0,
+                    "metrics": {},
+                })
+
+    # ── 5. WishlistItem closes a Gap ───────────────────────────────
+    for wish in src.get("wishlist") or []:
+        wt = (wish.get("category") or wish.get("type") or "").lower()
+        # match by linked_gap occasion or by item type
+        linked_occ = (wish.get("linked_gap") or "").lower()
+        wid = f"wishlist:{wish.get('id') or _slug(wish.get('name','wish'))}"
+        for g in new_gap_nodes:
+            gm = g.get("metrics") or {}
+            if (gm.get("missing_type") == wt) and (
+                not linked_occ or linked_occ == gm.get("occasion")
+            ):
+                new_gap_edges.append({
+                    "from": wid, "to": g["id"],
+                    "type": "WISHLIST_CLOSES_GAP",
+                    "weight": 1.0,
+                    "metrics": {},
+                })
+
+    # ── 6. OutfitRecommendation nodes from last 5 confirmed wears ──
+    hist = src["wear_history"] or {}
+    # Group by date — each unique wear-date with ≥ 2 items counts as an outfit
+    by_date: Dict[str, List[str]] = {}
+    for iid, h in hist.items():
+        if not isinstance(h, dict):
+            continue
+        d = (h.get("last_worn_date") or "")
+        if not d:
+            continue
+        by_date.setdefault(d, []).append(iid)
+    recent_dates = sorted(
+        [d for d, items in by_date.items() if len(items) >= 2],
+        reverse=True
+    )[:5]
+    new_outfit_nodes: List[Dict[str, Any]] = []
+    new_outfit_edges: List[Dict[str, Any]] = []
+    for idx, d in enumerate(recent_dates, start=1):
+        oid = f"outfit:{d}"
+        new_outfit_nodes.append({
+            "id": oid,
+            "type": "OutfitRecommendation",
+            "layer": "runtime",
+            "label": f"Outfit · {d}",
+            "weight": round(min(2.5, 1.0 + 0.2 * len(by_date[d])), 2),
+            "metrics": {"date": d, "piece_count": len(by_date[d])},
+        })
+        for iid in by_date[d]:
+            item_id = f"item:{iid}"
+            if item_id in nodes_by_id:
+                new_outfit_edges.append({
+                    "from": oid, "to": item_id,
+                    "type": "CONTAINS_ITEM",
+                    "weight": 1.0,
+                    "metrics": {},
+                })
+        new_outfit_edges.append({
+            "from": "step:5", "to": oid,
+            "type": "PRODUCES",
+            "weight": 1.0,
+            "metrics": {},
+        })
+
+    # Commit all new nodes + edges
+    nodes.extend(new_gap_nodes)
+    nodes.extend(new_outfit_nodes)
+    edges.extend(new_gap_edges)
+    edges.extend(new_outfit_edges)
+
+
 def build(include_user: bool = False) -> Dict[str, Any]:
     src = load_seed_sources(include_user=include_user)
     rule_packs, rules = _load_rule_packs_and_rules()
@@ -729,6 +932,13 @@ def build(include_user: bool = False) -> Dict[str, Any]:
     )
 
     all_nodes = aggregate_weights(all_nodes, edges)
+
+    # ── User-overlay enrichments — local-only, never on committed seed ──
+    # Adds WardrobeGap detection, recent OutfitRecommendation nodes,
+    # WISHLIST_CLOSES_GAP edges, days_since_worn freshness, calendar
+    # event-count rollups, and a small recency-bonus weight bump.
+    if include_user:
+        _enrich_with_user_signals(all_nodes, edges, src)
 
     # Sort for stable diffs across runs.
     all_nodes.sort(key=lambda n: (n["layer"], n["type"], n["id"]))
@@ -804,7 +1014,10 @@ def main() -> int:
     print(f"  edges:       {md['edge_count']}")
     print(f"  layers:      {md['layers']}")
     if args.include_user:
-        print("  ⚠ user overlay included — DO NOT commit this output.")
+        try:
+            print("  ⚠ user overlay included — DO NOT commit this output.")
+        except UnicodeEncodeError:
+            print("  [!] user overlay included -- DO NOT commit this output.")
     return 0
 
 

@@ -170,3 +170,147 @@ def render_wardrobe_knowledge_graph_section() -> None:
         )
     except Exception as e:
         st.error(f"Could not render the knowledge graph: {e}")
+
+
+def render_knowledge_graph_page() -> None:
+    """Dedicated 'Knowledge Graph' page (accessed from the user-menu
+    dropdown). Same viewer as the book, embedded full-bleed so the
+    user can explore the structured knowledge layer of their wardrobe.
+
+    Encoding (same as the book):
+      • Bigger circle = item worn more (worn_count × versatility roll-up)
+      • Bigger color circle = many items in that color family
+      • Bigger occasion/category circle = many items qualified for it
+      • Click a node → details panel · double-click → 1-hop highlight
+
+    Falls back to the public seed snapshot when the user-overlay
+    JSON hasn't been generated yet; offers a one-click regenerate.
+    """
+    import streamlit.components.v1 as components
+
+    # ── Page header ─────────────────────────────────────────────
+    st.markdown(
+        '<div style="margin-top:0.2rem; margin-bottom:1rem;">'
+        '  <div style="font-family:\'DM Serif Display\',serif; '
+        '              font-size:1.9rem; color:#1C1917; line-height:1.1;">'
+        'Knowledge Graph'
+        '  </div>'
+        '  <div style="font-size:0.86rem; color:#6E6E73; '
+        '              margin-top:0.35rem; max-width:62rem; line-height:1.55;">'
+        'Your closet as a structured-knowledge graph. <strong>Bigger '
+        'circles = signals you produced more of.</strong> A piece you '
+        "wore six times across three occasions grows. A color you keep "
+        "returning to grows. A category you've invested in (lots of "
+        'tops, lots of outerwear) grows. Domain rules and color-theory '
+        "edges stay quiet in the background so your behavior reads first."
+        '  </div>'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Choose data source ──────────────────────────────────────
+    user_kg = _read_json(_USER_JSON)
+    public_kg = _read_json(_PUBLIC_JSON)
+
+    if user_kg is None and public_kg is None:
+        st.info(
+            "Knowledge Graph data not found. Generate the public seed "
+            "with `python scripts/generate_wearly_kg.py`, then refresh."
+        )
+        return
+
+    use_user = user_kg is not None
+    kg = user_kg if use_user else public_kg
+    md = kg.get("metadata", {})
+
+    # ── Controls row ────────────────────────────────────────────
+    c1, c2, c3 = st.columns([2, 1, 1])
+    with c1:
+        src_label = ("your wardrobe overlay" if use_user
+                     else "public seed (Demo User)")
+        st.caption(
+            f"Showing **{md.get('node_count', '?')}** nodes · "
+            f"**{md.get('edge_count', '?')}** edges · "
+            f"source: *{src_label}* · "
+            f"version {md.get('version', '?')}"
+        )
+    with c2:
+        if st.button("Regenerate from my data",
+                     key="kgpage_regen_user",
+                     use_container_width=True,
+                     help="Re-runs the generator including your local "
+                          "wardrobe + wear history + rejection log."):
+            with st.spinner("Regenerating knowledge graph…"):
+                ok, msg = _regenerate_user_overlay()
+            if ok:
+                st.success(msg)
+                st.rerun()
+            else:
+                st.error(f"Regenerate failed: {msg}")
+    with c3:
+        if use_user and st.button("Use seed view",
+                                  key="kgpage_use_seed",
+                                  use_container_width=True,
+                                  help="Switch back to the public seed snapshot."):
+            try:
+                os.remove(_USER_JSON)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Could not remove overlay: {e}")
+
+    # ── Reading guide (matches the book's "What size means" sidebar) ──
+    with st.expander("What you can see in this graph", expanded=False):
+        st.markdown(
+            "**Size signals**\n\n"
+            "- **Worn-often items grow.** `WardrobeItem` size = "
+            "`1 + worn_count × 0.20 + versatility × 0.10`. A jacket "
+            "worn six times across three occasions reaches ~2.4×.\n"
+            "- **Heavy color families grow.** A `ColorFamily` node "
+            "rolls up the weights of every item that maps to it. A "
+            "closet that keeps returning to navy makes the navy "
+            "circle large.\n"
+            "- **Categories you've invested in grow.** Lots of tops? "
+            "The `Top` node is large. Lots of outerwear? Same.\n"
+            "- **Occasions you attend often grow.** Calendar events "
+            "of each type bump the `OccasionType` node — Work events "
+            "on the calendar push the Work circle bigger.\n"
+            "- **Recently worn items get a small bonus** (+0.2 if "
+            "worn in the last 14 days) so today's rotation reads "
+            "live.\n"
+            "- **MVP items** — versatility ≥ 3 *and* worn ≥ 3 — get "
+            "flagged in their metrics. Look for the items doing the "
+            "most work in your closet.\n\n"
+            "**Stories the graph tells**\n\n"
+            "- **`WardrobeGap` triangles** appear when an occasion "
+            "requires a type you don't own (e.g. no `outerwear` "
+            "tagged for `gym`). Click one to see the gap.\n"
+            "- **`WishlistItem` → `WardrobeGap`** edges connect a "
+            "saved-to-wishlist item to the gap it would close.\n"
+            "- **`OutfitRecommendation` nodes** appear for your "
+            "recent confirmed outfits — each one connects to the "
+            "items it contains via `CONTAINS_ITEM`.\n"
+            "- **`days_since_worn`** sits on each item's metrics — "
+            "items unworn for a long time stay small; recently-worn "
+            "items get the bonus.\n\n"
+            "**Domain layer stays quiet**\n\n"
+            "Rule packs, weather bands, and skin-tone palettes stay "
+            "at base size so the user-behavior layer reads first. "
+            "Every line is typed (`OWNS`, `HAS_COLOR`, "
+            "`SUITABLE_FOR`, `USES_RULE`, `POWERS`, "
+            "`WISHLIST_CLOSES_GAP`, …) — click a node and the side "
+            "panel lists all incoming and outgoing edges."
+        )
+
+    # ── Embed the viewer ────────────────────────────────────────
+    try:
+        html = _build_embed_html(kg)
+        # Slightly taller than the Wardrobe section since this is a
+        # dedicated page — give the graph plenty of room.
+        components.html(html, height=1080, scrolling=True)
+    except FileNotFoundError:
+        st.warning(
+            "Viewer template missing at "
+            "`docs/sims/wearly-knowledge-graph/main.html`."
+        )
+    except Exception as e:
+        st.error(f"Could not render the knowledge graph: {e}")
