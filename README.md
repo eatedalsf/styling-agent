@@ -136,20 +136,23 @@ Body-positive throughout. Every line of the reasoning trail can be traced to a `
 
 ---
 
-## Three graph layers — they answer different questions
+## The Wearly Knowledge Graph
 
-Wearly ships **three** interactive `vis-network` graphs. They sit at different altitudes of the same project and answer fundamentally different questions.
+Wearly ships an interactive `vis-network` Knowledge Graph at
+[Book → Wearly Knowledge Graph](https://eatedalsf.github.io/styling-agent/docs/sims/wearly-knowledge-graph/).
+It's the **structured-knowledge layer** — a three-layer model
+(domain rules + user-behavior aggregates + runtime archetypes) that
+captures *what Wearly knows about styling, this user, and the rules
+that connect them*. 91 nodes, 187 typed edges in the seed snapshot.
 
-| | **Learning Graph** | **Reasoning Graph** | **Wearly Knowledge Graph** |
-|---|---|---|---|
-| **Question** | *In what order should I learn Wearly's concepts?* | *How did the agent produce this specific outfit?* | *What does Wearly **know** about styling, this user, and the rules that connect them?* |
-| **What it models** | The reader's path through the Intelligent Book | The agent's runtime data for one recommendation | The reusable structured-knowledge layer: domain rules + user-behavior aggregates + runtime archetypes |
-| **Nodes are** | Concepts (28 total) | Entity instances (User, CalendarEvent, WardrobeItem, ...) — one run | Domain types + user-behavior aggregates + runtime archetypes (91 in the seed snapshot) |
-| **Edges are** | Prerequisites (*"understand A before B"*) | Typed relations from `graph/schema.md` | Typed relations across all three layers (`OWNS`, `REQUIRES`, `USES_RULE`, `POWERS`, `EVALUATES`, `CONTAINS_RULE`, ...) |
-| **Node size means** | Equal weight; Bloom level by color | Wear-count for items, piece-count for outfit | **Aggregated user signal** — heavier nodes carry more user activity (worn often, covers more occasions, items invested in this category) |
-| **Read it when** | You're trying to *learn* Wearly | You're auditing *one* recommendation | You're trying to *understand the structured knowledge under the agent* — or build a future RAG / LLM layer on top of it |
-| **Source file** | [`graph/learning-graph.json`](graph/learning-graph.json) | [`graph/graph.json`](graph/graph.json) + per-run dynamic graph | [`graph/wearly-knowledge-graph.json`](graph/wearly-knowledge-graph.json) (generated) |
-| **Generator** | hand-curated | per-run via `graph_tool.py` | [`scripts/generate_wearly_kg.py`](scripts/generate_wearly_kg.py) — deterministic, seed-only by default |
+| | **Wearly Knowledge Graph** |
+|---|---|
+| **Question it answers** | *What does Wearly know about styling, this user, and the rules that connect them?* |
+| **Nodes are** | Domain types + user-behavior aggregates + runtime archetypes (91 in the seed snapshot) |
+| **Edges are** | Typed relations across all three layers (`OWNS`, `REQUIRES`, `USES_RULE`, `POWERS`, `EVALUATES`, `CONTAINS_RULE`, ...) |
+| **Node size means** | **Aggregated user signal** — heavier nodes carry more user activity (worn often, covers more occasions, items invested in this category) |
+| **Source file** | [`graph/wearly-knowledge-graph.json`](graph/wearly-knowledge-graph.json) (generated, seed-only by default) |
+| **Generator** | [`scripts/generate_wearly_kg.py`](scripts/generate_wearly_kg.py) — deterministic |
 
 ### Why the Knowledge Graph is not decorative
 
@@ -178,14 +181,15 @@ The Knowledge Graph is the **substrate** the roadmap items in the next section s
 
 This is what "structure beats prompts" looks like in practice: structured knowledge guides the LLM rather than the LLM having to discover the structure inside free-text prompts.
 
-### How to view the three graphs
+### Where to view it
 
-| Graph | Where to view |
-|---|---|
-| Learning Graph | [Book → Learning Graph](https://eatedalsf.github.io/styling-agent/docs/sims/learning-graph/) |
-| Reasoning Graph (schema) | [Book → Reasoning Graph](https://eatedalsf.github.io/styling-agent/docs/sims/knowledge-graph/) |
-| Reasoning Graph (live per-recommendation) | Inside the app, expander below every outfit result |
-| **Wearly Knowledge Graph** | [Book → Wearly Knowledge Graph](https://eatedalsf.github.io/styling-agent/docs/sims/wearly-knowledge-graph/) |
+- **Book → Wearly Knowledge Graph**: <https://eatedalsf.github.io/styling-agent/docs/sims/wearly-knowledge-graph/>
+- **Inside the app**: at the bottom of the Wardrobe page as
+  *"Your wardrobe at a glance"*, optionally regenerated from your
+  own data via the **Regenerate from my data** button.
+- **Reasoning trail (per-recommendation)** still ships inside the app
+  as an expander below every outfit result — the per-run subgraph
+  that explains one specific decision.
 
 ---
 

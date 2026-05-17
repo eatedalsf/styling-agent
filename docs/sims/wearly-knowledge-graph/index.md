@@ -11,13 +11,10 @@
 > 91 nodes, 187 typed edges, generated deterministically from public
 > seed data by [`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py).
 >
-> **This is the third interactive graph in Wearly.** The
-> [Learning Graph](../learning-graph/index.md) teaches the reader the
-> book's concept order. The
-> [Reasoning Graph](../knowledge-graph/index.md) explains one specific
-> recommendation. **This graph** models the *structured knowledge*
+> **What this graph is for.** It models the *structured knowledge*
 > Wearly reasons over — reusable across users, queryable by future
-> LLM layers.
+> LLM layers. Big nodes = signals you produced more of; small nodes =
+> declared in the domain but unused.
 
 ### → [**Open the Knowledge Graph in full screen ↗**](main.html){target="_blank"}
 
@@ -89,7 +86,7 @@ The graph carries **20 typed relations**. The full catalog:
 | `HAS_WISHLIST_ITEM` | User | WishlistItem | Wants to acquire. |
 | `PREFERS` | User | ColorFamily | Aggregate preference signal. |
 
-### Runtime archetypes (the bridge to the Reasoning Graph)
+### Runtime archetypes (the bridge to live recommendations)
 
 | Edge | Source | Target | Meaning |
 |---|---|---|---|
@@ -168,7 +165,5 @@ the discovery layer.**
 
 ## See also
 
-- **[Learning Graph](../learning-graph/index.md)** — the *reader's* concept DAG.
-- **[Reasoning Graph](../knowledge-graph/index.md)** — the *runtime per-recommendation* entity model.
 - **[Skill package overview](../../../skills/wearly-styling-agent/SKILL.md)** — the eight rule packs the Knowledge Graph models.
 - **[Evidence & references](../../../docs/evidence-and-references.md)** — what informs the rules every `Rule` node represents.

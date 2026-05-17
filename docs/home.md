@@ -41,9 +41,8 @@ The repository itself: **[github.com/eatedalsf/styling-agent](https://github.com
 | **[Audit](docs/audit-2026-05.md)** | A consistency audit between the app and the book — every contract (numbers, vocabulary, rules) cross-checked. |
 | **[Evidence](docs/evidence-and-references.md)** | The canonical references document. Nine source categories every rule pack draws on, with verification status. |
 | **[Skills](skills/wearly-styling-agent/SKILL.md)** | The Wearly Styling Agent skill package — `SKILL.md` plus eight rule packs (occasion, weather, fit & silhouette, wardrobe filtering, color coordination, wear history, shopping gap, privacy). Every rule pack ends with a *Source basis* footer. |
-| **[Reasoning Graph](graph/schema.md)** | The runtime schema — nine entity types, seventeen relation types. The diagram view renders the graph as a Mermaid map; the running app renders it interactively per recommendation. |
-| **[Learning Graph](docs/sims/learning-graph/index.md)** | The book's concept DAG — 28 concepts, 39 prerequisite edges, every node Bloom-tagged. Hierarchical view by default; a "Suggested reading path" button highlights one canonical chain. |
-| **[MicroSims](docs/sims/index.md)** | Four interactive simulations: color harmony, wear-history freshness, reasoning graph, learning graph. Each one lets you try a rule by hand. |
+| **[Wearly Knowledge Graph](docs/sims/wearly-knowledge-graph/index.md)** | The three-layer structured-knowledge graph — domain, user behavior, runtime archetypes. 91 nodes, 187 typed edges. Click any node for details; double-click to highlight its 1-hop neighborhood. |
+| **[MicroSims](docs/sims/index.md)** | Interactive simulations: color harmony, wear-history freshness. Each one lets you try a rule by hand. |
 | **[Architecture](docs/architecture.md)** | System-level snapshot — code layout, tool boundaries, data files, dependencies. |
 | **[Project Vision](Wearly_Product_Brief.md)** | The product brief and the academic / course context that frames this project. |
 

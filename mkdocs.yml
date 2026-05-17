@@ -182,15 +182,6 @@ nav:
     - "Shopping gap rules": skills/wearly-styling-agent/shopping-gap-rules.md
     - "Privacy guidelines": skills/wearly-styling-agent/privacy-guidelines.md
 
-  - Reasoning Graph:
-    - "Schema": graph/schema.md
-    - "Diagram": graph/render.md
-    - "Interactive view": docs/sims/knowledge-graph/index.md
-    - "FAQ (library, sizes, colors, queries)": docs/knowledge-graph-faq.md
-
-  - Learning Graph:
-    - "Concept map (interactive)": docs/sims/learning-graph/index.md
-
   - Wearly Knowledge Graph:
     - "Structured knowledge (interactive)": docs/sims/wearly-knowledge-graph/index.md
     - "Schema":                              graph/wearly-knowledge-graph-schema.md

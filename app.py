@@ -4997,6 +4997,19 @@ def _render_wardrobe():
     # shipped (photo upload, product link import, wear history, item
     # editing). Removed — keeping them would be misleading.
 
+    # ── Knowledge-graph view of the closet ──────────────────────
+    # Plants the v0.4 Wearly Knowledge Graph viewer (same one rendered
+    # in the Intelligent Book) at the bottom of the Wardrobe page.
+    # The user can regenerate from their *own* wardrobe data via a
+    # button — the output goes to a gitignored local-only JSON so the
+    # committed public-seed snapshot is never touched.
+    try:
+        from wearly_kg_embed import render_wardrobe_knowledge_graph_section
+        render_wardrobe_knowledge_graph_section()
+    except Exception as _kg_err:
+        # Never let a viewer failure break the rest of the Wardrobe page.
+        st.caption(f"_Knowledge graph view unavailable: {_kg_err}_")
+
 
 
 
