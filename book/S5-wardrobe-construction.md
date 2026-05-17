@@ -25,7 +25,7 @@ because the styling literature treats dresses as a single-decision
 solution to formal events, and because rejecting a dress in favor of
 two separates inflates the chance of mismatch (color, formality, fit).
 
-The branch is rule-based, not learned. If no dress survives Step 4's
+The branch is rule-based and inspectable — every dress-vs-separates decision cites a named rule in the reasoning trail. If no dress survives Step 4's
 filter, the agent falls through to top + bottom; if a dress exists
 but the user has previously rejected dresses for this occasion, the
 agent also falls through.

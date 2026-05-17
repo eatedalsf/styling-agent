@@ -17,7 +17,7 @@ Wearly handles calendar events, location data, wardrobe photos (in production), 
 
 The privacy strip on the home and the privacy paragraph on the profile screen are both honest:
 
-> Your calendar, weather, wardrobe, and profile data are used only for outfit planning in this prototype. No accounts. No third parties.
+> Your calendar, weather, wardrobe, and profile data are used only for outfit planning, on this device. No accounts. No third parties.
 
 The single external network call is to Open-Meteo with a lat/lon (no user identifier). Open-Meteo's privacy policy is permissive; the call is unauthenticated and has no session.
 
@@ -94,4 +94,4 @@ The single external network call is to Open-Meteo with a lat/lon (no user identi
 2. *(Understand)* Why does Wearly cite GDPR if the prototype doesn't transmit data?
 3. *(Apply)* A user asks to delete all their Wearly data. Describe the exact steps in the prototype today.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

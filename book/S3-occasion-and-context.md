@@ -48,7 +48,7 @@ agent fall through to a formal top+bottom if no dress survives Step 4.
 A type missing from the candidate pool is what Step 6 detects as a
 *wardrobe gap* (see [§S7 · Honest gaps](S7-honest-gaps.md)).
 
-The mapping from free-text events to tags is rule-based, not learned.
+The mapping from free-text events to tags is rule-based and inspectable — every tag assignment has a named rule a reviewer can audit.
 A calendar entry titled *"Investor pitch"* maps to *work*; *"Sarah's
 wedding"* maps to *formal*; *"Gym class"* maps to *gym*. The agent
 falls back to *casual* whenever no signal in the event title resolves.
@@ -59,7 +59,7 @@ falls back to *casual* whenever no signal in the event title resolves.
   the *type-aware* axis of outfit compatibility — that a top, a
   bottom, and a shoe are different kinds of things that combine under
   different constraints. Wearly's `REQUIRED_PIECES` table uses that
-  exact axis, deterministically rather than learned.
+  exact axis as an inspectable lookup, so the type constraint is auditable per occasion.
   ⟶ [References [3]](../docs/references.md).
 - **Occasion-conditioned recommendation.** Han et al. (2017) treat an
   outfit as a sequence whose distribution depends on the wearer and

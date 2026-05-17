@@ -44,7 +44,7 @@ of the 25th ACM International Conference on Multimedia (MM '17)*.
 arXiv:[1707.05691](https://arxiv.org/abs/1707.05691).
 
 - *Supports*: [evidence § 3.2 Outfit compatibility](evidence-and-references.md);
-  the "Why rules, not ML" stance.
+  the "Why the reasoning core is inspectable rules" stance.
 - *Rule packs*: [`occasion-rules.md`](../skills/wearly-styling-agent/occasion-rules.md) (R3, dress-vs-separates).
 
 **[3]** Vasileva, M. I., Plummer, B. A., Dusad, K., Rajpal, S., Kumar, R.,

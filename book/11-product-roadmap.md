@@ -117,4 +117,4 @@ The phases are loose, not contractual. The roadmap exists to make trade-offs vis
 2. *(Understand)* Why is the result-dict contract called out as a stability anchor in the roadmap?
 3. *(Apply)* Pick a roadmap item. Identify one rule pack and one chapter that would need to change to land it.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

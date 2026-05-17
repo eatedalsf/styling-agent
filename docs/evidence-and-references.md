@@ -51,7 +51,7 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 - Fashion-specific recommendation work — search terms: *"outfit compatibility model," "fashion outfit recommendation," "set-based recommendation," "garment retrieval."*
 - The "Recommender Systems Handbook" (Ricci, Rokach, Shapira) is the standard reference text. `[to verify edition]`
 
-**Current basis.** Rule-based / content-based filtering. Wearly does *not* use collaborative filtering today (single-user prototype, no cross-user signal). The rule layer is intentional — see `book/04-styling-knowledge-base.md` for why rules over ML in this prototype.
+**Current basis.** Rule-based / content-based filtering. Wearly does *not* use collaborative filtering today (single-user scope today, no cross-user signal). The rule layer is intentional — see `book/04-styling-knowledge-base.md` for why the reasoning core is inspectable rules.
 
 **Verified citations.**
 
@@ -83,10 +83,10 @@ This pattern lets a future contributor pick any rule pack, find the relevant cat
 
 > **Cited:** Han, X., Wu, Z., Jiang, Y.-G., & Davis, L. S. (2017). Learning Fashion Compatibility with Bidirectional LSTMs. In *Proceedings of the 25th ACM International Conference on Multimedia (MM '17)*. arXiv:[1707.05691](https://arxiv.org/abs/1707.05691). Source for the widely-cited Polyvore outfit dataset.
 > **Claim it supports:** Outfit compatibility has been formalized as a learnable sequence task on real curated-outfit data. Wearly's rule layer is one alternative; this paper names the learned-model alternative we deliberately did not pursue.
-> **Relevant rule(s):** `occasion-rules.md` R3 (dress-vs-separates branching), `book/04-styling-knowledge-base.md` ("Why rules, not ML").
+> **Relevant rule(s):** `occasion-rules.md` R3 (dress-vs-separates branching), `book/04-styling-knowledge-base.md` ("Why the reasoning core is inspectable rules").
 
 > **Cited:** Vasileva, M. I., Plummer, B. A., Dusad, K., Rajpal, S., Kumar, R., & Forsyth, D. (2018). Learning Type-Aware Embeddings for Fashion Compatibility. In *Proceedings of the European Conference on Computer Vision (ECCV 2018)*. DOI: [10.1007/978-3-030-01270-0_24](https://doi.org/10.1007/978-3-030-01270-0_24). arXiv:[1803.09196](https://arxiv.org/abs/1803.09196).
-> **Claim it supports:** Item-type-aware embeddings improve outfit-compatibility prediction. Reinforces that *type* (top / bottom / shoes / accessory) is a meaningful axis — the same axis Wearly's REQUIRED_PIECES map uses, only deterministically rather than learned.
+> **Claim it supports:** Item-type-aware embeddings improve outfit-compatibility prediction. Reinforces that *type* (top / bottom / shoes / accessory) is a meaningful axis — the same axis Wearly's REQUIRED_PIECES map uses, only as an inspectable lookup.
 > **Relevant rule(s):** `occasion-rules.md` R2 (required piece-types).
 
 **Verification status.** `verified citations`.

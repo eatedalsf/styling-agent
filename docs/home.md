@@ -36,7 +36,7 @@ The repository itself: **[github.com/eatedalsf/styling-agent](https://github.com
 
 | Section | What you'll find |
 |---|---|
-| **[The Book](book/index.md)** | Three parts: Part I — twelve chapters explaining the Wearly agent (vision, user problem, seven-step workflow, knowledge base, wardrobe intelligence, fit-profile logic, calendar/weather context, shopping-gap logic, before/after, privacy, roadmap). Part II — eight Styling Rule Reference chapters teaching color, silhouette, occasion, weather/layering, wardrobe construction, freshness, honest gaps, and body-positive framing. Part III — evidence & provenance. |
+| **[The Book](book/index.md)** | Three parts: Part I — eleven chapters explaining the Wearly agent (vision, user problem, seven-step workflow, knowledge base, wardrobe intelligence, fit-profile logic, calendar/weather context, shopping-gap logic, before/after, privacy, roadmap). Part II — eight Styling Rule Reference chapters teaching color, silhouette, occasion, weather/layering, wardrobe construction, freshness, honest gaps, and body-positive framing. Part III — evidence & provenance. |
 | **[Glossary](docs/glossary.md)** + **[FAQ](docs/faq.md)** + **[References](docs/references.md)** | A project-wide glossary, a top-questions FAQ, and a numbered bibliography of every verified source the rules trace back to. |
 | **[Audit](docs/audit-2026-05.md)** | A consistency audit between the app and the book — every contract (numbers, vocabulary, rules) cross-checked. |
 | **[Evidence](docs/evidence-and-references.md)** | The canonical references document. Nine source categories every rule pack draws on, with verification status. |

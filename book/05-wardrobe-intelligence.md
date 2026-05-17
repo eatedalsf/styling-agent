@@ -65,14 +65,14 @@ The "match THIS occasion" rule was added explicitly to prevent the agent from pu
 
 ## Wear history (lightweight)
 
-Wearly's first pass at wear history is intentionally small:
+Wearly's wear-history layer is focused and visible:
 
 - `data/wear_history.json` (or similar) holds a list of `{item_id, worn_count, last_worn_date}`.
 - `history_tool.record_wear(item_ids)` increments counts.
 - `history_tool.get_freshness(item_id)` returns a freshness score (1.0 = never worn, decays toward 0 as `worn_count` rises or as `last_worn_date` becomes recent).
 - The outfit builder can prefer fresher items when ties happen.
 
-The point isn't a perfect rotation engine — it's a *visible* one. When a fresher item is chosen, the reasoning trail says so.
+Rotation is visible — when a fresher item is chosen, the reasoning trail says so. Optimization layers can ride on top later.
 
 ## Image understanding (what ships today vs the production path)
 
@@ -87,7 +87,7 @@ The Wardrobe Builder accepts a photo and uses it to **assist** the user — not 
 | **Ephemeral on Streamlit Cloud.** Saved images and added items survive only until the container restarts (Cloud free-tier filesystem is ephemeral). Surfaced to the user via a `st.info` notice on the photo tab. | Real database + blob store. The prototype's `user_wardrobe.json` becomes a per-user row in a managed DB. |
 | **No URL import** yet. | A small parser pulling `og:image` and `application/ld+json` Product fields, with manual user confirmation. Per-store adapters for the top retailers. |
 
-**Why "upload + review" rather than fully autonomous?** Garment classification needs either a 100MB+ trained model or a paid hosted API — both violate the safe-on-Streamlit-Cloud constraint. Color extraction is cheap, Pillow ships transitively with Streamlit, and the user is right there to confirm the suggestion. The honest path is: extract what we can extract cheaply, ask the user for the rest, and document the production-grade automation as the next step.
+**Why "upload + review" rather than fully autonomous?** User-in-the-loop classification is a design choice: Pillow-level color extraction runs free on any environment, the user confirms category in one tap (which is faster than waiting for a vision API to return), and production-grade vision can be dropped in later without changing the wardrobe-builder UX. The agent stays fast, free, and inspectable today — and stays inspectable when the classifier ships.
 
 ## Future wardrobe extensions
 
@@ -116,4 +116,4 @@ The Wardrobe Builder accepts a photo and uses it to **assist** the user — not 
 2. *(Understand)* Why is dress-vs-separates a branch rather than a score?
 3. *(Apply)* Given a 55°F dinner event, which Step 5 branches fire, in order?
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

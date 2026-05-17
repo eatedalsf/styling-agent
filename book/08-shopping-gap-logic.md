@@ -79,4 +79,4 @@ Live retailer scraping is out of scope. Per-store adapters with HTML/JSON-LD par
 2. *(Understand)* Why are shopping suggestions descriptive rather than promotional?
 3. *(Apply)* A user with no blazer attends a work meeting. Trace the gap from detection to the surfaced suggestion.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

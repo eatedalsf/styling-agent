@@ -97,8 +97,9 @@ to not crash the math.
   candidate pool because Step 4's seasonal filter excludes it. The
   frequency penalty doesn't reset between seasons.
 
-These are deliberate scope choices, not bugs. The rotation rule is
-small on purpose.
+These are deliberate scope choices. The rotation rule is focused:
+one freshness score, one floor, one tie-breaker — every decision
+visible in the reasoning trail.
 
 ## How Wearly applies this
 

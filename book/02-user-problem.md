@@ -59,4 +59,4 @@ The problem space is bounded on purpose. Within those bounds, the product is mea
 2. *(Understand)* Why is the 15-minute window itself a design constraint, not just a complaint?
 3. *(Apply)* Imagine a user with a 7am gym session and an 11am offsite interview. Which two context sources does Wearly read first, and in what order?
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

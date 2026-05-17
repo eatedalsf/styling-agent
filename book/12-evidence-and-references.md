@@ -122,4 +122,4 @@ Honest framing: citations name the *frameworks Wearly's rules draw on*. They do 
 2. *(Understand)* Why is the *Color Me Beautiful* framework deliberately *not* cited as science in §3.3?
 3. *(Apply)* Pick any reasoning line from a recent agent run. Trace its citation chip back to an evidence category.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

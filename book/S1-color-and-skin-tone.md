@@ -8,7 +8,7 @@ Wearly's color logic rests on the **warm / cool axis** — the design-school
 convention that classifies skin undertones and garment colors along the
 same warm-to-cool dimension and then asks how well a color sits with the
 wearer. The convention is centuries old; Wearly's implementation is the
-thin rule layer on top.
+rule layer that operationalizes the convention against an actual wardrobe.
 
 Three named palettes ship today:
 
@@ -28,9 +28,9 @@ for each item:
 score = clamp(score, 0, 100)
 ```
 
-That's the whole formula. Three lookups, one clamp. The +8 / +4 / −10
-asymmetry is a deliberate UX choice: a clash should cost more than a
-match adds, so the score is conservative.
+Three lookups, one clamp — every term visible in the reasoning trail.
+The +8 / +4 / −10 asymmetry is a deliberate UX choice: a clash should
+cost more than a match adds, so the score is conservative.
 
 ## Where this knowledge comes from
 

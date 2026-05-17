@@ -109,4 +109,4 @@ For the full evidence framing — what category supports the fit logic and what'
 2. *(Understand)* Why is `body_shape` framed as a *preference* rather than a *classification*?
 3. *(Apply)* A user leaves `body_shape` blank. Which proportion-related rules fire, and which don't?
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

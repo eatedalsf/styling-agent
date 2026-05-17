@@ -24,8 +24,7 @@ book is the reference layer that explains every other one.
 | **Book chapters** | The reasoning behind every step the app takes. | `book/01-vision.md` … `book/12-evidence-and-references.md` |
 | **Skill rules** | The operational rules the agent applies at runtime. | [`skills/wearly-styling-agent/`](../skills/wearly-styling-agent/SKILL.md) |
 | **Evidence & references** | The verified sources the rules trace back to. | [`docs/evidence-and-references.md`](../docs/evidence-and-references.md), [References](../docs/references.md) |
-| **Learning Graph** | The concept DAG that teaches the reader the path through the book. | [Learning Graph](../docs/sims/learning-graph/index.md) |
-| **Reasoning Graph** | The runtime entity model — what the agent knows and connects during a recommendation. | [Reasoning Graph](../docs/sims/knowledge-graph/index.md) |
+| **Wearly Knowledge Graph** | A three-layer structured-knowledge graph — domain rules + user-behavior aggregates + runtime archetypes. 91 nodes, 187 typed edges. | [Wearly Knowledge Graph](../docs/sims/wearly-knowledge-graph/index.md) |
 | **MicroSims** | Interactive widgets that let the reader try one rule or concept hands-on. | [MicroSims](../docs/sims/index.md) |
 
 A reader who only opens the app sees outcomes. A reader who only
@@ -43,8 +42,8 @@ a concept-graph–driven, MicroSim-equipped, evidence-citable companion to
 the running prototype. That framing is concrete — Wearly ships the
 artifacts a Level-2 book is expected to ship:
 
-- a **[concept learning graph](../docs/sims/learning-graph/index.md)** — 28 concepts, 39 prerequisite edges, every node Bloom-tagged (Remember → Understand → Apply → Analyze);
-- **[MicroSims](../docs/sims/index.md)** — small interactive simulations for color harmony, freshness, and the two graphs;
+- a **[Wearly Knowledge Graph](../docs/sims/wearly-knowledge-graph/index.md)** — a three-layer structured-knowledge graph (domain rules, user behavior, runtime archetypes), 91 nodes, 187 typed edges, deterministically generated from public seed data;
+- **[MicroSims](../docs/sims/index.md)** — small interactive simulations for color harmony, freshness, and the knowledge graph;
 - a project-wide **[Glossary](../docs/glossary.md)**, **[FAQ](../docs/faq.md)**, and **[References](../docs/references.md)**;
 - per-chapter **Key terms** and **Self-check** footers (Bloom-tiered);
 - a canonical **[`book-metadata.yml`](https://github.com/eatedalsf/styling-agent/blob/main/book-metadata.yml)** at the repo root.

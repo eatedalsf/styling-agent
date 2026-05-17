@@ -78,4 +78,4 @@ The Before / After screen earns 90 seconds in a 600-second talk — about 15% of
 2. *(Understand)* Why is *making the work visible* part of the value the demo claims — not just the time savings?
 3. *(Apply)* Sketch how a reviewer could falsify the time-savings claim in a 30-minute user test.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

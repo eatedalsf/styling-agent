@@ -38,10 +38,11 @@ The prototype is single-user and local-only.
 
 ### Is Wearly a real product or a course project?
 
-It's a working prototype built for SEIS 666 (Digital Transformation with
-AI) at the University of St. Thomas. The code runs; the documentation is
-the Intelligent Book you're reading; the citations are verified. It's
-not on a roadmap to commercial release in its current form.
+It's a working prototype built for SEIS 666 (Digital Transformation
+with AI) at the University of St. Thomas. The code runs, the
+documentation is the Intelligent Book you're reading, and the rule
+citations trace to verified sources. The roadmap chapter outlines
+what a production version would add.
 
 ### What does Wearly NOT do?
 
@@ -129,25 +130,33 @@ never leaves the device. See
 
 ## Knowledge graph
 
-### There are two graphs — what's the difference?
+### What is the Wearly Knowledge Graph?
 
-The **Reasoning Graph** (`graph/graph.json`, schema in
-[`graph/schema.md`](../graph/schema.md), viewer at
-[reasoning graph](sims/knowledge-graph/index.md)) models wardrobe items,
-outfits, and the agent's reasoning at runtime. The **Learning Graph**
-(`graph/learning-graph.json`, viewer at
-[learning graph](sims/learning-graph/index.md)) models the *reader's*
-path through this book — what concepts depend on what. Same library
-(vis-network.js), different purposes. The Reasoning Graph was called
-the "Knowledge Graph" in earlier drafts; the name was changed on display
-surfaces to avoid colliding with McCreary's *knowledge graph = concept
-graph* convention. File paths and the JSON are unchanged.
+The [**Wearly Knowledge Graph**](sims/wearly-knowledge-graph/index.md)
+is a three-layer structured-knowledge graph — **domain rules**,
+**user-behavior aggregates**, and **runtime archetypes** — generated
+deterministically by
+[`scripts/generate_wearly_kg.py`](https://github.com/eatedalsf/styling-agent/blob/main/scripts/generate_wearly_kg.py)
+into [`graph/wearly-knowledge-graph.json`](../graph/wearly-knowledge-graph.json).
+91 nodes, 187 typed edges in the seed snapshot. It's the structured
+context a future RAG or LLM shopping layer can query — every edge has
+a typed `from` / `to` / `type`, and the citation chain is traversable
+along graph hops.
 
-### Does the learning graph show Bloom levels?
+### What does a bigger circle mean?
 
-Yes. Every concept node carries a Bloom tag (Remember / Understand /
-Apply / Analyze) and you can filter by Bloom level in the sidebar of
-the interactive viewer.
+Aggregated user signal. An item you wear often grows; a color family
+your closet keeps returning to grows; an occasion you attend often
+grows. Domain archetypes (rule packs, weather bands, skin-tone palettes)
+stay at base size so the user-behavior layer reads first.
+
+### Where does the per-recommendation reasoning live?
+
+Inside the app, as an expander below every outfit result — a numbered
+reasoning trail that cites the specific rule (`<pack>#R<N>`) for each
+decision. That's the live, per-run reasoning surface; the Wearly
+Knowledge Graph is the structured-knowledge layer the runtime is
+reasoning against.
 
 ## How this book works
 

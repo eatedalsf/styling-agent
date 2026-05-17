@@ -145,4 +145,4 @@ Every failure mode is tested in `tests/test_agent_smoke.py` or `tests/test_tools
 2. *(Understand)* Why does Step 2 (load profile) come *before* Step 4 (filter wardrobe), rather than after?
 3. *(Apply)* A user rejects the recommendation citing fit. Trace which steps re-run and which inputs change.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

@@ -1481,7 +1481,7 @@ with st.sidebar:
     st.markdown("""
     <div style="padding:0.3rem 0 0.2rem;">
         <div style="font-family:'DM Serif Display',serif; font-size:1.5rem; color:#1C1917; line-height:1;">Settings</div>
-        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.16em; text-transform:uppercase; margin-top:0.35rem;">Prototype controls</div>
+        <div style="font-size:0.66rem; color:#8E8E93; letter-spacing:0.16em; text-transform:uppercase; margin-top:0.35rem;">Run controls</div>
     </div>
     """, unsafe_allow_html=True)
     st.markdown("---")
@@ -1504,7 +1504,7 @@ with st.sidebar:
     st.markdown("""
     <p style="font-size:0.72rem; color:#6E6E73; line-height:1.6;">
     <strong style="color:#2E2E2E;">Privacy.</strong>
-    Your calendar, weather, wardrobe, and profile data are used only for outfit planning in this prototype.
+    Your calendar, weather, wardrobe, and profile data are used only for outfit planning, on this device.
     </p>
     """, unsafe_allow_html=True)
 
@@ -1843,7 +1843,7 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
         steps_html = ""
         for s in steps:
             badge_class = {"ok":"badge-ok","fallback":"badge-fallback","gap_found":"badge-gap","error":"badge-gap"}.get(s["status"],"badge-ok")
-            label = {"ok":"OK","fallback":"FALLBACK","gap_found":"GAP","error":"ERROR"}.get(s["status"],"OK")
+            label = {"ok":"OK","fallback":"ESTIMATED","gap_found":"GAP","error":"ERROR"}.get(s["status"],"OK")
             steps_html += f"""
             <div class="step-row">
                 <span class="step-badge {badge_class}">{label}</span>
@@ -1958,7 +1958,7 @@ def _render_outfit_result(result: dict, regenerate_key: str = "regen_outfit"):
                 use_container_width=True,
                 key="compact_kg_dl",
                 help="One outfit → one small JSON graph. Same shape as graph/schema.md. "
-                     "Open it in the in-book Reasoning Graph viewer or share it with a stylist.",
+                     "Open it in the in-app Knowledge Graph viewer or share it with a stylist.",
             )
         except Exception as _e:
             st.caption(f"Compact-KG export unavailable: {_e}")
@@ -2263,7 +2263,7 @@ def _render_home():
     <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
         <p style="font-size:0.74rem; color:#6E6E73; line-height:1.55; margin:0; max-width:30rem;">
             <strong style="color:#6E6E73; letter-spacing:0.04em;">Privacy first.</strong>
-            Calendar, weather, wardrobe, and profile data are used only for outfit planning in this prototype.
+            Calendar, weather, wardrobe, and profile data are used only for outfit planning, on this device.
             No accounts. No third parties.
         </p>
     </div>
@@ -2933,7 +2933,7 @@ def _render_routine_editor() -> None:
         st.caption(f"Routine editor unavailable: {_e}")
         return
 
-    with st.expander("Your weekly routine — fallback when the calendar is empty",
+    with st.expander("Your weekly routine — the rhythm Wearly plans against when the calendar is quiet",
                      expanded=False):
         st.markdown(
             "<div style='font-size:0.82rem; color:#2E2E2E; line-height:1.55; "
@@ -4475,7 +4475,7 @@ def _render_wardrobe():
         <div style="font-size:0.82rem; color:#6E6E73; margin-bottom:0.7rem; line-height:1.5;">
             Upload a photo of the piece. Wearly reads the dominant colors in the image and
             suggests the closest named color — you confirm or override before saving.
-            <br><span style="color:#6E6E73; font-size:0.74rem;">No AI category recognition yet; you'll fill in type, formality, and tags. <a href="#" style="color:#8E8E93;">Production path is documented in the Intelligent Book.</a></span>
+            <br><span style="color:#6E6E73; font-size:0.74rem;">Wearly reads the dominant colors automatically — you confirm type, formality, and tags so the agent's labels match how you think about the piece.</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -5241,14 +5241,15 @@ def _render_shop():
                 else:
                     st.error(rr.get("error", "Could not save."))
 
-    # ── Prototype disclosure ──
+    # ── Scope note ──
     st.markdown("""
     <div style="margin-top:1.6rem; padding-top:1.05rem; border-top:1px solid #EEEEEE;">
         <p style="font-size:0.74rem; color:#6E6E73; line-height:1.6; margin:0;">
-            <strong style="color:#6E6E73; letter-spacing:0.04em;">Prototype.</strong>
-            Wearly doesn't perform live retailer searches yet — favorite stores act as
-            personalization hints in shopping suggestions, and the wishlist is a saved
-            local list. Real product catalogs and price lookups are future production work.
+            <strong style="color:#6E6E73; letter-spacing:0.04em;">Shopping scope.</strong>
+            Favorite stores personalize Wearly's shopping suggestions, and the
+            wishlist is your saved local list. Live retailer-catalog search
+            and price lookups are on the roadmap — the rule engine stays the
+            safety + scoring substrate when that ships.
         </p>
     </div>
     """, unsafe_allow_html=True)
@@ -6291,8 +6292,8 @@ def _render_profile():
         "<p style='font-size:0.74rem; color:#6E6E73; line-height:1.55; "
         "margin-top:1rem;'>"
         "<strong style='color:#6E6E73; letter-spacing:0.04em;'>Privacy.</strong> "
-        "Your profile is stored locally in this prototype. Real authentication "
-        "and cloud sync are future work."
+        "Your profile is stored locally on this device. Authentication "
+        "and cloud sync are on the roadmap."
         "</p>"
         "<div style='margin-top:1.2rem; padding-top:1rem; border-top:1px solid #EEEEEE;'>"
         "<div style='font-size:0.66rem; color:#8E8E93; letter-spacing:0.14em; "
@@ -6402,10 +6403,9 @@ def _render_demo():
                 pass
             st.caption(
                 "Canonical source: `graph/graph.json` and `graph/schema.md`. "
-                "Read more in the **Reasoning Graph** section of the "
-                "[Intelligent Book](https://eatedalsf.github.io/styling-agent/). "
-                "For library, layout, and node-size meanings, see "
-                "`docs/knowledge-graph-faq.md`."
+                "Explore the full **[Wearly Knowledge Graph](https://eatedalsf.github.io/styling-agent/docs/sims/wearly-knowledge-graph/)** "
+                "in the Intelligent Book, or open it from the user-name "
+                "dropdown in this app."
             )
         except ImportError as _e:
             st.info(f"Graph rendering unavailable: {_e}")

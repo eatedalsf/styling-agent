@@ -131,4 +131,4 @@ The connection between context and recommendation is **explicit in the reasoning
 2. *(Understand)* Why does Wearly classify by *tag* rather than passing the raw event title into the workflow?
 3. *(Apply)* Walk through the context Wearly assembles for a 70°F Saturday brunch with no calendar event set.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

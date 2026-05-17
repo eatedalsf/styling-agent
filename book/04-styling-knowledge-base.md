@@ -15,7 +15,7 @@
 > - Gaps → [§S7 · Honest gaps](S7-honest-gaps.md)
 > - Body-positive framing → [§S8 · Body-positive framing as a discipline](S8-body-positive-framing.md)
 
-Wearly's decisions aren't learned from photos — they're driven by a small, **inspectable knowledge base**. This chapter documents what's in it and why.
+Every Wearly decision traces to an **inspectable knowledge base** — three rule systems, eight rule packs, and a citation registry. This chapter documents what's in it and why.
 
 ## Three rule systems
 
@@ -57,34 +57,34 @@ Step 6 (gap check) compares the built outfit against this list. A missing requir
 - `cool fair` — navy, icy blue, lavender, silver, emerald, raspberry
 - `deep warm` — cobalt, emerald, bright red, gold, orange, purple
 
-The scoring formula is deliberately simple — base 60, +8 for `best`, +4 for `good`, −10 for `avoid`, clamped to 0–100. **It is more important that the score be readable than that it be sophisticated.** A reviewer can verify each item's contribution by inspecting the reasoning trail; a deep-learned color model would be neither explainable nor inspectable.
+The scoring formula is **intentionally transparent** — base 60, +8 for `best`, +4 for `good`, −10 for `avoid`, clamped to 0–100. Every contribution is visible in the reasoning trail; a reviewer can verify each item's score by inspection — a property a deep-learned color model would not have.
 
-## Why rules, not ML
+## Why the reasoning core is inspectable rules
 
-The course principle "structure beats volume" applies directly. A trained model would:
+The course principle "structure beats volume" applies directly. A learned compatibility model would:
 
-- be expensive to label,
+- need large labeled datasets to train,
 - be opaque ("the network said so"),
-- be impossible to debug from a reasoning trail,
-- not survive scrutiny in a 10-minute demo.
+- be impossible to trace from a reasoning line back to a citable rule,
+- prevent the body-positive language contract from being enforced at the prose layer.
 
-A small rule system, by contrast:
+A structured rule system, by contrast:
 
-- is fully visible in three JSON files and one Python module,
-- can be edited live during a demo to show the system adapting,
+- is fully visible across eight rule packs, the citation registry (`rule_refs.py`), and the [Wearly Knowledge Graph](../docs/sims/wearly-knowledge-graph/index.md) — every decision traces to a named rule,
+- can be edited at runtime — rule changes take effect on the next recommendation, with the new reasoning trail showing exactly what changed,
 - supports an audit trail without extra plumbing,
-- is the most defensible foundation for *adding* ML later (the rule outputs are training targets).
+- is the **strongest foundation for adding learned layers later** — the rule outputs become labeled training data for any future model, and the safety + scoring substrate stays in place underneath.
 
-## What the rules deliberately don't model (yet)
+## Next rule layers on the roadmap
 
 - **Body shape → silhouette** (Phase 3, fit profile).
 - **Modesty preferences** (Phase 3).
 - **Comfort and fabric** (Phase 4).
-- **Wear history** (Phase 4 — a small piece of this lands in this session).
+- **Wear history** (Phase 4 — a piece of this is shipped today).
 - **Cross-item color harmony** (currently per-item only).
 - **Brand affinity / aesthetic clusters** (Phase 5).
 
-Each of these is a future rule layer, not a future ML feature. The system's structure stays inspectable as it grows.
+Each is a future rule layer, not a future ML feature. The structure stays inspectable as it grows.
 
 ## What informs these rules
 
@@ -118,7 +118,7 @@ The honesty contract from chapter 12: Wearly says *"tends to work well,"* not *"
 ## Self-check
 
 1. *(Remember)* Name the three skin-tone palettes Wearly ships today.
-2. *(Understand)* Why does Wearly use rules rather than a learned compatibility model in this prototype?
+2. *(Understand)* Why is Wearly's reasoning core structured as inspectable rules, and what does that enable that a learned model could not?
 3. *(Apply)* Look up `occasion-rules.md` R2 in the skill pack. Which rule heading does it resolve to, and which chapter cites it?
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*

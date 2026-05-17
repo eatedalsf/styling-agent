@@ -495,6 +495,12 @@
   let ACTIVE_LEGEND_TYPE = null;   // null = no legend filter
 
   async function loadGraph() {
+    // When the viewer is embedded inside the Streamlit app, the host
+    // injects the graph JSON directly so the iframe doesn't need to
+    // fetch it (which would fail cross-origin). Honor that first.
+    if (typeof window !== "undefined" && window.__WEARLY_KG_DATA) {
+      return window.__WEARLY_KG_DATA;
+    }
     for (const p of candidatePaths) {
       try {
         const r = await fetch(p, {cache: "no-cache"});

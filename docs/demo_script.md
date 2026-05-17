@@ -174,8 +174,8 @@ Point to GitHub URL on the closing slide. Invite questions.
 
 | Q | A |
 |---|---|
-| "Is this really agentic if the runtime is deterministic Python instead of an LLM loop?" | Yes — and deliberately so. The agent surface (Skills + tool orchestration + reject loop) is standard agentic shape; the evaluator is rule-based for inspectability. Book ch 4 "Why rules, not ML" has the full answer. |
-| "Why not collaborative filtering / a learned outfit model?" | Privacy (single-user prototype, no cross-user signal) and explainability (a learned model can't cite a numbered rule). Han 2017 and Vasileva 2018 are named in §3.2 as the alternatives we deliberately did not pursue. |
+| "Is this really agentic if the runtime is deterministic Python instead of an LLM loop?" | Yes — and deliberately so. The agent surface (Skills + tool orchestration + reject loop) is standard agentic shape; the evaluator is rule-based for inspectability. Book ch 4 "Why the reasoning core is inspectable rules" has the full answer. |
+| "Why not collaborative filtering / a learned outfit model?" | Privacy (single-user scope today, no cross-user signal) and explainability (a learned model can't cite a numbered rule). Han 2017 and Vasileva 2018 are named in §3.2 as the alternatives we deliberately did not pursue. |
 | "How are the colors chosen?" | Three skin-tone palettes in `color_rules.json` informed by warm/cool color-theory convention. Itten 1961, Munsell 1905, and ISO 11664-4 are background frameworks; Wearly does not compute CIE distances at runtime. |
 | "Body shape feels reductive." | Agreed — and Wearly treats `body_shape` as a *user-declared proportion preference*, never an image-inferred classification. Hokka 2024 in *Fashion Practice* is cited in §3.4 for the inclusive-design framing. |
 | "What if the weather API is down?" | Documented seasonal fallback in `weather-rules.md` R6. The outfit still ships; the trail says so. |

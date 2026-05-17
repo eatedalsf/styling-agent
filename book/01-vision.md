@@ -53,4 +53,4 @@ That promise governs every design decision in the app: every screen must move th
 2. *(Understand)* Why does Wearly insist on the agent / chatbot distinction in its product vision?
 3. *(Apply)* Pick one item on the agent-not-chatbot list and identify the screen in the running app where it shows up.
 
-*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze) — the same tags used in the [Learning Graph](../docs/sims/learning-graph/index.md).*
+*Definitions live in the [Glossary](../docs/glossary.md). Self-check questions follow Bloom's taxonomy progression (Remember → Understand → Apply → Analyze).*
