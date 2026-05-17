@@ -90,11 +90,7 @@ desktop.ini
 # graph/wearly-knowledge-graph.json IS committed.
 graph/wearly-knowledge-graph.user.json
 
-# Node deps for the press-kit deck generator (PPTX-build tooling).
-# The deck itself + its source live alongside, but the npm install is
-# huge and noisy — rebuild on demand with `npm install` inside press-kit/.
-press-kit/node_modules/
-press-kit/package-lock.json
-# Local PDF previews of the deck (regenerable from PPTX in PowerPoint).
-press-kit/*.pdf
-press-kit/screenshots/
+# Press-kit — post-presentation deck, email template, LinkedIn captions,
+# screenshot shot list. Local-only personal sharing materials, never
+# committed.
+press-kit/
